@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/jira-core", "crates/jira"]
+resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }

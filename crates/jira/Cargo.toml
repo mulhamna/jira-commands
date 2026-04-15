@@ -1,0 +1,22 @@
+[package]
+name = "jira"
+version = "0.1.0"
+edition = "2021"
+description = "Jira CLI — terminal client for Atlassian Jira"
+license = "MIT"
+
+[[bin]]
+name = "jira"
+path = "src/main.rs"
+
+[dependencies]
+jira-core = { path = "../jira-core" }
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.29"
+crossterm = "0.28"
+inquire = "0.7"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+indicatif = "0.17"

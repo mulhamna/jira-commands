@@ -1,6 +1,6 @@
 [package]
 name = "jira-commands"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Jira CLI — terminal client for Atlassian Jira"
 license = "MIT"
@@ -14,7 +14,7 @@ name = "jira"
 path = "src/main.rs"
 
 [dependencies]
-jira-core = { path = "../jira-core", version = "0.1.0" }
+jira-core = { path = "../jira-core", version = "0.2.0" }
 clap = { version = "4", features = ["derive"] }
 ratatui = "0.29"
 crossterm = "0.28"
@@ -25,3 +25,4 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 indicatif = "0.17"
+open = "5"

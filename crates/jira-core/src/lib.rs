@@ -10,3 +10,4 @@ pub use client::{IssueType, JiraClient};
 pub use config::JiraConfig;
 pub use error::{JiraError, Result};
 pub use field_cache::FieldCache;
+pub use model::worklog::Worklog;

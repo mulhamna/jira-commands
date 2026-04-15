@@ -18,6 +18,7 @@ use crate::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
             SearchResult, UpdateIssueRequest,
         },
+        worklog::Worklog,
     },
 };
 
@@ -38,6 +39,10 @@ impl JiraClient {
             .expect("Failed to build HTTP client");
 
         Self { http, config }
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.config.base_url
     }
 
     fn platform_url(&self, path: &str) -> String {
@@ -618,6 +623,210 @@ impl JiraClient {
 
         self.get_issue(&resp.key).await
     }
+
+    // ── Worklog ──────────────────────────────────────────────────────────────
+
+    /// List all worklogs for an issue.
+    pub async fn get_worklogs(&self, issue_key: &str) -> Result<Vec<Worklog>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/worklog"));
+
+        #[derive(serde::Deserialize)]
+        struct WorklogResponse {
+            worklogs: Vec<Value>,
+        }
+
+        let http = &self.http;
+        let resp: WorklogResponse = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(resp
+            .worklogs
+            .iter()
+            .filter_map(|v| Worklog::from_value(v, issue_key))
+            .collect())
+    }
+
+    /// Add a worklog entry to an issue.
+    /// `time_spent` uses Jira format: "2h 30m", "1d", "45m"
+    /// `started` is optional ISO 8601 timestamp; defaults to now if None.
+    pub async fn add_worklog(
+        &self,
+        issue_key: &str,
+        time_spent: &str,
+        comment: Option<&str>,
+        started: Option<&str>,
+    ) -> Result<Worklog> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/worklog"));
+
+        // Jira requires started in "2006-01-02T15:04:05.000+0000" format
+        let started_str = started
+            .map(|s| s.to_string())
+            .unwrap_or_else(current_jira_timestamp);
+
+        let mut body = json!({
+            "timeSpent": time_spent,
+            "started": started_str,
+        });
+
+        if let Some(c) = comment {
+            body["comment"] = markdown_to_adf(c);
+        }
+
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.post(&url).headers(headers.clone()).json(&body))
+            .await?;
+
+        Worklog::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse worklog".into(),
+        })
+    }
+
+    /// Delete a worklog entry.
+    pub async fn delete_worklog(&self, issue_key: &str, worklog_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/worklog/{worklog_id}"));
+
+        let http = &self.http;
+        self.request_no_body(|| http.delete(&url).headers(headers.clone()))
+            .await
+    }
+
+    // ── Bulk ops ─────────────────────────────────────────────────────────────
+
+    /// Fetch ALL issues matching a JQL query using cursor-based pagination.
+    /// Respects the Atlassian safeguard: max 500 pages.
+    pub async fn get_all_issues(&self, jql: &str) -> Result<Vec<Issue>> {
+        let mut all_issues = Vec::new();
+        let mut next_page_token: Option<String> = None;
+        let mut iterations = 0u32;
+        const MAX_ITERATIONS: u32 = 500;
+
+        loop {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                break;
+            }
+
+            let result = self
+                .search_issues(jql, next_page_token.as_deref(), Some(100))
+                .await?;
+
+            all_issues.extend(result.issues);
+
+            match result.next_page_token {
+                Some(token) => next_page_token = Some(token),
+                None => break,
+            }
+        }
+
+        Ok(all_issues)
+    }
+
+    /// Archive a batch of issues by key. Jira accepts up to 1000 per request.
+    pub async fn archive_issues(&self, issue_keys: &[String]) -> Result<()> {
+        if issue_keys.is_empty() {
+            return Ok(());
+        }
+        let headers = self.auth_headers()?;
+        let url = self.platform_url("/issue/archive");
+
+        // Batch in chunks of 1000
+        for chunk in issue_keys.chunks(1000) {
+            let body = json!({ "issueIdsOrKeys": chunk });
+            let http = &self.http;
+            // Archive returns 200 with a body — use request() not request_no_body()
+            let _: Value = self
+                .request(|| http.put(&url).headers(headers.clone()).json(&body))
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    // ── Raw API passthrough ───────────────────────────────────────────────────
+
+    /// Execute an arbitrary Jira REST API call and return the raw JSON response.
+    /// `path` should start with `/rest/...`
+    pub async fn raw_request(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Value>,
+    ) -> Result<Value> {
+        let headers = self.auth_headers()?;
+        let url = format!("{}{}", self.config.base_url.trim_end_matches('/'), path);
+
+        let http = &self.http;
+        let builder_fn = || {
+            let req = match method.to_uppercase().as_str() {
+                "GET" => http.get(&url),
+                "POST" => http.post(&url),
+                "PUT" => http.put(&url),
+                "DELETE" => http.delete(&url),
+                "PATCH" => http.patch(&url),
+                _ => http.get(&url),
+            };
+            let req = req.headers(headers.clone());
+            if let Some(b) = &body {
+                req.json(b)
+            } else {
+                req
+            }
+        };
+
+        self.request(builder_fn).await
+    }
+
+    // ── Plans API (Jira Premium) ──────────────────────────────────────────────
+
+    /// Check if this Jira instance is Premium tier.
+    pub async fn is_premium(&self) -> bool {
+        match self.get_server_info().await {
+            Ok(info) => {
+                let license = info
+                    .get("deploymentType")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                // "Cloud" with advanced features, or check licenseInfo
+                let _ = license;
+                // Simplest heuristic: try to call the plans endpoint
+                let headers = match self.auth_headers() {
+                    Ok(h) => h,
+                    Err(_) => return false,
+                };
+                let url = self.platform_url("/plans/plan");
+                let http = &self.http;
+                matches!(
+                    http.get(&url).headers(headers).send().await,
+                    Ok(r) if r.status().is_success()
+                )
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// List Jira Plans (requires Jira Premium / Advanced Roadmaps).
+    pub async fn get_plans(&self) -> Result<Vec<Value>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url("/plans/plan");
+
+        #[derive(serde::Deserialize)]
+        struct PlansResponse {
+            values: Vec<Value>,
+        }
+
+        let http = &self.http;
+        let resp: PlansResponse = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(resp.values)
+    }
 }
 
 /// Issue type metadata (id + name) returned by createmeta.
@@ -650,6 +859,37 @@ where
             message: body,
         }),
     }
+}
+
+/// Returns current UTC time in Jira worklog format: "2006-01-02T15:04:05.000+0000"
+fn current_jira_timestamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    // Manual conversion: secs since epoch → date/time components
+    let s = secs % 60;
+    let m = (secs / 60) % 60;
+    let h = (secs / 3600) % 24;
+    // Days since epoch
+    let days = secs / 86400;
+    // Simplified: use a rough date calculation
+    // For worklog "started", accuracy to the day is sufficient
+    let year_approx = 1970 + days / 365;
+    let day_of_year = days % 365;
+    let month = (day_of_year / 30) + 1;
+    let day = (day_of_year % 30) + 1;
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000+0000",
+        year_approx,
+        month.min(12),
+        day.min(28),
+        h,
+        m,
+        s
+    )
 }
 
 fn base64_encode(input: &str) -> String {

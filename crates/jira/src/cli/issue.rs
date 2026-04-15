@@ -12,6 +12,7 @@ use jira_core::{
     FieldCache, IssueType, JiraClient,
 };
 use serde_json;
+use serde_json::Value;
 
 #[derive(Debug, Subcommand)]
 pub enum IssueCommand {
@@ -102,6 +103,78 @@ pub enum IssueCommand {
         #[arg(long)]
         required_only: bool,
     },
+    /// Worklog management (log time, list, delete)
+    Worklog {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        #[command(subcommand)]
+        command: WorklogCommand,
+    },
+    /// Transition all issues matching a JQL query in bulk
+    BulkTransition {
+        /// JQL query selecting the issues
+        #[arg(long)]
+        jql: String,
+        /// Transition name or ID to apply
+        #[arg(long)]
+        to: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Update fields on all issues matching a JQL query in bulk
+    BulkUpdate {
+        /// JQL query selecting the issues
+        #[arg(long)]
+        jql: String,
+        /// New assignee email
+        #[arg(long)]
+        assignee: Option<String>,
+        /// New priority
+        #[arg(long)]
+        priority: Option<String>,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Archive all issues matching a JQL query
+    Archive {
+        /// JQL query selecting issues to archive
+        #[arg(long)]
+        jql: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Guided interactive JQL query builder
+    Jql {
+        /// Run the generated JQL immediately
+        #[arg(long)]
+        run: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum WorklogCommand {
+    /// List worklogs for an issue
+    List,
+    /// Log time on an issue
+    Add {
+        /// Time spent (Jira format: "2h 30m", "1d", "45m")
+        #[arg(short, long)]
+        time: String,
+        /// Optional comment
+        #[arg(short, long)]
+        comment: Option<String>,
+    },
+    /// Delete a worklog entry
+    Delete {
+        /// Worklog ID
+        id: String,
+        /// Skip confirmation
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 pub async fn handle(
@@ -159,6 +232,18 @@ pub async fn handle(
             )
             .await
         }
+        IssueCommand::Worklog { key, command } => worklog(client, key, command).await,
+        IssueCommand::BulkTransition { jql, to, force } => {
+            bulk_transition(client, jql, to, force).await
+        }
+        IssueCommand::BulkUpdate {
+            jql,
+            assignee,
+            priority,
+            force,
+        } => bulk_update(client, jql, assignee, priority, force).await,
+        IssueCommand::Archive { jql, force } => archive(client, jql, force).await,
+        IssueCommand::Jql { run } => jql_builder(client, run).await,
     }
 }
 
@@ -783,8 +868,412 @@ fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
+// ─── worklog ─────────────────────────────────────────────────────────────────
+
+async fn worklog(client: JiraClient, key: String, cmd: WorklogCommand) -> Result<()> {
+    match cmd {
+        WorklogCommand::List => worklog_list(client, key).await,
+        WorklogCommand::Add { time, comment } => worklog_add(client, key, time, comment).await,
+        WorklogCommand::Delete { id, force } => worklog_delete(client, key, id, force).await,
+    }
+}
+
+async fn worklog_list(client: JiraClient, key: String) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching worklogs for {key}..."));
+    let logs = client
+        .get_worklogs(&key)
+        .await
+        .context("Failed to fetch worklogs")?;
+    spinner.finish_and_clear();
+
+    if logs.is_empty() {
+        println!("No worklogs found for {key}.");
+        return Ok(());
+    }
+
+    println!("{:<10} {:<20} {:<12} STARTED", "ID", "AUTHOR", "TIME");
+    println!("{}", "─".repeat(60));
+    for w in &logs {
+        println!(
+            "{:<10} {:<20} {:<12} {}",
+            w.id,
+            truncate(w.author.as_deref().unwrap_or("—"), 19),
+            w.time_spent,
+            &w.started[..10.min(w.started.len())]
+        );
+        if let Some(c) = &w.comment {
+            println!("           {}", c);
+        }
+    }
+    Ok(())
+}
+
+async fn worklog_add(
+    client: JiraClient,
+    key: String,
+    time: String,
+    comment: Option<String>,
+) -> Result<()> {
+    let spinner = spinner_new(format!("Logging {time} on {key}..."));
+    let log = client
+        .add_worklog(&key, &time, comment.as_deref(), None)
+        .await
+        .context("Failed to add worklog")?;
+    spinner.finish_and_clear();
+    println!(
+        "✓ Logged {} on {} (worklog id: {})",
+        log.time_spent, key, log.id
+    );
+    Ok(())
+}
+
+async fn worklog_delete(client: JiraClient, key: String, id: String, force: bool) -> Result<()> {
+    if !force {
+        let confirm = inquire::Confirm::new(&format!("Delete worklog {id} on {key}?"))
+            .with_default(false)
+            .prompt()
+            .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let spinner = spinner_new(format!("Deleting worklog {id}..."));
+    client
+        .delete_worklog(&key, &id)
+        .await
+        .context("Failed to delete worklog")?;
+    spinner.finish_and_clear();
+    println!("✓ Deleted worklog {id} from {key}");
+    Ok(())
+}
+
+// ─── bulk transition ──────────────────────────────────────────────────────────
+
+async fn bulk_transition(client: JiraClient, jql: String, to: String, force: bool) -> Result<()> {
+    let spinner = spinner_new("Fetching issues...");
+    let issues = client
+        .get_all_issues(&jql)
+        .await
+        .context("Failed to fetch issues")?;
+    spinner.finish_and_clear();
+
+    if issues.is_empty() {
+        println!("No issues found matching JQL.");
+        return Ok(());
+    }
+
+    println!("Found {} issues.", issues.len());
+
+    if !force {
+        let confirm = inquire::Confirm::new(&format!(
+            "Transition all {} issues to '{to}'?",
+            issues.len()
+        ))
+        .with_default(false)
+        .prompt()
+        .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    // Fetch available transitions from the first issue
+    let transitions = client
+        .get_transitions(&issues[0].key)
+        .await
+        .context("Failed to fetch transitions")?;
+
+    let transition_id = transitions
+        .iter()
+        .find(|t| {
+            t.get("id").and_then(|v| v.as_str()) == Some(&to)
+                || t.get("name")
+                    .and_then(|v| v.as_str())
+                    .map(|n| n.to_lowercase())
+                    == Some(to.to_lowercase())
+        })
+        .and_then(|t| t.get("id"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", to))?;
+
+    let pb = ProgressBar::new(issues.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.cyan} [{bar:40}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("=> "),
+    );
+
+    let mut ok = 0u64;
+    let mut failed: Vec<String> = Vec::new();
+
+    for issue in &issues {
+        pb.set_message(issue.key.clone());
+        match client.transition_issue(&issue.key, &transition_id).await {
+            Ok(_) => ok += 1,
+            Err(e) => failed.push(format!("{}: {}", issue.key, e)),
+        }
+        pb.inc(1);
+    }
+
+    pb.finish_and_clear();
+    println!("✓ Transitioned {ok}/{} issues to '{to}'", issues.len());
+    if !failed.is_empty() {
+        println!("✗ Failed ({}):", failed.len());
+        for f in &failed {
+            println!("  {f}");
+        }
+    }
+
+    Ok(())
+}
+
+// ─── bulk update ─────────────────────────────────────────────────────────────
+
+async fn bulk_update(
+    client: JiraClient,
+    jql: String,
+    assignee: Option<String>,
+    priority: Option<String>,
+    force: bool,
+) -> Result<()> {
+    if assignee.is_none() && priority.is_none() {
+        anyhow::bail!("Nothing to update. Use --assignee or --priority.");
+    }
+
+    let spinner = spinner_new("Fetching issues...");
+    let issues = client
+        .get_all_issues(&jql)
+        .await
+        .context("Failed to fetch issues")?;
+    spinner.finish_and_clear();
+
+    if issues.is_empty() {
+        println!("No issues found.");
+        return Ok(());
+    }
+
+    println!("Found {} issues.", issues.len());
+
+    if !force {
+        let confirm = inquire::Confirm::new(&format!("Update {} issues?", issues.len()))
+            .with_default(false)
+            .prompt()
+            .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let req = UpdateIssueRequest {
+        assignee: assignee.clone(),
+        priority: priority.clone(),
+        ..Default::default()
+    };
+
+    let pb = ProgressBar::new(issues.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.cyan} [{bar:40}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("=> "),
+    );
+
+    let mut ok = 0u64;
+    let mut failed: Vec<String> = Vec::new();
+
+    for issue in &issues {
+        pb.set_message(issue.key.clone());
+        match client.update_issue(&issue.key, req.clone()).await {
+            Ok(_) => ok += 1,
+            Err(e) => failed.push(format!("{}: {}", issue.key, e)),
+        }
+        pb.inc(1);
+    }
+
+    pb.finish_and_clear();
+    println!("✓ Updated {ok}/{} issues", issues.len());
+    if !failed.is_empty() {
+        println!("✗ Failed ({}):", failed.len());
+        for f in &failed {
+            println!("  {f}");
+        }
+    }
+
+    Ok(())
+}
+
+// ─── archive ─────────────────────────────────────────────────────────────────
+
+async fn archive(client: JiraClient, jql: String, force: bool) -> Result<()> {
+    let spinner = spinner_new("Fetching issues...");
+    let issues = client
+        .get_all_issues(&jql)
+        .await
+        .context("Failed to fetch issues")?;
+    spinner.finish_and_clear();
+
+    if issues.is_empty() {
+        println!("No issues found.");
+        return Ok(());
+    }
+
+    println!("Found {} issues.", issues.len());
+
+    if !force {
+        let confirm = inquire::Confirm::new(&format!(
+            "Archive {} issues? This cannot be undone.",
+            issues.len()
+        ))
+        .with_default(false)
+        .prompt()
+        .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let keys: Vec<String> = issues.iter().map(|i| i.key.clone()).collect();
+
+    let spinner = spinner_new(format!("Archiving {} issues...", keys.len()));
+    client
+        .archive_issues(&keys)
+        .await
+        .context("Failed to archive issues")?;
+    spinner.finish_and_clear();
+    println!("✓ Archived {} issues", keys.len());
+
+    Ok(())
+}
+
+// ─── jql builder ─────────────────────────────────────────────────────────────
+
+async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
+    println!("JQL Builder — press Enter to skip any field\n");
+
+    let project = Text::new("Project key (e.g. PROJ):")
+        .prompt_skippable()
+        .context("Failed to read project")?
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string());
+
+    let status_opts = vec![
+        "To Do",
+        "In Progress",
+        "In Review",
+        "Done",
+        "Blocked",
+        "(any)",
+    ];
+    let status_sel = Select::new("Status:", status_opts)
+        .prompt()
+        .context("Failed to read status")?;
+    let status = if status_sel == "(any)" {
+        None
+    } else {
+        Some(status_sel.to_string())
+    };
+
+    let assignee_opts = vec!["Me (currentUser)", "Unassigned", "Custom email", "(any)"];
+    let assignee_sel = Select::new("Assignee:", assignee_opts)
+        .prompt()
+        .context("Failed to read assignee")?;
+    let assignee = match assignee_sel {
+        "Me (currentUser)" => Some("currentUser()".to_string()),
+        "Unassigned" => Some("EMPTY".to_string()),
+        "Custom email" => {
+            let email = Text::new("Email:")
+                .prompt()
+                .context("Failed to read email")?;
+            Some(format!("\"{email}\""))
+        }
+        _ => None,
+    };
+
+    let priority_opts = vec!["Highest", "High", "Medium", "Low", "Lowest", "(any)"];
+    let priority_sel = Select::new("Priority:", priority_opts)
+        .prompt()
+        .context("Failed to read priority")?;
+    let priority = if priority_sel == "(any)" {
+        None
+    } else {
+        Some(priority_sel.to_string())
+    };
+
+    let order_opts = vec!["updated DESC", "created DESC", "priority DESC", "key ASC"];
+    let order = Select::new("Order by:", order_opts)
+        .prompt()
+        .context("Failed to read order")?;
+
+    // Build JQL
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(p) = project {
+        parts.push(format!("project = {p}"));
+    }
+    if let Some(s) = status {
+        parts.push(format!("status = \"{s}\""));
+    }
+    if let Some(a) = assignee {
+        parts.push(format!("assignee = {a}"));
+    }
+    if let Some(p) = priority {
+        parts.push(format!("priority = \"{p}\""));
+    }
+
+    if parts.is_empty() {
+        parts.push("assignee = currentUser()".to_string());
+    }
+
+    let jql = format!("{} ORDER BY {}", parts.join(" AND "), order);
+
+    println!("\nGenerated JQL:\n  {jql}\n");
+
+    if run {
+        let spinner = spinner_new("Searching...");
+        let result = client
+            .search_issues(&jql, None, Some(25))
+            .await
+            .context("Search failed")?;
+        spinner.finish_and_clear();
+
+        if result.issues.is_empty() {
+            println!("No issues found.");
+            return Ok(());
+        }
+
+        println!("{:<12} {:<8} {:<20} SUMMARY", "KEY", "TYPE", "STATUS");
+        println!("{}", "─".repeat(82));
+        for issue in &result.issues {
+            let summary = if issue.summary.len() > 38 {
+                format!("{}…", &issue.summary[..37])
+            } else {
+                issue.summary.clone()
+            };
+            println!(
+                "{:<12} {:<8} {:<20} {}",
+                issue.key,
+                truncate(&issue.issue_type, 7),
+                truncate(&issue.status, 19),
+                summary
+            );
+        }
+        if let Some(total) = result.total {
+            println!("\nShowing {} of {total}", result.issues.len());
+        }
+    }
+
+    Ok(())
+}
+
 // Keep old CreateIssueRequest available for any other callers
 #[allow(dead_code)]
 fn _use_old_request() {
     let _ = CreateIssueRequest::default();
+    let _: Option<Value> = None;
 }

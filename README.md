@@ -115,7 +115,7 @@ jira auth logout           # Remove credentials
 ### TUI
 
 ```bash
-jira tui                   # Launch for all assigned issues
+jira tui                   # Launch for assigned issues (currentUser)
 jira tui --project MYPROJ  # Launch for a specific project
 ```
 
@@ -123,10 +123,15 @@ jira tui --project MYPROJ  # Launch for a specific project
 
 | Key | Action |
 |---|---|
-| `↑` / `↓` | Navigate issue list |
+| `↑` / `k` | Move up |
+| `↓` / `j` | Move down |
 | `Enter` | View issue detail |
-| `q` | Quit / go back |
-| `?` | Help |
+| `t` | Transition issue (interactive picker) |
+| `o` | Open issue in browser |
+| `r` | Refresh list |
+| `/` | Search — type JQL, press Enter |
+| `?` | Help popup |
+| `q` / `Esc` | Quit / go back |
 
 ### Environment variables
 
@@ -245,9 +250,9 @@ The release workflow will:
 | Phase | Focus | Status |
 |---|---|---|
 | 1 — Foundation | Auth, config, HTTP client, issue CRUD, TUI | ✅ Done |
-| 2 — Custom fields & Attachments | Dynamic field introspection, file upload | Planned |
-| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog, JQL builder | Planned |
-| 4 — Power features | Plans API, archive, raw API passthrough | Planned |
+| 2 — Custom fields & Attachments | Dynamic field introspection, file upload | ✅ Done |
+| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog, JQL builder | ✅ Done |
+| 4 — Power features | Plans API, archive, raw API passthrough | ✅ Done |
 
 ---
 

@@ -80,7 +80,7 @@ jobs:
       - name: Publish jira-core
         run: cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
       # Wait for crates.io index before publishing binary that depends on jira-core
-      - run: sleep 30
+      - run: sleep 90
       - name: Publish jira-commands (binary crate)
         run: cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 

@@ -4,6 +4,8 @@ use figment::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use crate::error::{JiraError, Result};
 
@@ -65,6 +67,11 @@ impl JiraConfig {
 
         std::fs::write(&config_path, toml_str)
             .map_err(|e| JiraError::Config(format!("Failed to write config: {e}")))?;
+
+        // Restrict permissions to owner-only (rw-------) on Unix
+        #[cfg(unix)]
+        std::fs::set_permissions(&config_path, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| JiraError::Config(format!("Failed to set config permissions: {e}")))?;
 
         Ok(())
     }

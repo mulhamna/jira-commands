@@ -128,7 +128,7 @@ async fn list_issues(
     } else if let Some(proj) = &project {
         format!("project = {proj} ORDER BY updated DESC")
     } else {
-        "ORDER BY updated DESC".to_string()
+        "assignee = currentUser() ORDER BY updated DESC".to_string()
     };
 
     let spinner = ProgressBar::new_spinner();

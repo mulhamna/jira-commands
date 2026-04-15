@@ -26,7 +26,6 @@ pub struct App {
     issues: Vec<Issue>,
     table_state: TableState,
     mode: Mode,
-    status_message: String,
 }
 
 impl App {
@@ -39,14 +38,11 @@ impl App {
             issues,
             table_state,
             mode: Mode::List,
-            status_message: String::new(),
         }
     }
 
     fn selected_issue(&self) -> Option<&Issue> {
-        self.table_state
-            .selected()
-            .and_then(|i| self.issues.get(i))
+        self.table_state.selected().and_then(|i| self.issues.get(i))
     }
 
     fn next(&mut self) {
@@ -214,7 +210,8 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
             Cell::from(issue.key.clone()).style(Style::default().fg(Color::Cyan)),
             Cell::from(issue.issue_type.clone()),
             Cell::from(issue.priority.clone().unwrap_or_else(|| "-".into())),
-            Cell::from(issue.status.clone()).style(Style::default().fg(status_color(&issue.status))),
+            Cell::from(issue.status.clone())
+                .style(Style::default().fg(status_color(&issue.status))),
             Cell::from(issue.assignee.clone().unwrap_or_else(|| "-".into())),
             Cell::from(summary),
         ];
@@ -239,7 +236,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
             .borders(Borders::ALL)
             .title(format!(" Issues ({}) ", app.issues.len())),
     )
-    .highlight_style(
+    .row_highlight_style(
         Style::default()
             .bg(Color::DarkGray)
             .add_modifier(Modifier::BOLD),
@@ -254,53 +251,58 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect) {
         return;
     };
 
-    let mut lines: Vec<Line> = Vec::new();
-
-    lines.push(Line::from(vec![
-        Span::styled(
-            issue.key.clone(),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" — "),
-        Span::styled(issue.summary.clone(), Style::default().add_modifier(Modifier::BOLD)),
-    ]));
-
-    lines.push(Line::from(""));
-    lines.push(field_line("Type", &issue.issue_type));
-    lines.push(field_line("Status", &issue.status));
-    lines.push(field_line("Project", &issue.project_key));
-
-    if let Some(p) = &issue.priority {
-        lines.push(field_line("Priority", p));
-    }
-    if let Some(a) = &issue.assignee {
-        lines.push(field_line("Assignee", a));
-    }
-    if let Some(r) = &issue.reporter {
-        lines.push(field_line("Reporter", r));
-    }
-
     let created = &issue.created[..10.min(issue.created.len())];
     let updated = &issue.updated[..10.min(issue.updated.len())];
-    lines.push(field_line("Created", created));
-    lines.push(field_line("Updated", updated));
 
-    if let Some(desc) = &issue.description {
-        let text = jira_core::adf::adf_to_text(desc);
-        if !text.is_empty() {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Description:",
-                Style::default().add_modifier(Modifier::UNDERLINED),
-            )));
-            lines.push(Line::from(""));
-            for line in text.lines() {
-                lines.push(Line::from(format!("  {line}")));
+    // Build static lines first, then extend with conditional ones
+    #[allow(clippy::vec_init_then_push)]
+    let lines: Vec<Line> = {
+        let mut v = vec![
+            Line::from(vec![
+                Span::styled(
+                    issue.key.clone(),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" — "),
+                Span::styled(
+                    issue.summary.clone(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(""),
+            field_line("Type", &issue.issue_type),
+            field_line("Status", &issue.status),
+            field_line("Project", &issue.project_key),
+        ];
+        if let Some(p) = &issue.priority {
+            v.push(field_line("Priority", p));
+        }
+        if let Some(a) = &issue.assignee {
+            v.push(field_line("Assignee", a));
+        }
+        if let Some(r) = &issue.reporter {
+            v.push(field_line("Reporter", r));
+        }
+        v.push(field_line("Created", created));
+        v.push(field_line("Updated", updated));
+        if let Some(desc) = &issue.description {
+            let text = jira_core::adf::adf_to_text(desc);
+            if !text.is_empty() {
+                v.push(Line::from(""));
+                v.push(Line::from(Span::styled(
+                    "Description:",
+                    Style::default().add_modifier(Modifier::UNDERLINED),
+                )));
+                v.push(Line::from(""));
+                for line in text.lines() {
+                    v.push(Line::from(format!("  {line}")));
+                }
             }
         }
-    }
+        v
+    };
 
     let paragraph = Paragraph::new(lines)
         .block(
@@ -322,14 +324,20 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled("List View:", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled(
+            "List View:",
+            Style::default().fg(Color::Yellow),
+        )),
         Line::from("  ↑ / k     — Move up"),
         Line::from("  ↓ / j     — Move down"),
         Line::from("  Enter     — View issue detail"),
         Line::from("  ?         — Show this help"),
         Line::from("  q / Esc   — Quit"),
         Line::from(""),
-        Line::from(Span::styled("Detail View:", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled(
+            "Detail View:",
+            Style::default().fg(Color::Yellow),
+        )),
         Line::from("  Esc / Bsp — Back to list"),
         Line::from("  ?         — Show this help"),
         Line::from("  q         — Quit"),
@@ -347,7 +355,9 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         .title(" Help ")
         .style(Style::default().bg(Color::Black));
 
-    let paragraph = Paragraph::new(help_text).block(block).wrap(ratatui::widgets::Wrap { trim: false });
+    let paragraph = Paragraph::new(help_text)
+        .block(block)
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(paragraph, popup_area);
 }

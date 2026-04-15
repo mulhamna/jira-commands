@@ -75,11 +75,17 @@ pub enum IssueCommand {
     },
 }
 
-pub async fn handle(cmd: IssueCommand, client: JiraClient, default_project: Option<String>) -> Result<()> {
+pub async fn handle(
+    cmd: IssueCommand,
+    client: JiraClient,
+    default_project: Option<String>,
+) -> Result<()> {
     match cmd {
-        IssueCommand::List { project, jql, limit } => {
-            list_issues(client, project.or(default_project), jql, limit).await
-        }
+        IssueCommand::List {
+            project,
+            jql,
+            limit,
+        } => list_issues(client, project.or(default_project), jql, limit).await,
         IssueCommand::View { key } => view_issue(client, key).await,
         IssueCommand::Create {
             project,
@@ -208,8 +214,14 @@ async fn view_issue(client: JiraClient, key: String) -> Result<()> {
     if let Some(reporter) = &issue.reporter {
         println!("  Reporter:   {reporter}");
     }
-    println!("  Created:    {}", &issue.created[..10.min(issue.created.len())]);
-    println!("  Updated:    {}", &issue.updated[..10.min(issue.updated.len())]);
+    println!(
+        "  Created:    {}",
+        &issue.created[..10.min(issue.created.len())]
+    );
+    println!(
+        "  Updated:    {}",
+        &issue.updated[..10.min(issue.updated.len())]
+    );
 
     if let Some(desc) = &issue.description {
         let text = jira_core::adf::adf_to_text(desc);

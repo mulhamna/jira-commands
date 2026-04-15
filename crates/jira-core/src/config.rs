@@ -40,13 +40,12 @@ impl JiraConfig {
             figment = figment.merge(Toml::file(&config_path));
         }
 
-        figment = figment
-            .merge(Env::prefixed("JIRA_").map(|key| match key.as_str() {
-                "url" => "base_url".into(),
-                "email" => "email".into(),
-                "token" => "token".into(),
-                other => other.into(),
-            }));
+        figment = figment.merge(Env::prefixed("JIRA_").map(|key| match key.as_str() {
+            "url" => "base_url".into(),
+            "email" => "email".into(),
+            "token" => "token".into(),
+            other => other.into(),
+        }));
 
         figment
             .extract()

@@ -13,7 +13,10 @@ use crate::{
     error::{JiraError, Result},
     model::{
         field::Field,
-        issue::{CreateIssueRequest, Issue, RawIssue, RawSearchResponse, SearchResult, UpdateIssueRequest},
+        issue::{
+            CreateIssueRequest, Issue, RawIssue, RawSearchResponse, SearchResult,
+            UpdateIssueRequest,
+        },
     },
 };
 
@@ -37,20 +40,28 @@ impl JiraClient {
     }
 
     fn platform_url(&self, path: &str) -> String {
-        format!("{}{}{}", self.config.base_url.trim_end_matches('/'), PLATFORM_BASE, path)
+        format!(
+            "{}{}{}",
+            self.config.base_url.trim_end_matches('/'),
+            PLATFORM_BASE,
+            path
+        )
     }
 
     #[allow(dead_code)]
     fn agile_url(&self, path: &str) -> String {
-        format!("{}{}{}", self.config.base_url.trim_end_matches('/'), AGILE_BASE, path)
+        format!(
+            "{}{}{}",
+            self.config.base_url.trim_end_matches('/'),
+            AGILE_BASE,
+            path
+        )
     }
 
     fn auth_headers(&self) -> Result<HeaderMap> {
-        let token = self
-            .config
-            .token
-            .as_deref()
-            .ok_or_else(|| JiraError::Auth("No token configured. Run `jira auth login` first.".into()))?;
+        let token = self.config.token.as_deref().ok_or_else(|| {
+            JiraError::Auth("No token configured. Run `jira auth login` first.".into())
+        })?;
 
         let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
         let auth_value = format!("Basic {credentials}");
@@ -100,7 +111,10 @@ impl JiraClient {
     }
 
     /// Core request method for responses with no body (204 No Content).
-    async fn request_no_body(&self, builder_fn: impl Fn() -> reqwest::RequestBuilder) -> Result<()> {
+    async fn request_no_body(
+        &self,
+        builder_fn: impl Fn() -> reqwest::RequestBuilder,
+    ) -> Result<()> {
         let mut attempt = 0u32;
         loop {
             attempt += 1;
@@ -166,11 +180,7 @@ impl JiraClient {
 
         let http = &self.http;
         let raw: RawSearchResponse = self
-            .request(|| {
-                http.post(&url)
-                    .headers(headers.clone())
-                    .json(&body)
-            })
+            .request(|| http.post(&url).headers(headers.clone()).json(&body))
             .await?;
 
         Ok(SearchResult {
@@ -198,10 +208,7 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
 
-        let description_adf = req
-            .description
-            .as_deref()
-            .map(markdown_to_adf);
+        let description_adf = req.description.as_deref().map(markdown_to_adf);
 
         let mut fields = json!({
             "project": { "key": req.project_key },
@@ -263,10 +270,8 @@ impl JiraClient {
         let body = json!({ "fields": fields });
 
         let http = &self.http;
-        self.request_no_body(|| {
-            http.put(&url).headers(headers.clone()).json(&body)
-        })
-        .await
+        self.request_no_body(|| http.put(&url).headers(headers.clone()).json(&body))
+            .await
     }
 
     /// Delete an issue.
@@ -357,10 +362,8 @@ impl JiraClient {
         });
 
         let http = &self.http;
-        self.request_no_body(|| {
-            http.post(&url).headers(headers.clone()).json(&body)
-        })
-        .await
+        self.request_no_body(|| http.post(&url).headers(headers.clone()).json(&body))
+            .await
     }
 
     /// Get available transitions for an issue.
@@ -415,13 +418,29 @@ fn base64_encode(input: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         let b0 = bytes[i] as u32;
-        let b1 = if i + 1 < bytes.len() { bytes[i + 1] as u32 } else { 0 };
-        let b2 = if i + 2 < bytes.len() { bytes[i + 2] as u32 } else { 0 };
+        let b1 = if i + 1 < bytes.len() {
+            bytes[i + 1] as u32
+        } else {
+            0
+        };
+        let b2 = if i + 2 < bytes.len() {
+            bytes[i + 2] as u32
+        } else {
+            0
+        };
 
         let _ = write!(result, "{}", CHARS[((b0 >> 2) & 0x3F) as usize] as char);
-        let _ = write!(result, "{}", CHARS[(((b0 & 0x3) << 4) | ((b1 >> 4) & 0xF)) as usize] as char);
+        let _ = write!(
+            result,
+            "{}",
+            CHARS[(((b0 & 0x3) << 4) | ((b1 >> 4) & 0xF)) as usize] as char
+        );
         if i + 1 < bytes.len() {
-            let _ = write!(result, "{}", CHARS[(((b1 & 0xF) << 2) | ((b2 >> 6) & 0x3)) as usize] as char);
+            let _ = write!(
+                result,
+                "{}",
+                CHARS[(((b1 & 0xF) << 2) | ((b2 >> 6) & 0x3)) as usize] as char
+            );
         } else {
             result.push('=');
         }

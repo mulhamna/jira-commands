@@ -1,0 +1,31 @@
+# Build output
+/target/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment / secrets
+.env
+.env.local
+*.env
+
+# Editor backup
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Config lokal (jangan commit token/credential)
+config.local.toml

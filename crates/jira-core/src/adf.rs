@@ -105,10 +105,7 @@ fn render_list(node: &Value, out: &mut String, depth: usize, ordered: bool) {
 
 /// Convert Markdown text to ADF JSON.
 pub fn markdown_to_adf(markdown: &str) -> Value {
-    use comrak::{
-        nodes::{AstNode, NodeValue},
-        parse_document, Arena, Options,
-    };
+    use comrak::{parse_document, Arena, Options};
 
     let arena = Arena::new();
     let options = Options::default();
@@ -125,7 +122,7 @@ pub fn markdown_to_adf(markdown: &str) -> Value {
 }
 
 fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) {
-    use comrak::nodes::NodeValue;
+    use comrak::nodes::{ListType, NodeValue};
 
     match &node.data.borrow().value {
         NodeValue::Document => {
@@ -156,23 +153,7 @@ fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) 
                 "content": inline_content
             }));
         }
-        NodeValue::BulletList => {
-            let mut items: Vec<Value> = Vec::new();
-            for child in node.children() {
-                let mut item_content: Vec<Value> = Vec::new();
-                convert_node(child, &mut item_content);
-                items.push(json!({
-                    "type": "listItem",
-                    "content": item_content
-                }));
-            }
-            out.push(json!({
-                "type": "bulletList",
-                "content": items
-            }));
-        }
         NodeValue::List(list) => {
-            use comrak::nodes::ListType;
             let mut items: Vec<Value> = Vec::new();
             for child in node.children() {
                 let mut item_content: Vec<Value> = Vec::new();
@@ -261,10 +242,7 @@ fn collect_inline<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>
                 collect_inline(child, &mut inner);
             }
             for mut item in inner {
-                let marks = item
-                    .get("marks")
-                    .cloned()
-                    .unwrap_or_else(|| json!([]));
+                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
                 let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
                 marks_arr.push(json!({ "type": "strong" }));
                 item["marks"] = json!(marks_arr);
@@ -277,10 +255,7 @@ fn collect_inline<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>
                 collect_inline(child, &mut inner);
             }
             for mut item in inner {
-                let marks = item
-                    .get("marks")
-                    .cloned()
-                    .unwrap_or_else(|| json!([]));
+                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
                 let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
                 marks_arr.push(json!({ "type": "em" }));
                 item["marks"] = json!(marks_arr);
@@ -294,10 +269,7 @@ fn collect_inline<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>
             }
             let url = link.url.clone();
             for mut item in inner {
-                let marks = item
-                    .get("marks")
-                    .cloned()
-                    .unwrap_or_else(|| json!([]));
+                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
                 let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
                 marks_arr.push(json!({
                     "type": "link",

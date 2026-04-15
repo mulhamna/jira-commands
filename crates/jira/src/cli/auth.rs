@@ -36,10 +36,12 @@ async fn login() -> Result<()> {
         .prompt()
         .context("Failed to read email")?;
 
-    let token = Password::new("API token (from https://id.atlassian.com/manage-profile/security/api-tokens):")
-        .with_display_mode(PasswordDisplayMode::Masked)
-        .prompt()
-        .context("Failed to read token")?;
+    let token = Password::new(
+        "API token (from https://id.atlassian.com/manage-profile/security/api-tokens):",
+    )
+    .with_display_mode(PasswordDisplayMode::Masked)
+    .prompt()
+    .context("Failed to read token")?;
 
     // Save to keyring
     Auth::save_token(&email, &token).context("Failed to save token to keyring")?;

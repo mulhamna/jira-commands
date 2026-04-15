@@ -1,0 +1,32 @@
+{
+  "name": "jira-commands",
+  "owner": {
+    "name": "mulhamna",
+    "email": ""
+  },
+  "metadata": {
+    "description": "Claude Code plugin for Jira — manage issues, worklogs, transitions, and more from within Claude Code.",
+    "version": "0.3.0"
+  },
+  "plugins": [
+    {
+      "name": "jira",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/mulhamna/jira-commands.git",
+        "path": "plugin",
+        "ref": "main"
+      },
+      "description": "Manage Jira issues from Claude Code — list, view, create, transition, worklog, bulk ops, and raw API passthrough. Requires `cargo install jira-commands`.",
+      "version": "0.3.0",
+      "author": {
+        "name": "mulhamna"
+      },
+      "homepage": "https://github.com/mulhamna/jira-commands",
+      "repository": "https://github.com/mulhamna/jira-commands",
+      "license": "MIT",
+      "keywords": ["jira", "atlassian", "project-management", "issue-tracker"],
+      "category": "productivity"
+    }
+  ]
+}

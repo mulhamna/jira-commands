@@ -1,8 +1,9 @@
 [package]
 name = "jira-commands"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Jira CLI — terminal client for Atlassian Jira"
+readme = "README.md"
 license = "MIT"
 repository = "https://github.com/mulhamna/jira-commands"
 homepage = "https://github.com/mulhamna/jira-commands"
@@ -14,7 +15,7 @@ name = "jira"
 path = "src/main.rs"
 
 [dependencies]
-jira-core = { path = "../jira-core", version = "0.2.0" }
+jira-core = { path = "../jira-core", version = "0.3.0" }
 clap = { version = "4", features = ["derive"] }
 ratatui = "0.29"
 crossterm = "0.28"

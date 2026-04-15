@@ -603,3 +603,4 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 | 2026-04-15 | Rename crate binary dari "jira" ke "jira-commands" (nama "jira" sudah dipakai di crates.io) |
 | 2026-04-15 | Phase 2 selesai — FieldKind/FieldValue, FieldCache, attachment upload, `issue attach`, `issue fields`, create dengan dynamic field prompts |
 | 2026-04-15 | Phase 3 & 4 selesai — worklog CRUD, bulk transition/update, archive, JQL builder, `jira api` raw passthrough, `jira plan list`; versi bump ke 0.2.0 |
+| 2026-04-15 | Tambah Claude Code plugin di `plugin/` — 9 skills (list, view, create, transition, worklog, bulk-transition, attach, jql, api); versi bump ke 0.3.0 |

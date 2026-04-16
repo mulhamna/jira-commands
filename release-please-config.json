@@ -2,30 +2,19 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
 
   "include-component-in-tag": false,
-  "separate-pull-requests": false,
-
-  "plugins": [
-    {
-      "type": "linked-versions",
-      "groupName": "jira",
-      "components": ["jira-core", "jira-commands"]
-    }
-  ],
 
   "packages": {
-    "crates/jira-core": {
-      "release-type": "rust",
-      "component": "jira-core"
-    },
     "crates/jira": {
       "release-type": "rust",
       "component": "jira-commands",
       "extra-files": [
         {
           "type": "json",
-          "path": "plugin/.claude-plugin/plugin.json",
+          "path": "../../plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
-        }
+        },
+        "../jira-core/Cargo.toml",
+        "Cargo.toml"
       ]
     }
   }

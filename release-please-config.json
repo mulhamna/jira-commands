@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "jira-commands",
+      "include-component-in-tag": false,
+      "include-v-in-tag": true,
+
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "crates/jira-core/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "crates/jira/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "crates/jira/Cargo.toml",
+          "jsonpath": "$.dependencies.jira-core.version"
+        },
+        {
+          "type": "json",
+          "path": "plugin/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

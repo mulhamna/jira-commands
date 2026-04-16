@@ -1,0 +1,79 @@
+name: Security
+
+# Runs on every PR (to catch backdoors before merge) and weekly on main
+# (to catch newly published CVEs in existing deps).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. CVE scan (rustsec advisory database) ───────────────────────────────
+  cargo-audit:
+    name: cargo audit (CVE scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write  # rustsec/audit-check opens issues for new CVEs
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: rustsec/audit-check@dd51754d4e59da7395a4cd9b593f0ff2d61a9b95 # v1.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 2. License, ban, and source policy ───────────────────────────────────
+  cargo-deny:
+    name: cargo deny (license + ban + sources)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: EmbarkStudios/cargo-deny-action@91bf2b620e09e18d6eb78b92e7861937469acedb # v2
+        with:
+          command: check all
+
+  # ── 3. OpenSSF Scorecard (supply-chain health) ────────────────────────────
+  # Scores the repo on: branch protection, CI, dependency pinning, token perms,
+  # signed releases, dangerous workflows, etc.
+  # Results appear in the GitHub Security tab as SARIF alerts.
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only run on push to main — scorecard needs write access not available to
+    # fork PRs, and the results are repo-level, not per-PR.
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF to Security tab
+      id-token: write         # publish results to deps.dev
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@62b2cac7ed8198b15735ed49ab1e5cf35480ba46 # v2.4.0
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scorecard-sarif
+          path: scorecard-results.sarif
+          retention-days: 5
+
+      - uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a # v3
+        with:
+          sarif_file: scorecard-results.sarif

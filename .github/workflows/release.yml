@@ -1,20 +1,34 @@
 name: Release
 
+# ── SHA PINNING REMINDER ─────────────────────────────────────────────────────
+# All actions below use version tags. Pin to commit SHA for supply-chain
+# hardening. Dependabot will keep pins updated via weekly PRs.
+#   npx pin-github-action@latest .github/workflows/release.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
-permissions:
-  contents: write
+# No global permissions — each job declares only what it needs.
+permissions: {}
+
+# Prevent two releases from running in parallel (e.g. two rapid tag pushes)
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false  # never cancel a release mid-flight
 
 jobs:
   # ── 0. Validate tag matches Cargo.toml version ────────────────────────────
   validate-tag:
     name: Validate tag vs Cargo.toml
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Verify tag matches Cargo.toml version
         run: |
@@ -37,7 +51,7 @@ jobs:
         run: |
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          PLUGIN_VER=$(python3 -c "import json,sys; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
+          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
           if [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
             echo "ERROR: Version mismatch before release!"
@@ -60,7 +74,13 @@ jobs:
     name: Build (${{ matrix.target }})
     needs: validate-tag
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      attestations: write  # for build provenance
+      id-token: write      # for sigstore/OIDC
     strategy:
+      fail-fast: false  # build all platforms even if one fails
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -80,21 +100,21 @@ jobs:
             artifact: jira-windows-x86_64.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: ${{ matrix.target }}
 
       - name: Install Zig + cargo-zigbuild (Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          pip3 install ziglang --break-system-packages
+          pip3 install ziglang==0.14.0 --break-system-packages
           cargo install cargo-zigbuild --locked
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
       - name: Build (zigbuild — Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -113,39 +133,71 @@ jobs:
         shell: pwsh
         run: Copy-Item target/${{ matrix.target }}/release/jira.exe ${{ matrix.artifact }}
 
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: ${{ matrix.artifact }}
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
+          if-no-files-found: error
 
+  # ── 2. Publish to crates.io ───────────────────────────────────────────────
   publish-crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     needs: build-binaries
+    timeout-minutes: 15
+    # Requires a GitHub Environment named "production" with required reviewers.
+    # Set up at: Settings → Environments → New environment → production
+    environment: production
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
       - name: Publish jira-core
         run: cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      # Wait for crates.io index before publishing binary that depends on jira-core
-      - run: sleep 90
+
+      - name: Wait for jira-core to appear in crates.io index
+        run: |
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Waiting for jira-core v${VERSION} to be indexed..."
+          for i in $(seq 1 24); do
+            if cargo search jira-core 2>/dev/null | grep -q "^jira-core = \"${VERSION}\""; then
+              echo "✓ jira-core v${VERSION} is live in crates.io index"
+              exit 0
+            fi
+            echo "  attempt $i/24 — sleeping 15s..."
+            sleep 15
+          done
+          echo "ERROR: jira-core v${VERSION} not found in index after 6 minutes."
+          exit 1
+
       - name: Publish jira-commands (binary crate)
         run: cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
+  # ── 3. Create GitHub Release ──────────────────────────────────────────────
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-binaries, publish-crates]
+    timeout-minutes: 10
+    permissions:
+      contents: write  # only this job needs to write to repo/releases
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts/
 
-      - name: Generate checksums
+      - name: Generate SHA-256 checksums
         run: |
           cd artifacts
           for dir in */; do
@@ -153,9 +205,11 @@ jobs:
             sha256sum "$file/$file" >> ../checksums.txt 2>/dev/null || \
             sha256sum "$file/$file.exe" >> ../checksums.txt 2>/dev/null || true
           done
+          echo "=== checksums.txt ==="
+          cat ../checksums.txt
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
           files: |

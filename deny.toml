@@ -1,0 +1,63 @@
+# cargo-deny configuration
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# Deny crates with known security vulnerabilities
+vulnerability = "deny"
+# Warn on unmaintained crates (may silently accumulate CVEs)
+unmaintained = "warn"
+# Deny yanked crates (yanked = maintainer pulled it, often due to a bug/vuln)
+yanked = "deny"
+notice = "warn"
+# Ignore advisories only when there is no fix available AND you have documented why
+ignore = []
+
+[licenses]
+# Only allow OSI/FSF-approved permissive licenses.
+# Copyleft (GPL, AGPL, LGPL) is denied — this is a CLI tool, not a library
+# shipped inside another product, but we keep it clean for downstream users
+# who embed jira-core.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "ISC",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Unicode-DFS-2016",
+  "Unicode-3.0",
+  "Zlib",
+  "CC0-1.0",
+  "OpenSSL",
+]
+unlicensed = "deny"
+copyleft = "deny"
+allow-osi-fsf-free = "neither"
+default = "deny"
+# Confidence threshold for license detection (0.0–1.0)
+confidence-threshold = 0.8
+exceptions = []
+
+[bans]
+# Warn if the same crate appears at multiple versions in the dep tree.
+# Use `skip` below to allowlist known unavoidable duplicates.
+multiple-versions = "warn"
+# Deny wildcard dep specs (e.g. dep = "*") — they are unpinnable and risky
+wildcards = "deny"
+highlight = "all"
+
+# Deny crates known to be malicious or dangerous
+deny = []
+
+# Known unavoidable duplicate versions (add here only after investigation)
+skip = []
+skip-tree = []
+
+[sources]
+# Only allow crates from the official registry and git sources explicitly listed.
+# This prevents dependency confusion attacks via unofficial registries.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Add git sources here only for crates not yet on crates.io:
+allow-git = []

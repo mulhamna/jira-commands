@@ -1,0 +1,25 @@
+# CODEOWNERS — every PR requires approval from @mulhamna
+#
+# GitHub enforces this when branch protection is configured with
+# "Require review from Code Owners". Set up at:
+#   Settings → Branches → Branch protection rules → main
+#   ✓ Require a pull request before merging
+#   ✓ Require approvals (1)
+#   ✓ Require review from Code Owners
+#   ✓ Require status checks to pass (CI / Security)
+#   ✓ Do not allow bypassing the above settings
+
+# Default owner for everything
+* @mulhamna
+
+# CI/CD workflows — extra sensitive, must always be reviewed by owner
+.github/ @mulhamna
+
+# Core library and binary source
+crates/ @mulhamna
+
+# Release configuration — version bumps and publish rules
+release-please-config.json @mulhamna
+.release-please-manifest.json @mulhamna
+deny.toml @mulhamna
+Cargo.toml @mulhamna

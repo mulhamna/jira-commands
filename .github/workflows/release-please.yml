@@ -1,0 +1,59 @@
+name: Release Please
+
+# ── HOW THIS WORKS ────────────────────────────────────────────────────────────
+# 1. Every push to main is analyzed for Conventional Commits.
+# 2. release-please creates/updates a "Release PR" that:
+#      - Bumps versions in both Cargo.toml files AND plugin.json
+#      - Updates CHANGELOG.md
+# 3. When you (the owner) merge the Release PR:
+#      - release-please pushes a git tag (e.g. v0.5.0)
+#      - That tag triggers release.yml → builds binaries, publishes to crates.io
+#
+# You NEVER need to manually bump versions, update CHANGELOG, or push tags.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ⚠️  REQUIRED SETUP: Personal Access Token (PAT)
+# ─────────────────────────────────────────────────────────────────────────────
+# The default GITHUB_TOKEN cannot trigger other workflows (GitHub safety rule).
+# Without a PAT, release-please creates the tag but release.yml never runs.
+#
+# One-time setup:
+#   1. Go to: https://github.com/settings/personal-access-tokens/new
+#   2. Create a fine-grained PAT scoped to this repo with these permissions:
+#         - Contents: Read and write
+#         - Pull requests: Read and write
+#   3. Add it as repo secret: Settings → Secrets → Actions → New secret
+#         Name:  RELEASE_PLEASE_TOKEN
+#         Value: <paste the PAT>
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write       # push version-bump commits + tags
+  pull-requests: write  # create/update the Release PR
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
+        id: release
+        with:
+          # Use PAT so that the pushed tag triggers release.yml.
+          # Falls back to GITHUB_TOKEN if RELEASE_PLEASE_TOKEN is not set yet,
+          # in which case you'll need to manually re-push the tag to trigger release.yml.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

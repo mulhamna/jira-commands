@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # ── Rust dependencies ──────────────────────────────────────────────────────
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - rust
+    # Group all non-breaking Rust dep updates into a single weekly PR
+    # to avoid noise. Breaking changes (major bumps) remain separate.
+    groups:
+      rust-deps:
+        patterns: ["*"]
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── GitHub Actions ────────────────────────────────────────────────────────
+  # Dependabot will update action references AND pin them to full commit SHAs,
+  # which satisfies the supply-chain hardening requirement automatically.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Asia/Jakarta"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types:
+          - "minor"
+          - "patch"

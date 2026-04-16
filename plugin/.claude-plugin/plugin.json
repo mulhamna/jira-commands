@@ -1,6 +1,6 @@
 {
   "name": "jira",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Jira CLI integration for Claude Code — create, list, view, transition, and manage Jira issues directly from Claude Code. Requires jira-commands CLI to be installed (`cargo install jira-commands`).",
   "author": {
     "name": "mulhamna",
@@ -9,5 +9,10 @@
   "repository": "https://github.com/mulhamna/jira-commands",
   "homepage": "https://github.com/mulhamna/jira-commands",
   "license": "MIT",
-  "keywords": ["jira", "atlassian", "project-management", "issue-tracker"]
+  "keywords": [
+    "jira",
+    "atlassian",
+    "project-management",
+    "issue-tracker"
+  ]
 }

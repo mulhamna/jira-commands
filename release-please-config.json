@@ -1,6 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
 
+  "include-component-in-tag": false,
+  "separate-pull-requests": false,
+
   "plugins": [
     {
       "type": "linked-versions",
@@ -12,13 +15,11 @@
   "packages": {
     "crates/jira-core": {
       "release-type": "rust",
-      "component": "jira-core",
-      "changelog-path": "../../CHANGELOG.md"
+      "component": "jira-core"
     },
     "crates/jira": {
       "release-type": "rust",
       "component": "jira-commands",
-      "changelog-path": "../../CHANGELOG.md",
       "extra-files": [
         {
           "type": "json",

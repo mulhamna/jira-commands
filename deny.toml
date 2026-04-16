@@ -1,23 +1,21 @@
 # cargo-deny configuration
 # Docs: https://embarkstudios.github.io/cargo-deny/
+#
+# Uses cargo-deny 0.16+ format (opt-in via `version = 2` markers).
+# Deprecated fields (vulnerability, notice, yanked, unlicensed, copyleft,
+# allow-osi-fsf-free, default) have been removed — their behavior is now
+# controlled implicitly by cargo-deny defaults in v2 mode.
 
 [advisories]
-# Deny crates with known security vulnerabilities
-vulnerability = "deny"
-# Check all deps for unmaintained status (new format in cargo-deny 0.16+)
-# Valid values: "all", "workspace", "transitive", "none"
+version = 2
+# Scope of unmaintained check: "all", "workspace", "transitive", "none"
 unmaintained = "all"
-# Deny yanked crates (yanked = maintainer pulled it, often due to a bug/vuln)
-yanked = "deny"
-notice = "warn"
-# Ignore advisories only when there is no fix available AND you have documented why
+# Advisory IDs to ignore (add with a comment justification)
 ignore = []
 
 [licenses]
-# Only allow OSI/FSF-approved permissive licenses.
-# Copyleft (GPL, AGPL, LGPL) is denied — this is a CLI tool, not a library
-# shipped inside another product, but we keep it clean for downstream users
-# who embed jira-core.
+version = 2
+# Only these licenses are allowed — anything else is denied by default in v2
 allow = [
   "MIT",
   "Apache-2.0",
@@ -30,35 +28,24 @@ allow = [
   "Zlib",
   "CC0-1.0",
   "OpenSSL",
+  "MPL-2.0",
 ]
-unlicensed = "deny"
-copyleft = "deny"
-allow-osi-fsf-free = "neither"
-default = "deny"
-# Confidence threshold for license detection (0.0–1.0)
 confidence-threshold = 0.8
 exceptions = []
 
 [bans]
-# Warn if the same crate appears at multiple versions in the dep tree.
-# Use `skip` below to allowlist known unavoidable duplicates.
+# Warn if the same crate appears at multiple versions in the dep tree
 multiple-versions = "warn"
 # Deny wildcard dep specs (e.g. dep = "*") — they are unpinnable and risky
 wildcards = "deny"
 highlight = "all"
-
-# Deny crates known to be malicious or dangerous
 deny = []
-
-# Known unavoidable duplicate versions (add here only after investigation)
 skip = []
 skip-tree = []
 
 [sources]
-# Only allow crates from the official registry and git sources explicitly listed.
-# This prevents dependency confusion attacks via unofficial registries.
+# Deny crates from unknown registries — prevents dependency confusion attacks
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# Add git sources here only for crates not yet on crates.io:
 allow-git = []

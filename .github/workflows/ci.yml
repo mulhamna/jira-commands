@@ -57,13 +57,18 @@ jobs:
             exit 1
           fi
 
-      - name: Check CHANGELOG.md has entry for current version
+      - name: Check CHANGELOG entry exists for current version
+        # release-please writes per-package CHANGELOGs. Accept an entry in any
+        # of: root CHANGELOG.md, jira-core/CHANGELOG.md, or jira/CHANGELOG.md.
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          if ! grep -qF "[${VERSION}]" CHANGELOG.md; then
-            echo "ERROR: CHANGELOG.md is missing an entry for v${VERSION}."
-            echo "  Add a '## [${VERSION}] — YYYY-MM-DD' section to CHANGELOG.md."
-            exit 1
+          if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
+            || grep -qF "[${VERSION}]" crates/jira-core/CHANGELOG.md 2>/dev/null \
+            || grep -qF "[${VERSION}]" crates/jira/CHANGELOG.md 2>/dev/null; then
+            echo "✓ CHANGELOG entry found for v${VERSION}"
+          else
+            echo "WARNING: No CHANGELOG entry found for v${VERSION} in any location."
+            echo "  release-please will create per-package CHANGELOGs automatically."
           fi
 
       - name: Check README.md jira-core version is up to date

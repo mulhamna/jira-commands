@@ -16,21 +16,26 @@ permissions:
 
 jobs:
   # ── 1. CVE scan (rustsec advisory database) ───────────────────────────────
+  # Uses plain shell commands instead of rustsec/audit-check action to avoid
+  # GitHub Issues creation (which requires elevated token scopes and fails on
+  # repos where Issues are disabled).
   cargo-audit:
     name: cargo audit (CVE scan)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write  # rustsec/audit-check opens issues for new CVEs
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: rustsec/audit-check@dd51754d4e59da7395a4cd9b593f0ff2d61a9b95 # v1.4.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # Disable issue creation — avoids "Resource not accessible by integration"
-          # error when GitHub Issues is disabled or token scope is limited.
-          create-issues: false
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit
+        # Fails on known vulnerabilities (CVE) in the advisory db.
+        # Warnings (unmaintained / unsound) do NOT fail the build — those are
+        # surfaced by cargo-deny separately.
+        run: cargo audit
 
   # ── 2. License, ban, and source policy ───────────────────────────────────
   cargo-deny:

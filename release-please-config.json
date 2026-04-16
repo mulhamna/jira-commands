@@ -10,10 +10,10 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "../../plugin/.claude-plugin/plugin.json",
+          "path": "/plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
         },
-        "../jira-core/Cargo.toml"
+        "/crates/jira-core/Cargo.toml"
       ]
     }
   }

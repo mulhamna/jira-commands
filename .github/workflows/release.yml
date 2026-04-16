@@ -168,26 +168,49 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
-      - name: Publish jira-core
-        run: cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Wait for jira-core to appear in crates.io index
+      # Idempotent: safe to re-run after partial-success (e.g. if a later step
+      # fails and we re-trigger the workflow, we don't want to error on "already
+      # published"). Check the crates.io sparse index — the authoritative source
+      # cargo itself uses to resolve dependencies.
+      - name: Publish jira-core (skip if already published)
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
-          echo "Waiting for jira-core v${VERSION} to be indexed..."
-          for i in $(seq 1 24); do
-            if cargo search jira-core 2>/dev/null | grep -q "^jira-core = \"${VERSION}\""; then
-              echo "✓ jira-core v${VERSION} is live in crates.io index"
+          if curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-core v${VERSION} already on crates.io — skipping publish"
+          else
+            echo "Publishing jira-core v${VERSION}..."
+            cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
+
+      # Use the sparse index (index.crates.io) — authoritative and updates
+      # within seconds of publish. The previous implementation used `cargo search`
+      # which queries the separate crates.io search service; that service has a
+      # much longer indexing delay (can exceed 10 minutes) and caused timeout
+      # failures here even though the sparse index was already up-to-date.
+      - name: Wait for jira-core in crates.io sparse index
+        run: |
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          echo "Waiting for jira-core v${VERSION} in sparse index..."
+          for i in $(seq 1 30); do
+            if curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${VERSION}\""; then
+              echo "✓ jira-core v${VERSION} is live in sparse index"
               exit 0
             fi
-            echo "  attempt $i/24 — sleeping 15s..."
-            sleep 15
+            echo "  attempt $i/30 — sleeping 10s..."
+            sleep 10
           done
-          echo "ERROR: jira-core v${VERSION} not found in index after 6 minutes."
+          echo "ERROR: jira-core v${VERSION} not found in sparse index after 5 minutes."
           exit 1
 
-      - name: Publish jira-commands (binary crate)
-        run: cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Publish jira-commands (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-commands" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-commands v${VERSION} already on crates.io — skipping publish"
+          else
+            echo "Publishing jira-commands v${VERSION}..."
+            cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
 
   # ── 3. Create GitHub Release ──────────────────────────────────────────────
   create-release:

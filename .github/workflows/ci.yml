@@ -40,8 +40,8 @@ jobs:
 
       - name: Check version consistency (jira-core == jira-commands == plugin)
         run: |
-          CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
           echo "jira-core:     $CORE_VER"
@@ -61,7 +61,7 @@ jobs:
         # release-please writes per-package CHANGELOGs. Accept an entry in any
         # of: root CHANGELOG.md, jira-core/CHANGELOG.md, or jira/CHANGELOG.md.
         run: |
-          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
             || grep -qF "[${VERSION}]" crates/jira-core/CHANGELOG.md 2>/dev/null \
             || grep -qF "[${VERSION}]" crates/jira/CHANGELOG.md 2>/dev/null; then
@@ -75,7 +75,7 @@ jobs:
         # WARNING only — README version lags on patch bumps by design.
         # On minor/major bumps, update README.md manually before merging.
         run: |
-          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           if ! grep -qF "jira-core = \"${MAJOR_MINOR}\"" README.md; then
             echo "WARNING: README.md library example may reference an old jira-core version."

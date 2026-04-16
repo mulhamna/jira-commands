@@ -33,7 +33,7 @@ jobs:
       - name: Verify tag matches Cargo.toml version
         run: |
           TAG="${GITHUB_REF_NAME}"
-          CARGO_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          CARGO_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           EXPECTED_TAG="v${CARGO_VER}"
 
           echo "Git tag:        $TAG"
@@ -49,8 +49,8 @@ jobs:
 
       - name: Verify all three versions match
         run: |
-          CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
           if [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
@@ -63,7 +63,7 @@ jobs:
 
       - name: Verify CHANGELOG.md has entry for this version
         run: |
-          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if ! grep -qF "[${VERSION}]" CHANGELOG.md; then
             echo "ERROR: CHANGELOG.md has no entry for v${VERSION}. Add one before releasing."
             exit 1
@@ -165,7 +165,7 @@ jobs:
 
       - name: Wait for jira-core to appear in crates.io index
         run: |
-          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           echo "Waiting for jira-core v${VERSION} to be indexed..."
           for i in $(seq 1 24); do
             if cargo search jira-core 2>/dev/null | grep -q "^jira-core = \"${VERSION}\""; then

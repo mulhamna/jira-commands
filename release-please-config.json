@@ -13,8 +13,7 @@
           "path": "../../plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
         },
-        "../jira-core/Cargo.toml",
-        "Cargo.toml"
+        "../jira-core/Cargo.toml"
       ]
     }
   }

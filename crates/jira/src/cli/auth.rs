@@ -5,22 +5,47 @@ use jira_core::config::{config_file_path, JiraConfig};
 
 #[derive(Debug, Subcommand)]
 pub enum AuthCommand {
-    /// Log in — save URL, email, and API token
+    /// Set up Jira credentials — URL, email, and API token
+    ///
+    /// Credentials are saved to ~/.config/jira/config.toml (chmod 600 on Unix).
+    /// Override any field at runtime with environment variables:
+    ///   JIRA_URL, JIRA_EMAIL, JIRA_TOKEN
+    ///
+    /// API tokens are different from your Atlassian password.
+    /// Generate one at: https://id.atlassian.com/manage-profile/security/api-tokens
     Login,
-    /// Log out — remove saved credentials
+
+    /// Remove the stored API token
+    ///
+    /// Clears only the token — URL and email are preserved.
+    /// Run `jira auth login` again to set a new token.
     Logout,
-    /// Show current authentication status
+
+    /// Show current authentication status and configuration
+    ///
+    /// Displays: Jira URL, email, token presence, config file path,
+    /// and default project key (if configured).
     Status,
-    /// Update individual credential fields
+
+    /// Update individual credential fields without re-running login
+    ///
+    /// Useful for rotating tokens or switching users without entering
+    /// all credentials again. Only provided flags are changed.
+    ///
+    /// Examples:
+    ///   jira auth update --token <new-token>
+    ///   jira auth update --email new@example.com
+    ///   jira auth update --url https://neworg.atlassian.net
+    ///   jira auth update --email new@example.com --token <token>
     Update {
-        /// New Jira base URL
-        #[arg(long)]
+        /// New Jira base URL (e.g. https://yourorg.atlassian.net)
+        #[arg(long, value_name = "URL")]
         url: Option<String>,
         /// New email address
-        #[arg(long)]
+        #[arg(long, value_name = "EMAIL")]
         email: Option<String>,
         /// New API token
-        #[arg(long)]
+        #[arg(long, value_name = "TOKEN")]
         token: Option<String>,
     },
 }

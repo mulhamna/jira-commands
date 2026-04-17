@@ -29,3 +29,6 @@
 
 # Config lokal (jangan commit token/credential)
 config.local.toml
+
+# Claude working checklist — internal only, tidak perlu di repo
+TASK.md

@@ -4,36 +4,91 @@ use jira_core::JiraClient;
 
 #[derive(Debug, Subcommand)]
 pub enum ApiCommand {
-    /// Execute a raw Jira REST API call and print the JSON response.
+    /// Send a GET request and print the JSON response
+    ///
+    /// Useful for exploring the Jira API or fetching data not yet exposed
+    /// by built-in commands. Response is pretty-printed JSON.
+    /// Returns nothing (no output) on 204 No Content responses.
+    ///
+    /// Common paths:
+    ///   /rest/api/3/serverInfo                      server info & tier
+    ///   /rest/api/3/myself                          current user
+    ///   /rest/api/3/issue/PROJ-123                  issue detail (raw)
+    ///   /rest/api/3/issue/PROJ-123/transitions      available transitions
+    ///   /rest/api/3/project/PROJ                    project metadata
+    ///   /rest/agile/1.0/board                       all boards
+    ///   /rest/agile/1.0/board/42/sprint             sprints for a board
     ///
     /// Examples:
     ///   jira api get /rest/api/3/serverInfo
-    ///   jira api get /rest/api/3/issue/PROJ-123
-    ///   jira api post /rest/api/3/issue --body '{"fields":{"project":{"key":"PROJ"},...}}'
+    ///   jira api get /rest/api/3/myself
+    ///   jira api get /rest/api/3/issue/PROJ-123/transitions
     #[command(name = "get")]
     Get {
-        /// API path (e.g. /rest/api/3/serverInfo)
+        /// API path starting with /rest/... (e.g. /rest/api/3/serverInfo)
         path: String,
     },
+
+    /// Send a POST request with a JSON body
+    ///
+    /// Prints the response JSON on success, or nothing on 201/204 No Content.
+    ///
+    /// Examples:
+    ///   jira api post /rest/api/3/issue \
+    ///     --body '{"fields":{"project":{"key":"PROJ"},"summary":"Test","issuetype":{"name":"Task"}}}'
+    ///
+    ///   jira api post /rest/api/3/issue/PROJ-123/comment \
+    ///     --body '{"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}}'
     #[command(name = "post")]
     Post {
+        /// API path starting with /rest/...
         path: String,
-        /// JSON body
-        #[arg(long)]
+        /// Request body as a JSON string
+        #[arg(long, value_name = "JSON")]
         body: Option<String>,
     },
+
+    /// Send a PUT request with a JSON body (full resource replacement)
+    ///
+    /// PUT replaces the resource entirely. For partial field updates, use PATCH.
+    ///
+    /// Examples:
+    ///   jira api put /rest/api/3/issue/PROJ-123 \
+    ///     --body '{"fields":{"summary":"New title","priority":{"name":"High"}}}'
     #[command(name = "put")]
     Put {
+        /// API path starting with /rest/...
         path: String,
-        #[arg(long)]
+        /// Request body as a JSON string
+        #[arg(long, value_name = "JSON")]
         body: Option<String>,
     },
+
+    /// Send a DELETE request — no output on success (204 No Content)
+    ///
+    /// Examples:
+    ///   jira api delete /rest/api/3/issue/PROJ-123
+    ///   jira api delete /rest/api/3/issue/PROJ-123/worklog/12345
+    ///   jira api delete /rest/api/3/issue/PROJ-123/attachments/67890
     #[command(name = "delete")]
-    Delete { path: String },
+    Delete {
+        /// API path starting with /rest/...
+        path: String,
+    },
+
+    /// Send a PATCH request with a JSON body (partial update)
+    ///
+    /// PATCH applies partial updates — only the fields in the body are changed.
+    ///
+    /// Examples:
+    ///   jira api patch /rest/api/3/issue/PROJ-123 \
+    ///     --body '{"fields":{"priority":{"name":"High"}}}'
     #[command(name = "patch")]
     Patch {
+        /// API path starting with /rest/...
         path: String,
-        #[arg(long)]
+        /// Request body as a JSON string
+        #[arg(long, value_name = "JSON")]
         body: Option<String>,
     },
 }

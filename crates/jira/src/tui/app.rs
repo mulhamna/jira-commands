@@ -6,7 +6,10 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use jira_core::{model::Issue, JiraClient};
+use jira_core::{
+    model::{Issue, UpdateIssueRequest},
+    JiraClient,
+};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -40,6 +43,8 @@ pub struct App {
     base_url: String,
     /// Current active JQL
     jql: String,
+    /// Default project key (from --project flag or config)
+    default_project: Option<String>,
     /// Buffer while the user is typing in Search mode
     search_input: String,
     /// Bottom status bar message (text, is_error)
@@ -60,18 +65,26 @@ enum AppAction {
     FetchTransitions,
     ExecuteTransition(String, String), // (issue_key, transition_id)
     OpenBrowser,
+    CreateIssue,
+    EditIssue(String),
+    AssignIssue(String),
+    AddWorklog(String),
+    EditLabels(String),
+    EditComponents(String),
+    UploadAttachment(String),
 }
 
 // ─── App impl ────────────────────────────────────────────────────────────────
 
 impl App {
-    fn new(jql: String, base_url: String) -> Self {
+    fn new(jql: String, base_url: String, default_project: Option<String>) -> Self {
         Self {
             issues: Vec::new(),
             table_state: TableState::default(),
             mode: Mode::List,
             base_url,
             jql,
+            default_project,
             search_input: String::new(),
             status: None,
             transitions: Vec::new(),
@@ -197,6 +210,50 @@ impl App {
                 self.mode = Mode::Help;
                 AppAction::None
             }
+            // Edit actions
+            KeyCode::Char('c') => AppAction::CreateIssue,
+            KeyCode::Char('e') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditIssue(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('a') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AssignIssue(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('w') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AddWorklog(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('l') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditLabels(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('m') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditComponents(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('u') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::UploadAttachment(key)
+                } else {
+                    AppAction::None
+                }
+            }
             _ => AppAction::None,
         }
     }
@@ -212,6 +269,48 @@ impl App {
             KeyCode::Char('?') => {
                 self.mode = Mode::Help;
                 AppAction::None
+            }
+            KeyCode::Char('e') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditIssue(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('a') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AssignIssue(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('w') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AddWorklog(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('l') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditLabels(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('m') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::EditComponents(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char('u') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::UploadAttachment(key)
+                } else {
+                    AppAction::None
+                }
             }
             _ => AppAction::None,
         }
@@ -277,6 +376,24 @@ impl App {
     }
 }
 
+// ─── Suspend / resume helpers ─────────────────────────────────────────────────
+
+/// Leave alternate screen so we can render normal terminal prompts.
+fn suspend_tui<B: ratatui::backend::Backend + io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+    Ok(())
+}
+
+/// Re-enter alternate screen after prompts are done.
+fn resume_tui<B: ratatui::backend::Backend + io::Write>(terminal: &mut Terminal<B>) -> Result<()> {
+    enable_raw_mode()?;
+    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+    terminal.clear()?;
+    Ok(())
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> {
@@ -294,7 +411,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(jql.clone(), base_url);
+    let mut app = App::new(jql.clone(), base_url, project.clone());
 
     // Initial load
     app.set_status("Loading issues...", false);
@@ -407,6 +524,114 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 }
             }
 
+            // ── Edit actions (suspend TUI → prompt → resume TUI) ──────────
+            AppAction::CreateIssue => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_create_issue(&client, app.default_project.clone()).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(Some(key)) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Created {key}"), false);
+                    }
+                    Ok(None) => app.set_status("Create cancelled", false),
+                    Err(e) => app.set_status(format!("Create failed: {e}"), true),
+                }
+            }
+
+            AppAction::EditIssue(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_edit_issue(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Updated {key}"), false);
+                    }
+                    Ok(false) => app.set_status("Edit cancelled", false),
+                    Err(e) => app.set_status(format!("Edit failed: {e}"), true),
+                }
+            }
+
+            AppAction::AssignIssue(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_assign_issue(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Assigned {key}"), false);
+                    }
+                    Ok(false) => app.set_status("Assign cancelled", false),
+                    Err(e) => app.set_status(format!("Assign failed: {e}"), true),
+                }
+            }
+
+            AppAction::AddWorklog(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_add_worklog(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => app.set_status(format!("✓ Worklog added to {key}"), false),
+                    Ok(false) => app.set_status("Worklog cancelled", false),
+                    Err(e) => app.set_status(format!("Worklog failed: {e}"), true),
+                }
+            }
+
+            AppAction::EditLabels(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_edit_labels(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Labels updated on {key}"), false);
+                    }
+                    Ok(false) => app.set_status("Label edit cancelled", false),
+                    Err(e) => app.set_status(format!("Label edit failed: {e}"), true),
+                }
+            }
+
+            AppAction::EditComponents(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_edit_components(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Components updated on {key}"), false);
+                    }
+                    Ok(false) => app.set_status("Component edit cancelled", false),
+                    Err(e) => app.set_status(format!("Component edit failed: {e}"), true),
+                }
+            }
+
+            AppAction::UploadAttachment(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_upload_attachment(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => app.set_status(format!("✓ Attachment uploaded to {key}"), false),
+                    Ok(false) => app.set_status("Upload cancelled", false),
+                    Err(e) => app.set_status(format!("Upload failed: {e}"), true),
+                }
+            }
+
             AppAction::None => {}
         }
     }
@@ -416,6 +641,290 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+// ─── Suspended interactive actions ───────────────────────────────────────────
+
+/// Create a new issue interactively. Returns the created issue key, or None if cancelled.
+async fn tui_create_issue(
+    client: &JiraClient,
+    default_project: Option<String>,
+) -> Result<Option<String>> {
+    use inquire::{Select, Text};
+    use jira_core::model::CreateIssueRequestV2;
+
+    println!("\n── Create Issue ──────────────────────────────────");
+
+    let project = match default_project {
+        Some(p) => {
+            let input = Text::new("Project key:")
+                .with_default(&p)
+                .prompt_skippable()?;
+            match input {
+                Some(s) if !s.trim().is_empty() => s.trim().to_uppercase(),
+                _ => return Ok(None),
+            }
+        }
+        None => {
+            let input = Text::new("Project key:").prompt_skippable()?;
+            match input {
+                Some(s) if !s.trim().is_empty() => s.trim().to_uppercase(),
+                _ => return Ok(None),
+            }
+        }
+    };
+
+    let summary = match Text::new("Summary:").prompt_skippable()? {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return Ok(None),
+    };
+
+    // Fetch issue types for the project
+    let issue_type = if let Ok(types) = client.get_issue_types(&project).await {
+        let names: Vec<String> = types.iter().map(|t| t.name.clone()).collect();
+        if names.is_empty() {
+            "Task".to_string()
+        } else {
+            Select::new("Issue type:", names)
+                .prompt()
+                .unwrap_or_else(|_| "Task".to_string())
+        }
+    } else {
+        "Task".to_string()
+    };
+
+    let assignee = Text::new("Assignee (email or 'me', blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    let priority = Text::new("Priority (blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    let req = CreateIssueRequestV2 {
+        project_key: project,
+        summary,
+        description: None,
+        description_adf: None,
+        issue_type,
+        assignee,
+        priority,
+        labels: Vec::new(),
+        components: Vec::new(),
+        parent: None,
+        fix_versions: Vec::new(),
+        custom_fields: std::collections::HashMap::new(),
+    };
+
+    let issue = client.create_issue_v2(req).await?;
+    println!("✓ Created {}", issue.key);
+    Ok(Some(issue.key))
+}
+
+/// Edit an existing issue — prompts for fields to change (blank = keep current).
+/// Returns true if any update was made.
+async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Edit {key} ──────────────────────────────────────");
+    println!("  Leave a field blank to keep its current value.\n");
+
+    let summary = Text::new("New summary (blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    let assignee = Text::new("New assignee — email or 'me' (blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    let priority = Text::new("New priority (blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    if summary.is_none() && assignee.is_none() && priority.is_none() {
+        println!("  Nothing to update.");
+        return Ok(false);
+    }
+
+    let req = UpdateIssueRequest {
+        summary,
+        assignee,
+        priority,
+        ..Default::default()
+    };
+
+    client.update_issue(key, req).await?;
+    println!("✓ Updated {key}");
+    Ok(true)
+}
+
+/// Assign an issue to a specific user.
+async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Assign {key} ─────────────────────────────────────");
+
+    let assignee =
+        match Text::new("Assignee (email or 'me', blank to cancel):").prompt_skippable()? {
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+            _ => return Ok(false),
+        };
+
+    let req = UpdateIssueRequest {
+        assignee: Some(assignee),
+        ..Default::default()
+    };
+
+    client.update_issue(key, req).await?;
+    println!("✓ Assigned {key}");
+    Ok(true)
+}
+
+/// Add a worklog entry to an issue.
+async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Add Worklog to {key} ──────────────────────────────");
+    println!("  Time format examples: 2h, 30m, 1d, 1h 30m\n");
+
+    let time = match Text::new("Time spent (blank to cancel):").prompt_skippable()? {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return Ok(false),
+    };
+
+    let comment = Text::new("Comment (blank to skip):")
+        .prompt_skippable()?
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
+
+    client
+        .add_worklog(key, &time, comment.as_deref(), None)
+        .await?;
+    println!("✓ Worklog added to {key}");
+    Ok(true)
+}
+
+/// Set labels on an issue (replaces existing).
+async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Edit Labels on {key} ──────────────────────────────");
+    println!("  Enter comma-separated labels. Blank to cancel.\n");
+
+    let input = match Text::new("Labels (comma-separated):").prompt_skippable()? {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    if input.trim().is_empty() {
+        return Ok(false);
+    }
+
+    let labels: Vec<String> = input
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let req = UpdateIssueRequest {
+        labels: Some(labels),
+        ..Default::default()
+    };
+
+    client.update_issue(key, req).await?;
+    println!("✓ Labels updated on {key}");
+    Ok(true)
+}
+
+/// Set components on an issue (replaces existing).
+async fn tui_edit_components(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Edit Components on {key} ──────────────────────────");
+    println!("  Enter comma-separated component names. Blank to cancel.\n");
+
+    let input = match Text::new("Components (comma-separated):").prompt_skippable()? {
+        Some(s) => s,
+        None => return Ok(false),
+    };
+
+    if input.trim().is_empty() {
+        return Ok(false);
+    }
+
+    let components: Vec<String> = input
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let req = UpdateIssueRequest {
+        components: Some(components),
+        ..Default::default()
+    };
+
+    client.update_issue(key, req).await?;
+    println!("✓ Components updated on {key}");
+    Ok(true)
+}
+
+/// Upload a file attachment to an issue.
+async fn tui_upload_attachment(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Upload Attachment to {key} ────────────────────────");
+
+    let path_str = match Text::new("File path (blank to cancel):").prompt_skippable()? {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return Ok(false),
+    };
+
+    let path = std::path::PathBuf::from(&path_str);
+    if !path.exists() {
+        anyhow::bail!("File not found: {path_str}");
+    }
+
+    client.upload_attachment(key, &path).await?;
+    println!(
+        "✓ Uploaded {} to {key}",
+        path.file_name().unwrap_or_default().to_string_lossy()
+    );
+    Ok(true)
 }
 
 // ─── UI rendering ────────────────────────────────────────────────────────────
@@ -473,10 +982,13 @@ fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     let text = match &app.mode {
         Mode::List => {
-            " j/k:move  Enter:view  t:transition  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:view  t:transition  c:create  e:edit  a:assign  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
-        Mode::View => " Esc:back  t:transition  o:browser  ?:help  q:quit".to_string(),
+        Mode::View => {
+            " Esc:back  t:transition  e:edit  a:assign  w:worklog  l:labels  m:comps  u:upload  o:browser  ?:help  q:quit"
+                .to_string()
+        }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
         Mode::Transition => " j/k:move  Enter:execute  Esc:cancel".to_string(),
         Mode::Help => " Any key: close".to_string(),
@@ -688,7 +1200,7 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_help_popup(f: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(55, 70, area);
+    let popup_area = centered_rect(60, 85, area);
 
     let lines = vec![
         Line::from(Span::styled(
@@ -703,7 +1215,14 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ↑/k       Move up"),
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     View issue detail"),
-        Line::from("  t         Transition issue (interactive)"),
+        Line::from("  t         Transition issue (in-TUI picker)"),
+        Line::from("  c         Create new issue"),
+        Line::from("  e         Edit selected issue (summary/assignee/priority)"),
+        Line::from("  a         Assign selected issue"),
+        Line::from("  w         Add worklog to selected issue"),
+        Line::from("  l         Set labels on selected issue"),
+        Line::from("  m         Set components on selected issue"),
+        Line::from("  u         Upload attachment to selected issue"),
         Line::from("  o         Open issue in browser"),
         Line::from("  r         Refresh list"),
         Line::from("  /         Search with JQL"),
@@ -716,6 +1235,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         )),
         Line::from("  Esc / q   Back to list"),
         Line::from("  t         Transition this issue"),
+        Line::from("  e / a / w / l / m / u   (same as list)"),
         Line::from("  o         Open in browser"),
         Line::from(""),
         Line::from(Span::styled("Search:", Style::default().fg(Color::Yellow))),

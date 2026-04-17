@@ -24,28 +24,46 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Create, list, view, update, delete, transition, and attach files to issues
+    /// Create, list, view, update, delete, transition, attach, and bulk-operate on issues
     Issue {
         #[command(subcommand)]
-        command: cli::issue::IssueCommand,
+        command: Box<cli::issue::IssueCommand>,
     },
-    /// Manage credentials (login, logout, status, update)
+    /// Manage credentials — login, logout, status, update
     Auth {
         #[command(subcommand)]
         command: cli::auth::AuthCommand,
     },
-    /// Launch the interactive TUI — browse and transition issues with keyboard shortcuts
+
+    /// Launch the interactive TUI — browse, search, and transition issues
+    ///
+    /// Keyboard shortcuts:
+    ///   j / k  or  ↑ / ↓    Navigate the issue list
+    ///   /                    Enter search mode — type a JQL query and press Enter
+    ///   Esc                  Cancel search / go back
+    ///   Enter                Open issue detail view
+    ///   t                    Transition the selected issue (interactive picker)
+    ///   o                    Open the selected issue in your browser
+    ///   r                    Refresh the issue list
+    ///   ?                    Show keyboard help overlay
+    ///   q                    Quit
+    ///
+    /// Examples:
+    ///   jira tui                   # uses default project from config, or your assigned issues
+    ///   jira tui -p PROJ           # start filtered to a specific project
     Tui {
-        /// Filter by project key (e.g. MYPROJ). Defaults to assignee = currentUser()
-        #[arg(short, long)]
+        /// Project key to filter issues (e.g. PROJ). Falls back to config default, then assignee = currentUser()
+        #[arg(short, long, value_name = "PROJECT")]
         project: Option<String>,
     },
-    /// Execute raw Jira REST API calls and print JSON response
+
+    /// Execute raw Jira REST API calls — GET, POST, PUT, PATCH, DELETE
     Api {
         #[command(subcommand)]
         command: cli::api::ApiCommand,
     },
-    /// Manage Jira Plans (requires Jira Premium / Advanced Roadmaps)
+
+    /// Manage Jira Plans / Advanced Roadmaps (requires Jira Premium)
     Plan {
         #[command(subcommand)]
         command: cli::plan::PlanCommand,
@@ -72,7 +90,7 @@ async fn main() -> Result<()> {
         Commands::Issue { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
-            cli::issue::handle(command, client, config.project).await?;
+            cli::issue::handle(*command, client, config.project).await?;
         }
         Commands::Tui { project } => {
             let client = build_client().context("Failed to initialize Jira client")?;

@@ -42,21 +42,45 @@ pub struct CreateIssueRequest {
 pub struct CreateIssueRequestV2 {
     pub project_key: String,
     pub summary: String,
+    /// Markdown description — converted to ADF automatically. Ignored if `description_adf` is set.
     pub description: Option<String>,
+    /// Pre-built ADF description — takes priority over `description`.
+    pub description_adf: Option<Value>,
     pub issue_type: String,
     pub assignee: Option<String>,
     pub priority: Option<String>,
+    /// Labels (plain string list, e.g. ["bug", "backend"])
+    pub labels: Vec<String>,
+    /// Component names (e.g. ["auth", "api"])
+    pub components: Vec<String>,
+    /// Parent issue key for sub-tasks (e.g. "PROJ-100")
+    pub parent: Option<String>,
+    /// Fix version names (e.g. ["v1.0", "v1.1"])
+    pub fix_versions: Vec<String>,
     /// Custom field ID → typed value
     pub custom_fields: HashMap<String, FieldValue>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct UpdateIssueRequest {
     pub summary: Option<String>,
+    /// Markdown description — converted to ADF. Ignored if `description_adf` is set.
     pub description: Option<String>,
+    /// Pre-built ADF description — takes priority over `description`.
+    pub description_adf: Option<Value>,
     pub assignee: Option<String>,
     pub priority: Option<String>,
     pub status: Option<String>,
+    /// Labels (replaces existing labels)
+    pub labels: Option<Vec<String>>,
+    /// Component names (replaces existing components)
+    pub components: Option<Vec<String>>,
+    /// Fix version names (replaces existing fix versions)
+    pub fix_versions: Option<Vec<String>>,
+    /// Parent issue key
+    pub parent: Option<String>,
+    /// Arbitrary custom field values (field_id → value)
+    pub custom_fields: HashMap<String, FieldValue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

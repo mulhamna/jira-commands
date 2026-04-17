@@ -103,6 +103,26 @@ fn render_list(node: &Value, out: &mut String, depth: usize, ordered: bool) {
     }
 }
 
+/// Convert plain text to ADF JSON — each non-empty line becomes a paragraph.
+pub fn plain_text_to_adf(text: &str) -> Value {
+    let mut content: Vec<Value> = text
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|line| {
+            json!({
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": line }]
+            })
+        })
+        .collect();
+
+    if content.is_empty() {
+        content.push(json!({ "type": "paragraph", "content": [] }));
+    }
+
+    json!({ "version": 1, "type": "doc", "content": content })
+}
+
 /// Convert Markdown text to ADF JSON.
 pub fn markdown_to_adf(markdown: &str) -> Value {
     use comrak::{parse_document, Arena, Options};

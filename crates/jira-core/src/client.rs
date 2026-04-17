@@ -26,6 +26,7 @@ const PLATFORM_BASE: &str = "/rest/api/3";
 const AGILE_BASE: &str = "/rest/agile/1.0";
 const MAX_RETRIES: u32 = 3;
 
+#[derive(Clone)]
 pub struct JiraClient {
     http: Client,
     config: JiraConfig,
@@ -366,18 +367,38 @@ impl JiraClient {
         if let Some(summary) = &req.summary {
             fields["summary"] = json!(summary);
         }
-
-        if let Some(description) = &req.description {
+        if let Some(adf) = &req.description_adf {
+            fields["description"] = adf.clone();
+        } else if let Some(description) = &req.description {
             fields["description"] = markdown_to_adf(description);
         }
-
         if let Some(assignee) = &req.assignee {
             let account_id = self.resolve_assignee_account_id(assignee).await?;
             fields["assignee"] = json!({ "accountId": account_id });
         }
-
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
+        }
+        if let Some(labels) = &req.labels {
+            fields["labels"] = json!(labels);
+        }
+        if let Some(components) = &req.components {
+            fields["components"] = json!(components
+                .iter()
+                .map(|c| json!({"name": c}))
+                .collect::<Vec<_>>());
+        }
+        if let Some(fix_versions) = &req.fix_versions {
+            fields["fixVersions"] = json!(fix_versions
+                .iter()
+                .map(|v| json!({"name": v}))
+                .collect::<Vec<_>>());
+        }
+        if let Some(parent) = &req.parent {
+            fields["parent"] = json!({ "key": parent });
+        }
+        for (field_id, value) in &req.custom_fields {
+            fields[field_id] = value.to_api_json();
         }
 
         let body = json!({ "fields": fields });
@@ -640,7 +661,9 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
 
-        let description_adf = req.description.as_deref().map(markdown_to_adf);
+        let description_adf = req
+            .description_adf
+            .or_else(|| req.description.as_deref().map(markdown_to_adf));
 
         let mut fields = json!({
             "project": { "key": req.project_key },
@@ -658,7 +681,26 @@ impl JiraClient {
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
         }
-
+        if !req.labels.is_empty() {
+            fields["labels"] = json!(req.labels);
+        }
+        if !req.components.is_empty() {
+            fields["components"] = json!(req
+                .components
+                .iter()
+                .map(|c| json!({"name": c}))
+                .collect::<Vec<_>>());
+        }
+        if let Some(parent) = &req.parent {
+            fields["parent"] = json!({ "key": parent });
+        }
+        if !req.fix_versions.is_empty() {
+            fields["fixVersions"] = json!(req
+                .fix_versions
+                .iter()
+                .map(|v| json!({"name": v}))
+                .collect::<Vec<_>>());
+        }
         for (field_id, value) in &req.custom_fields {
             fields[field_id] = value.to_api_json();
         }

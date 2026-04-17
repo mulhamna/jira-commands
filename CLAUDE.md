@@ -32,6 +32,18 @@ Semua operasi commit, push, dan tag adalah tanggung jawab pemilik repo sepenuhny
 Kalau Claude perlu "commit sesuatu", cukup siapkan file-nya dan instruksikan
 pemilik repo untuk melakukan commit sendiri.
 
+### TASK.md — checklist kerja Claude
+
+File `TASK.md` di root repo adalah checklist kerja Claude yang **gitignored** (tidak masuk repo).
+
+**Claude WAJIB:**
+1. Baca `TASK.md` di awal setiap sesi baru
+2. Update checkbox `[ ]` → `[x]` segera setelah task selesai dan smoke test hijau
+3. Kalau `TASK.md` tidak ada (misal fresh clone), buat ulang berdasarkan context percakapan atau tanya pemilik repo
+
+Tujuan: supaya setelah compaction, Claude bisa lanjut dari titik yang benar tanpa harus
+mengulang pekerjaan yang sudah selesai.
+
 ---
 
 ## Project overview
@@ -54,6 +66,8 @@ Rust CLI untuk Atlassian Jira yang menggantikan / memperbaiki keterbatasan
 ```
 jira-commands/
 ├── CLAUDE.md
+├── SECURITY.md             # responsible disclosure policy
+├── CHANGELOG.md            # generated/updated by release-please
 ├── Cargo.toml              # workspace root
 ├── crates/
 │   ├── jira-core/          # PUBLIC LIBRARY: API client, auth, model, ADF parser
@@ -62,10 +76,16 @@ jira-commands/
 │   └── jira/               # BINARY: clap commands, TUI, wiring semua crate
 │       ├── Cargo.toml      # dipublish ke crates.io sebagai "jira-commands"
 │       └── src/
+├── plugin/
+│   └── .claude-plugin/     # Claude Code plugin (9 skills)
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml
-│       └── release.yml
+│       ├── ci.yml              # fmt + clippy + test, semua push/PR ke main
+│       ├── security.yml        # cargo audit, SHA-pinned
+│       ├── release-please.yml  # otomatis bump versi + CHANGELOG + tag
+│       └── release.yml         # build binaries + publish crates.io (trigger: tag)
+├── release-please-config.json
+├── .release-please-manifest.json
 └── tests/                  # integration tests (cross-crate)
 ```
 
@@ -91,7 +111,7 @@ cargo install jira-commands
 Orang lain bisa pakai `jira-core` sebagai library dependency tanpa harus pakai CLI-nya:
 ```toml
 [dependencies]
-jira-core = "0.1"
+jira-core = "0.4"
 ```
 
 **`jira/` (binary)** — tidak perlu stabil sebagai API publik:
@@ -108,18 +128,19 @@ jira-core = "0.1"
 |---|---|---|
 | CLI arg parsing | `clap` (derive) | Subcommands, help generation |
 | TUI framework | `ratatui` + `crossterm` | Fork aktif dari tui-rs |
-| Interactive prompt | `inquire` | Select, input, confirm |
-| Async HTTP | `reqwest` (async, multipart) | Native multipart untuk attachment |
+| Interactive prompt | `inquire` | Select, input, confirm, Text |
+| Async HTTP | `reqwest` (async, multipart, rustls-tls) | Native multipart untuk attachment |
 | Async runtime | `tokio` | Full features |
 | Serialisasi | `serde` + `serde_json` | JSON API response |
 | Config | `figment` + `toml` | Multi-source config (file + env) |
-| Token storage | `keyring` | OS keychain (macOS/Linux/Windows) |
+| Token storage | Config file `~/.config/jira/config.toml` chmod 600 | Tidak pakai keyring (cross-platform) |
 | Path resolution | `dirs` | XDG-compliant config path |
-| Markdown parser | `comrak` | CommonMark + GFM, konversi ke ADF |
-| Syntax highlight | `syntect` | Code block di issue view |
-| Progress | `indicatif` | Spinner dan progress bar |
+| Markdown → ADF | `comrak` | CommonMark + GFM, konversi ke ADF |
+| MIME detection | `mime_guess` | Untuk attachment upload |
+| Browser open | `open` | `jira issue view --open`, TUI `o` key |
+| Progress | `indicatif` | Spinner dan progress bar (suppress di non-TTY) |
 | Error handling | `anyhow` (app) + `thiserror` (lib) | |
-| Logging | `tracing` + `tracing-subscriber` | Debug mode |
+| Logging | `tracing` + `tracing-subscriber` | Debug mode via `--verbose` |
 
 ---
 
@@ -299,227 +320,61 @@ git rebase --continue
 
 Gunakan `rebase`, bukan `merge`, supaya history tetap linear.
 
-### 3. Version bump — kapan dan bagaimana
+### 3. Version bump
 
-Versi mengikuti **Semantic Versioning (semver)**:
+**Jangan pernah manual bump versi.** Release-please menentukan versi berikutnya
+secara otomatis berdasarkan tipe commit:
 
-| Jenis perubahan | Bump |
+| Commit type | Bump yang dihasilkan |
 |---|---|
-| Breaking change di public API `jira-core` | MAJOR (`1.0.0 → 2.0.0`) |
-| Fitur baru backward-compatible | MINOR (`0.1.0 → 0.2.0`) |
-| Bug fix, patch, performance | PATCH (`0.1.0 → 0.1.1`) |
-| Dependency update non-breaking | PATCH |
+| `feat:` | MINOR (`0.4.1 → 0.5.0`) |
+| `fix:`, `perf:`, `refactor:` | PATCH (`0.4.1 → 0.4.2`) |
+| `feat!:` atau `BREAKING CHANGE:` di footer | MAJOR (`0.4.1 → 1.0.0`) |
+| `chore:`, `docs:`, `ci:`, `test:` | Tidak trigger release baru |
 
-Claude boleh edit `Cargo.toml` untuk bump versi, tapi **commit tetap dilakukan
-pemilik repo**.
-
-```bash
-# Setelah Claude edit Cargo.toml, pemilik repo jalankan:
-cargo update -p jira-core   # update Cargo.lock
-# lalu commit manual
-```
-
-Kalau `jira-core` versinya naik, `jira/Cargo.toml` yang depend ke `jira-core`
-juga harus ikut di-update.
+Release-please akan bump: `crates/jira-core/Cargo.toml`, `crates/jira/Cargo.toml`,
+dan `plugin/.claude-plugin/plugin.json` sekaligus dalam satu Release PR.
 
 ---
 
 ## GitHub Actions
 
-### CI (`ci.yml`) — jaga branch main
+Semua workflow menggunakan **SHA-pinned actions** untuk supply-chain security.
+Lihat file aktual di `.github/workflows/` — jangan salin YAML dari dokumen ini.
 
-Trigger: setiap push ke `main` dan setiap PR ke `main`.
+### `ci.yml` — quality gate di setiap push/PR
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
+Trigger: semua push ke `main` dan semua PR ke `main`.
+Matrix: ubuntu, macos, windows.
+Steps: `cargo fmt --check` → `cargo clippy -D warnings` → `cargo test --all` → `cargo build --all`
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+### `security.yml` — dependency audit
 
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+Trigger: setiap push ke `main`.
+Menjalankan `cargo audit` terhadap RustSec Advisory Database.
 
-jobs:
-  check:
-    name: Check (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+### `release-please.yml` — otomatis versi + CHANGELOG + tag
 
-    steps:
-      - uses: actions/checkout@v4
+Trigger: setiap push ke `main`.
+Menganalisis Conventional Commits lalu membuat/mengupdate Release PR.
+Saat Release PR di-merge: push tag → trigger `release.yml`.
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+Butuh secret `RELEASE_PLEASE_TOKEN` (fine-grained PAT: Contents + Pull requests write).
+Fallback ke `GITHUB_TOKEN` tapi tag yang dibuat tidak akan trigger `release.yml`.
 
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+### `release.yml` — build + publish (trigger: tag `v*`)
 
-      - name: Format check
-        run: cargo fmt --all -- --check
+1. Validasi tag cocok dengan versi di `Cargo.toml`
+2. Build binary 5 platform (linux x86/arm64, macos x86/arm64, windows x86)
+3. Publish `jira-core` ke crates.io → tunggu sparse index → publish `jira-commands`
+4. Create GitHub Release dengan binaries + checksums
 
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+### Secrets yang perlu di-setup
 
-      - name: Tests
-        run: cargo test --all
-
-      - name: Build
-        run: cargo build --all
-```
-
-### Release (`release.yml`) — publish ke crates.io + GitHub Releases
-
-Trigger: push tag `v*` (contoh: `v0.1.0`).
-
-```yaml
-# .github/workflows/release.yml
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-
-permissions:
-  contents: write
-
-jobs:
-  build-binaries:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact: jira-linux-x86_64
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact: jira-linux-aarch64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            artifact: jira-macos-x86_64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            artifact: jira-macos-aarch64
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            artifact: jira-windows-x86_64.exe
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install cross (Linux aarch64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo install cross --git https://github.com/cross-rs/cross
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build (cross)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cross build --release --target ${{ matrix.target }} -p jira-commands
-
-      - name: Build (native)
-        if: matrix.target != 'aarch64-unknown-linux-gnu'
-        run: cargo build --release --target ${{ matrix.target }} -p jira-commands
-
-      - name: Rename binary (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cp target/${{ matrix.target }}/release/jira ${{ matrix.artifact }}
-
-      - name: Rename binary (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cp target/${{ matrix.target }}/release/jira.exe ${{ matrix.artifact }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
-
-  publish-crates:
-    name: Publish to crates.io
-    runs-on: ubuntu-latest
-    needs: build-binaries
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Publish jira-core
-        run: cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      # Tunggu crates.io index sebelum publish binary yang depend ke jira-core
-      - run: sleep 30
-      - name: Publish jira-cli (binary crate)
-        run: cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-  create-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: [build-binaries, publish-crates]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Generate checksums
-        run: |
-          cd artifacts
-          for dir in */; do
-            file="${dir%/}"
-            sha256sum "$file/$file" >> ../checksums.txt 2>/dev/null || \
-            sha256sum "$file/$file.exe" >> ../checksums.txt 2>/dev/null || true
-          done
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            artifacts/**/*
-            checksums.txt
-```
-
-### Cara trigger release (pemilik repo)
-
-```bash
-# Pastikan main sudah clean
-git status
-
-# Bump versi di Cargo.toml (bisa minta Claude untuk edit file-nya)
-# lalu commit manual
-
-# Tag dengan versi baru
-git tag v0.1.0
-
-# Push tag — ini yang trigger release workflow
-git push origin v0.1.0
-```
-
-### Secrets yang perlu di-setup di GitHub repo
-
-| Secret name | Isi | Di mana set |
+| Secret | Isi | Di mana set |
 |---|---|---|
-| `CARGO_REGISTRY_TOKEN` | Token dari crates.io | Settings → Secrets → Actions |
+| `CARGO_REGISTRY_TOKEN` | API token dari crates.io | Settings → Secrets → Actions |
+| `RELEASE_PLEASE_TOKEN` | Fine-grained PAT (Contents + PRs write) | Settings → Secrets → Actions |
 
 ---
 
@@ -564,88 +419,59 @@ cargo build --all
 |---|---|---|
 | 1 — Foundation | Auth, config, HTTP client, search (cursor pagination), issue CRUD, TUI dasar | **Done** |
 | 2 — Custom field & Attachment | Dynamic field introspection, semua field type, upload file/image | **Done** |
-| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog CRUD, JQL builder interaktif | Planned |
-| 4 — Power features | Plans API, archive, raw API passthrough, plugin scripting | Planned |
+| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog CRUD, JQL builder interaktif | **Done** |
+| 4 — Power features | Plans API, archive, raw API passthrough, Claude Code plugin | **Done** |
+| 5 — UX & Automation | Improved `--help`, non-interactive create/update, `--json` mode, `bulk-create`, `clone`, `batch`, TUI edit actions (c/e/a/w/l/m/u) | **Done** |
 
 ---
 
-## Aturan wajib setiap ada perubahan (patch / minor / major)
+## Alur release — release-please (otomatis)
 
-> CI akan REJECT PR yang melanggar aturan ini. Semua harus selesai sebelum commit.
+> **Jangan pernah manual bump version, manual update CHANGELOG, atau manual push tag.**
+> Semua diurus oleh **release-please** via CI/CD.
 
-### Checklist mandatory — wajib dikerjakan Claude, dikonfirmasi pemilik repo
+### Cara kerjanya
 
-| # | Yang harus diupdate | Keterangan |
-|---|---|---|
-| 1 | `CHANGELOG.md` | Tambah entry `## [X.Y.Z] — YYYY-MM-DD` dengan bullet `Added / Fixed / Changed / Removed` |
-| 2 | `crates/jira-core/Cargo.toml` | Bump `version` |
-| 3 | `crates/jira/Cargo.toml` | Bump `version` **dan** dep ke `jira-core` |
-| 4 | `plugin/.claude-plugin/plugin.json` | Bump `"version"` |
-| 5 | `README.md` | Update `jira-core = "X.Y"` di contoh library dependency |
-| 6 | `CLAUDE.md` (dokumen ini) | Tambah entry di tabel Changelog CLAUDE.md di bawah |
+1. Push commit ke `main` dengan **Conventional Commits** (`feat:`, `fix:`, `chore:`, dll.)
+2. release-please otomatis buat/update sebuah "Release PR" yang:
+   - Bump versi di `crates/jira-core/Cargo.toml`, `crates/jira/Cargo.toml`, `plugin/.claude-plugin/plugin.json`
+   - Generate entry baru di `CHANGELOG.md`
+3. Pemilik repo **merge** Release PR
+4. release-please push tag → `release.yml` trigger:
+   - Build binary 5 platform
+   - Publish `jira-core` ke crates.io
+   - Publish `jira-commands` ke crates.io
+   - Create GitHub Release dengan binaries + checksums
 
-**Ketiga versi (jira-core, jira-commands, plugin) HARUS selalu sama.**
-CI job `docs-check` akan fail kalau ada yang tidak sinkron.
-
-### Apa yang harus ada di CHANGELOG.md
-
-```markdown
-## [X.Y.Z] — YYYY-MM-DD
-
-### Added
-- Fitur baru
-
-### Fixed
-- Bug yang diperbaiki
-
-### Changed
-- Perubahan perilaku existing (termasuk breaking changes di public API)
-
-### Removed
-- Hal yang dihapus
-```
-
-Hapus section yang tidak relevan (misal tidak ada yang dihapus → tidak perlu `### Removed`).
-
-### Aturan crates.io
-
-- **Jangan publish manual** — publish selalu via GitHub Actions release workflow (trigger: `git push origin vX.Y.Z`)
-- Urutan publish: `jira-core` dulu → tunggu 90 detik → baru `jira-commands`
-- Kalau publish gagal di tengah jalan: jangan re-run workflow sembarangan — cek apakah salah satu sudah terpublish di crates.io, karena versi yang sama tidak bisa di-publish ulang
-- CI hanya menjalankan `cargo publish --dry-run -p jira-core`. `jira-commands` **tidak** di-dry-run di CI karena ia depend ke `jira-core` versi baru yang belum ada di crates.io — Cargo akan gagal resolve. Validasi `jira-commands` cukup dari build + clippy job.
-
-### Aturan Claude Code plugin marketplace
-
-- Versi di `plugin/.claude-plugin/plugin.json` harus sama dengan versi crate
-- Plugin menggunakan binary `jira` yang sudah terinstall — pastikan README sudah dokumentasikan `cargo install jira-commands` sebagai prerequisite
-- Setiap ada skill baru atau perubahan perilaku skill, update description di `plugin/skills/<skill>/SKILL.md` dan update tabel di README.md
-
-### Alur release yang benar (pemilik repo)
+### Yang perlu dilakukan sebelum push ke main
 
 ```bash
-# 1. Pastikan semua checklist di atas sudah selesai (Claude bisa bantu)
+# 1. Smoke test
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 
-# 2. Commit semua perubahan
+# 2. Commit dengan Conventional Commits — ini yang release-please baca untuk bump versi
 git add .
-git commit -m "chore: release vX.Y.Z"
+git commit -m "feat: add TUI edit actions and bulk-create command"
 git push origin main
 
-# 3. Tunggu CI hijau di GitHub Actions sebelum tag
-
-# 4. Tag → otomatis trigger release workflow (build + publish + GitHub Release)
-git tag vX.Y.Z
-git push origin vX.Y.Z
+# 3. Tunggu CI hijau → release-please buat/update Release PR otomatis
+# 4. Review dan merge Release PR → tag + release otomatis
 ```
 
-Setelah push tag, GitHub Actions akan:
-1. Validate bahwa tag `vX.Y.Z` cocok dengan versi di `Cargo.toml`
-2. Build binary 5 platform
-3. Publish `jira-core` ke crates.io
-4. Publish `jira-commands` ke crates.io
-5. Create GitHub Release dengan binaries + checksums
+### Aturan crates.io
+
+- **Jangan publish manual** — publish selalu via GitHub Actions setelah Release PR di-merge
+- Urutan publish: `jira-core` dulu → tunggu 90 detik → baru `jira-commands`
+- Kalau publish gagal di tengah jalan: cek apakah salah satu sudah terpublish di crates.io — versi yang sama tidak bisa di-publish ulang
+- CI hanya menjalankan `cargo publish --dry-run -p jira-core`. `jira-commands` tidak di-dry-run karena depend ke `jira-core` versi baru yang belum ada di crates.io
+
+### Aturan Claude Code plugin marketplace
+
+- Versi di `plugin/.claude-plugin/plugin.json` di-bump otomatis oleh release-please (via `extra-files` di `release-please-config.json`)
+- Plugin menggunakan binary `jira` yang sudah terinstall — pastikan README dokumentasikan `cargo install jira-commands` sebagai prerequisite
+- Setiap ada skill baru atau perubahan perilaku skill, update description di `plugin/skills/<skill>/SKILL.md` dan update tabel di README.md
 
 ---
 
@@ -686,3 +512,5 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 | 2026-04-15 | Tambah Claude Code plugin di `plugin/` — 9 skills (list, view, create, transition, worklog, bulk-transition, attach, jql, api); versi bump ke 0.3.0 |
 | 2026-04-16 | Fix 204 No Content handling; fix assignee ke accountId (resolve email→accountId via /user/search, support "me" via /myself); raw_request return Option<Value>; quiet spinner/progress bar saat non-TTY; tambah CHANGELOG.md; versi bump ke 0.4.0 |
 | 2026-04-16 | Fix TUI JQL search: tambah f.set_cursor_position() di render_search_bar() supaya cursor terminal muncul saat user ketik JQL; hapus fake █ cursor di footer; update plugin list-issues skill |
+| 2026-04-17 | Phase B–E selesai — improved --help, non-interactive create/update, bulk-create, clone, batch, --json mode, TUI edit actions (c/e/a/w/l/m/u), CI security job, SECURITY.md |
+| 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md |

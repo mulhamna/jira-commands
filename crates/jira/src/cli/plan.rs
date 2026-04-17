@@ -4,7 +4,15 @@ use jira_core::JiraClient;
 
 #[derive(Debug, Subcommand)]
 pub enum PlanCommand {
-    /// List Jira Plans (requires Jira Premium / Advanced Roadmaps)
+    /// List all Jira Plans / Advanced Roadmaps
+    ///
+    /// Jira Plans (formerly Advanced Roadmaps) is a Jira Premium feature.
+    /// This command will return an error on Standard and Free tiers.
+    ///
+    /// To check your Jira tier:
+    ///   jira api get /rest/api/3/serverInfo
+    ///
+    /// Shows: plan ID, name, and status.
     List,
 }
 

@@ -9,7 +9,7 @@ Core library for the [jira-commands](https://crates.io/crates/jira-commands) Jir
 
 ```toml
 [dependencies]
-jira-core = "0.3"
+jira-core = "0.5"
 ```
 
 ```rust

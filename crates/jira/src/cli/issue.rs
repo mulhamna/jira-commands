@@ -413,6 +413,51 @@ pub enum IssueCommand {
     /// Examples:
     ///   jira issue jql              # build query, print it
     ///   jira issue jql --run        # build and run immediately
+    ///
+    /// ── JQL Quick Reference ────────────────────────────────────────────────
+    ///
+    /// Operators:
+    ///   =   !=   >   <   >=   <=   in (...)   not in (...)   is EMPTY   ~
+    ///
+    /// Common fields:
+    ///   project = PROJ
+    ///   assignee = currentUser()
+    ///   assignee = "email@example.com"
+    ///   status = "In Progress"
+    ///   status in ("To Do", "In Progress")
+    ///   priority = High
+    ///   issuetype = Bug
+    ///   sprint = openSprints()
+    ///   sprint = closedSprints()
+    ///   labels = backend
+    ///   component = "auth-service"
+    ///   fixVersion = "v2.0"
+    ///   reporter = currentUser()
+    ///   parent = PROJ-100
+    ///
+    /// Date filters:
+    ///   created >= -7d               created in last 7 days
+    ///   updated >= -30d              updated in last 30 days
+    ///   created >= "2024-01-01"      on or after a date
+    ///   updated < -90d               not updated in 90+ days
+    ///
+    /// Text search:
+    ///   text ~ "login bug"           full-text search (summary + description)
+    ///   summary ~ "payment"          summary only
+    ///
+    /// Combining:
+    ///   project = PROJ AND status = "In Progress"
+    ///   assignee = currentUser() OR assignee = "teammate@org.com"
+    ///   project = PROJ AND NOT status = Done
+    ///
+    /// Sorting:
+    ///   ORDER BY updated DESC
+    ///   ORDER BY priority DESC, created ASC
+    ///
+    /// Full examples:
+    ///   project = PROJ AND assignee = currentUser() AND sprint = openSprints() ORDER BY priority DESC
+    ///   status in ("To Do", "In Progress") AND updated >= -7d ORDER BY updated DESC
+    ///   project = PROJ AND issuetype = Bug AND priority in (High, Critical) ORDER BY created DESC
     Jql {
         /// Execute the generated JQL immediately (shows up to 25 results)
         #[arg(long)]

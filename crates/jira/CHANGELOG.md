@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/mulhamna/jira-commands/compare/v0.4.2...v0.5.0) (2026-04-17)
+
+
+### Features
+
+* add bulk-create, clone, batch, json mode, and TUI edit actions ([28e1893](https://github.com/mulhamna/jira-commands/commit/28e18938cc8815041c71df04141c7f52c23963c1))
+
+
+### Bug Fixes
+
+* **ci:** sync jira-core dep version on release-please bumps ([f6528b3](https://github.com/mulhamna/jira-commands/commit/f6528b378a0f8e5458bd7fd74e33e004a2a32db8))
+
 ## [0.4.2](https://github.com/mulhamna/jira-commands/compare/v0.4.1...v0.4.2) (2026-04-16)
 
 

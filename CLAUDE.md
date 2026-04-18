@@ -24,6 +24,7 @@ git stash
 ```
 
 Claude hanya boleh:
+
 - Membuat dan mengedit file di filesystem
 - Menjalankan `cargo` commands untuk build/test/check
 - Menjalankan `git status`, `git diff`, `git log` untuk **membaca** state saja
@@ -37,6 +38,7 @@ pemilik repo untuk melakukan commit sendiri.
 File `TASK.md` di root repo adalah checklist kerja Claude yang **gitignored** (tidak masuk repo).
 
 **Claude WAJIB:**
+
 1. Baca `TASK.md` di awal setiap sesi baru
 2. Update checkbox `[ ]` → `[x]` segera setelah task selesai dan smoke test hijau
 3. Kalau `TASK.md` tidak ada (misal fresh clone), buat ulang berdasarkan context percakapan atau tanya pemilik repo
@@ -102,6 +104,7 @@ cargo install jira-commands
 ### Pemisahan tanggung jawab crate
 
 **`jira-core`** — public API, harus stabil dan terdokumentasi:
+
 - `JiraClient` — semua HTTP call ke Jira API
 - Model types (`Issue`, `Field`, `Sprint`, dll.)
 - ADF parser dan renderer
@@ -109,12 +112,14 @@ cargo install jira-commands
 - Error types (`thiserror`)
 
 Orang lain bisa pakai `jira-core` sebagai library dependency tanpa harus pakai CLI-nya:
+
 ```toml
 [dependencies]
 jira-core = "0.4"
 ```
 
 **`jira/` (binary)** — tidak perlu stabil sebagai API publik:
+
 - Semua `clap` command definitions
 - TUI dengan `ratatui` + `crossterm`
 - Interactive prompt dengan `inquire`
@@ -124,23 +129,23 @@ jira-core = "0.4"
 
 ## Tech stack
 
-| Kebutuhan | Crate | Keterangan |
-|---|---|---|
-| CLI arg parsing | `clap` (derive) | Subcommands, help generation |
-| TUI framework | `ratatui` + `crossterm` | Fork aktif dari tui-rs |
-| Interactive prompt | `inquire` | Select, input, confirm, Text |
-| Async HTTP | `reqwest` (async, multipart, rustls-tls) | Native multipart untuk attachment |
-| Async runtime | `tokio` | Full features |
-| Serialisasi | `serde` + `serde_json` | JSON API response |
-| Config | `figment` + `toml` | Multi-source config (file + env) |
-| Token storage | Config file `~/.config/jira/config.toml` chmod 600 | Tidak pakai keyring (cross-platform) |
-| Path resolution | `dirs` | XDG-compliant config path |
-| Markdown → ADF | `comrak` | CommonMark + GFM, konversi ke ADF |
-| MIME detection | `mime_guess` | Untuk attachment upload |
-| Browser open | `open` | `jira issue view --open`, TUI `o` key |
-| Progress | `indicatif` | Spinner dan progress bar (suppress di non-TTY) |
-| Error handling | `anyhow` (app) + `thiserror` (lib) | |
-| Logging | `tracing` + `tracing-subscriber` | Debug mode via `--verbose` |
+| Kebutuhan          | Crate                                              | Keterangan                                     |
+| ------------------ | -------------------------------------------------- | ---------------------------------------------- |
+| CLI arg parsing    | `clap` (derive)                                    | Subcommands, help generation                   |
+| TUI framework      | `ratatui` + `crossterm`                            | Fork aktif dari tui-rs                         |
+| Interactive prompt | `inquire`                                          | Select, input, confirm, Text                   |
+| Async HTTP         | `reqwest` (async, multipart, rustls-tls)           | Native multipart untuk attachment              |
+| Async runtime      | `tokio`                                            | Full features                                  |
+| Serialisasi        | `serde` + `serde_json`                             | JSON API response                              |
+| Config             | `figment` + `toml`                                 | Multi-source config (file + env)               |
+| Token storage      | Config file `~/.config/jira/config.toml` chmod 600 | Tidak pakai keyring (cross-platform)           |
+| Path resolution    | `dirs`                                             | XDG-compliant config path                      |
+| Markdown → ADF     | `comrak`                                           | CommonMark + GFM, konversi ke ADF              |
+| MIME detection     | `mime_guess`                                       | Untuk attachment upload                        |
+| Browser open       | `open`                                             | `jira issue view --open`, TUI `o` key          |
+| Progress           | `indicatif`                                        | Spinner dan progress bar (suppress di non-TTY) |
+| Error handling     | `anyhow` (app) + `thiserror` (lib)                 |                                                |
+| Logging            | `tracing` + `tracing-subscriber`                   | Debug mode via `--verbose`                     |
 
 ---
 
@@ -325,12 +330,12 @@ Gunakan `rebase`, bukan `merge`, supaya history tetap linear.
 **Jangan pernah manual bump versi.** Release-please menentukan versi berikutnya
 secara otomatis berdasarkan tipe commit:
 
-| Commit type | Bump yang dihasilkan |
-|---|---|
-| `feat:` | MINOR (`0.4.1 → 0.5.0`) |
-| `fix:`, `perf:`, `refactor:` | PATCH (`0.4.1 → 0.4.2`) |
-| `feat!:` atau `BREAKING CHANGE:` di footer | MAJOR (`0.4.1 → 1.0.0`) |
-| `chore:`, `docs:`, `ci:`, `test:` | Tidak trigger release baru |
+| Commit type                                | Bump yang dihasilkan       |
+| ------------------------------------------ | -------------------------- |
+| `feat:`                                    | MINOR (`0.4.1 → 0.5.0`)    |
+| `fix:`, `perf:`, `refactor:`               | PATCH (`0.4.1 → 0.4.2`)    |
+| `feat!:` atau `BREAKING CHANGE:` di footer | MAJOR (`0.4.1 → 1.0.0`)    |
+| `chore:`, `docs:`, `ci:`, `test:`          | Tidak trigger release baru |
 
 Release-please akan bump: `crates/jira-core/Cargo.toml`, `crates/jira/Cargo.toml`,
 dan `plugin/.claude-plugin/plugin.json` sekaligus dalam satu Release PR.
@@ -371,9 +376,9 @@ Fallback ke `GITHUB_TOKEN` tapi tag yang dibuat tidak akan trigger `release.yml`
 
 ### Secrets yang perlu di-setup
 
-| Secret | Isi | Di mana set |
-|---|---|---|
-| `CARGO_REGISTRY_TOKEN` | API token dari crates.io | Settings → Secrets → Actions |
+| Secret                 | Isi                                     | Di mana set                  |
+| ---------------------- | --------------------------------------- | ---------------------------- |
+| `CARGO_REGISTRY_TOKEN` | API token dari crates.io                | Settings → Secrets → Actions |
 | `RELEASE_PLEASE_TOKEN` | Fine-grained PAT (Contents + PRs write) | Settings → Secrets → Actions |
 
 ---
@@ -415,14 +420,14 @@ cargo build --all
 
 ## Roadmap singkat
 
-| Phase | Fokus | Status |
-|---|---|---|
-| 1 — Foundation | Auth, config, HTTP client, search (cursor pagination), issue CRUD, TUI dasar | **Done** |
-| 2 — Custom field & Attachment | Dynamic field introspection, semua field type, upload file/image | **Done** |
-| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog CRUD, JQL builder interaktif | **Done** |
-| 4 — Power features | Plans API, archive, raw API passthrough, Claude Code plugin | **Done** |
-| 5 — UX & Automation | Improved `--help`, non-interactive create/update, `--json` mode, `bulk-create`, `clone`, `batch`, TUI edit actions (c/e/a/w/l/m/u) | **Done** |
-| 6 — Distribution | Homebrew tap (macOS/Linux), automated formula updates via CI/CD | **Done** |
+| Phase                         | Fokus                                                                                                                              | Status   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1 — Foundation                | Auth, config, HTTP client, search (cursor pagination), issue CRUD, TUI dasar                                                       | **Done** |
+| 2 — Custom field & Attachment | Dynamic field introspection, semua field type, upload file/image                                                                   | **Done** |
+| 3 — Bulk ops & Advanced TUI   | Bulk edit/transition, worklog CRUD, JQL builder interaktif                                                                         | **Done** |
+| 4 — Power features            | Plans API, archive, raw API passthrough, Claude Code plugin                                                                        | **Done** |
+| 5 — UX & Automation           | Improved `--help`, non-interactive create/update, `--json` mode, `bulk-create`, `clone`, `batch`, TUI edit actions (c/e/a/w/l/m/u) | **Done** |
+| 6 — Distribution              | Homebrew tap (macOS/Linux), automated formula updates via CI/CD                                                                    | **Done** |
 
 ---
 
@@ -496,24 +501,24 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 
 ## Changelog CLAUDE.md
 
-| Tanggal | Perubahan |
-|---|---|
-| 2026-04-14 | Initial version — hasil analisis jira-commands gaps + Jira API v3 terbaru |
-| 2026-04-14 | Hapus jira-tui sebagai crate terpisah, TUI masuk ke binary crate |
-| 2026-04-14 | Tambah aturan Claude dilarang git commit/push/tag — hanya pemilik repo |
-| 2026-04-15 | Phase 1 selesai — auth, config, HTTP client, issue CRUD, TUI dasar |
-| 2026-04-15 | Hapus keyring, token disimpan di config file chmod 600 (cross-platform) |
-| 2026-04-15 | Tambah `auth update` untuk ganti URL/email/token tanpa login ulang |
-| 2026-04-15 | Fix JQL default: fallback ke `assignee = currentUser()` jika tanpa project |
-| 2026-04-15 | Fix Cargo.toml untuk publish crates.io: version di path dep + metadata fields |
-| 2026-04-15 | Publish ke crates.io trigger via tag `v*`, BUKAN push ke main |
-| 2026-04-15 | Rename crate binary dari "jira" ke "jira-commands" (nama "jira" sudah dipakai di crates.io) |
-| 2026-04-15 | Phase 2 selesai — FieldKind/FieldValue, FieldCache, attachment upload, `issue attach`, `issue fields`, create dengan dynamic field prompts |
-| 2026-04-15 | Phase 3 & 4 selesai — worklog CRUD, bulk transition/update, archive, JQL builder, `jira api` raw passthrough, `jira plan list`; versi bump ke 0.2.0 |
-| 2026-04-15 | Tambah Claude Code plugin di `plugin/` — 9 skills (list, view, create, transition, worklog, bulk-transition, attach, jql, api); versi bump ke 0.3.0 |
+| Tanggal    | Perubahan                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-04-14 | Initial version — hasil analisis jira-commands gaps + Jira API v3 terbaru                                                                                                                                                                        |
+| 2026-04-14 | Hapus jira-tui sebagai crate terpisah, TUI masuk ke binary crate                                                                                                                                                                                 |
+| 2026-04-14 | Tambah aturan Claude dilarang git commit/push/tag — hanya pemilik repo                                                                                                                                                                           |
+| 2026-04-15 | Phase 1 selesai — auth, config, HTTP client, issue CRUD, TUI dasar                                                                                                                                                                               |
+| 2026-04-15 | Hapus keyring, token disimpan di config file chmod 600 (cross-platform)                                                                                                                                                                          |
+| 2026-04-15 | Tambah `auth update` untuk ganti URL/email/token tanpa login ulang                                                                                                                                                                               |
+| 2026-04-15 | Fix JQL default: fallback ke `assignee = currentUser()` jika tanpa project                                                                                                                                                                       |
+| 2026-04-15 | Fix Cargo.toml untuk publish crates.io: version di path dep + metadata fields                                                                                                                                                                    |
+| 2026-04-15 | Publish ke crates.io trigger via tag `v*`, BUKAN push ke main                                                                                                                                                                                    |
+| 2026-04-15 | Rename crate binary dari "jira" ke "jira-commands" (nama "jira" sudah dipakai di crates.io)                                                                                                                                                      |
+| 2026-04-15 | Phase 2 selesai — FieldKind/FieldValue, FieldCache, attachment upload, `issue attach`, `issue fields`, create dengan dynamic field prompts                                                                                                       |
+| 2026-04-15 | Phase 3 & 4 selesai — worklog CRUD, bulk transition/update, archive, JQL builder, `jira api` raw passthrough, `jira plan list`; versi bump ke 0.2.0                                                                                              |
+| 2026-04-15 | Tambah Claude Code plugin di `plugin/` — 9 skills (list, view, create, transition, worklog, bulk-transition, attach, jql, api); versi bump ke 0.3.0                                                                                              |
 | 2026-04-16 | Fix 204 No Content handling; fix assignee ke accountId (resolve email→accountId via /user/search, support "me" via /myself); raw_request return Option<Value>; quiet spinner/progress bar saat non-TTY; tambah CHANGELOG.md; versi bump ke 0.4.0 |
-| 2026-04-16 | Fix TUI JQL search: tambah f.set_cursor_position() di render_search_bar() supaya cursor terminal muncul saat user ketik JQL; hapus fake █ cursor di footer; update plugin list-issues skill |
-| 2026-04-17 | Phase B–E selesai — improved --help, non-interactive create/update, bulk-create, clone, batch, --json mode, TUI edit actions (c/e/a/w/l/m/u), CI security job, SECURITY.md |
-| 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md |
-| 2026-04-17 | Phase 6 — Homebrew tap: Formula/jira-commands.rb di mulhamna/homebrew-tap, job update-homebrew di release.yml (auto-update SHA256 + version setiap release); update semua README + CLAUDE.md |
-| 2026-04-18 | Phase 7 — Rename binary `jira` → `jirac`: dual binary shim (argv[0] deprecation warning), curl install script (install.sh), ecosystem disclaimer di semua README, Homebrew caveats + symlink, update release.yml artifacts |
+| 2026-04-16 | Fix TUI JQL search: tambah f.set_cursor_position() di render_search_bar() supaya cursor terminal muncul saat user ketik JQL; hapus fake █ cursor di footer; update plugin list-issues skill                                                      |
+| 2026-04-17 | Phase B–E selesai — improved --help, non-interactive create/update, bulk-create, clone, batch, --json mode, TUI edit actions (c/e/a/w/l/m/u), CI security job, SECURITY.md                                                                       |
+| 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md                                                                                                                                  |
+| 2026-04-17 | Phase 6 — Homebrew tap: Formula/jira-commands.rb di mulhamna/homebrew-tap, job update-homebrew di release.yml (auto-update SHA256 + version setiap release); update semua README + CLAUDE.md                                                     |
+| 2026-04-18 | Phase 7 — Rename binary `jira` → `jirac`: dual binary shim (argv[0] deprecation warning), curl install script (install.sh), ecosystem disclaimer di semua README, Homebrew caveats + symlink, update release.yml artifacts                       |

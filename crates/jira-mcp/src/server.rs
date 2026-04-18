@@ -18,9 +18,9 @@ use crate::{
     error::AppResult,
     models::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueListArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ToolResponse, WorklogAddArgs,
-        WorklogDeleteArgs,
+        IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs,
+        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ToolResponse,
+        WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 

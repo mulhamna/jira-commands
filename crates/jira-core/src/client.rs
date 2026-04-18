@@ -645,7 +645,11 @@ impl JiraClient {
         let url = self.platform_url(&format!("/issue/{issue_key}/attachments"));
         let mime = media_type
             .map(|value| value.to_string())
-            .or_else(|| mime_guess::from_path(file_name).first_raw().map(str::to_string))
+            .or_else(|| {
+                mime_guess::from_path(file_name)
+                    .first_raw()
+                    .map(str::to_string)
+            })
             .unwrap_or_else(|| "application/octet-stream".to_string());
 
         let http = &self.http;

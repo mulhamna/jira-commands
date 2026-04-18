@@ -1,16 +1,16 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jira_core::{
-    JiraClient,
-    config::{JiraConfig, config_file_path},
+    config::{config_file_path, JiraConfig},
     model::{
-        CreateIssueRequestV2, UpdateIssueRequest,
         field::{Field, FieldValue},
+        CreateIssueRequestV2, UpdateIssueRequest,
     },
+    JiraClient,
 };
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use url::form_urlencoded;
 
 use crate::{
@@ -263,12 +263,7 @@ impl JiraApp {
                 } => {
                     let bytes = STANDARD.decode(base64)?;
                     client
-                        .upload_attachment_bytes(
-                            &args.key,
-                            &filename,
-                            bytes,
-                            media_type.as_deref(),
-                        )
+                        .upload_attachment_bytes(&args.key, &filename, bytes, media_type.as_deref())
                         .await?
                 }
             };
@@ -514,7 +509,9 @@ async fn resolve_transition(
     })
 }
 
-fn map_custom_fields(custom_fields: Option<std::collections::BTreeMap<String, Value>>) -> HashMap<String, FieldValue> {
+fn map_custom_fields(
+    custom_fields: Option<std::collections::BTreeMap<String, Value>>,
+) -> HashMap<String, FieldValue> {
     custom_fields
         .unwrap_or_default()
         .into_iter()
@@ -604,8 +601,8 @@ mod tests {
     use serial_test::serial;
     use tempfile::TempDir;
     use wiremock::{
-        Mock, MockServer, ResponseTemplate,
         matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
     };
 
     use super::*;
@@ -700,13 +697,11 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/rest/api/3/search/jql"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_json(json!({
-                    "issues": [sample_issue()],
-                    "nextPageToken": null,
-                    "total": 1
-                })),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [sample_issue()],
+                "nextPageToken": null,
+                "total": 1
+            })))
             .mount(&mock_server)
             .await;
 
@@ -772,7 +767,11 @@ mod tests {
     fn build_api_path_rejects_duplicate_query_sources() {
         let err = build_api_path(
             "/rest/api/3/project?expand=lead".into(),
-            Some([("startAt".to_string(), Value::Number(1.into()))].into_iter().collect()),
+            Some(
+                [("startAt".to_string(), Value::Number(1.into()))]
+                    .into_iter()
+                    .collect(),
+            ),
         )
         .expect_err("duplicate query should fail");
 

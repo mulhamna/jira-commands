@@ -1,14 +1,14 @@
 use rmcp::{
-    ErrorData, Json, ServerHandler, ServiceExt,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
     transport::{
         stdio,
         streamable_http_server::{
-            StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
+            session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
         },
     },
+    ErrorData, Json, ServerHandler, ServiceExt,
 };
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -85,7 +85,10 @@ impl JiraMcpServer {
         self.respond(self.app.auth_set_credentials(args))
     }
 
-    #[tool(name = "jira_auth_logout", description = "Remove the stored Jira API token")]
+    #[tool(
+        name = "jira_auth_logout",
+        description = "Remove the stored Jira API token"
+    )]
     pub async fn jira_auth_logout(&self) -> Result<Json<Value>, ErrorData> {
         self.respond(self.app.auth_logout())
     }
@@ -101,7 +104,10 @@ impl JiraMcpServer {
         self.respond(self.app.issue_list(args).await)
     }
 
-    #[tool(name = "jira_issue_view", description = "Fetch full details for a Jira issue")]
+    #[tool(
+        name = "jira_issue_view",
+        description = "Fetch full details for a Jira issue"
+    )]
     pub async fn jira_issue_view(
         &self,
         Parameters(args): Parameters<IssueKeyArgs>,
@@ -150,7 +156,10 @@ impl JiraMcpServer {
         self.respond(self.app.issue_create(args).await)
     }
 
-    #[tool(name = "jira_issue_update", description = "Update fields on a Jira issue")]
+    #[tool(
+        name = "jira_issue_update",
+        description = "Update fields on a Jira issue"
+    )]
     pub async fn jira_issue_update(
         &self,
         Parameters(args): Parameters<IssueUpdateArgs>,
@@ -191,7 +200,10 @@ impl JiraMcpServer {
         self.respond(self.app.issue_attach(args).await)
     }
 
-    #[tool(name = "jira_worklog_list", description = "List worklogs on a Jira issue")]
+    #[tool(
+        name = "jira_worklog_list",
+        description = "List worklogs on a Jira issue"
+    )]
     pub async fn jira_worklog_list(
         &self,
         Parameters(args): Parameters<IssueKeyArgs>,
@@ -199,7 +211,10 @@ impl JiraMcpServer {
         self.respond(self.app.worklog_list(args).await)
     }
 
-    #[tool(name = "jira_worklog_add", description = "Add a worklog entry to a Jira issue")]
+    #[tool(
+        name = "jira_worklog_add",
+        description = "Add a worklog entry to a Jira issue"
+    )]
     pub async fn jira_worklog_add(
         &self,
         Parameters(args): Parameters<WorklogAddArgs>,
@@ -207,7 +222,10 @@ impl JiraMcpServer {
         self.respond(self.app.worklog_add(args).await)
     }
 
-    #[tool(name = "jira_worklog_delete", description = "Delete a worklog entry from a Jira issue")]
+    #[tool(
+        name = "jira_worklog_delete",
+        description = "Delete a worklog entry from a Jira issue"
+    )]
     pub async fn jira_worklog_delete(
         &self,
         Parameters(args): Parameters<WorklogDeleteArgs>,
@@ -248,7 +266,10 @@ impl JiraMcpServer {
         self.respond(self.app.issue_archive(args).await)
     }
 
-    #[tool(name = "jira_plan_list", description = "List Jira Plans / Advanced Roadmaps plans")]
+    #[tool(
+        name = "jira_plan_list",
+        description = "List Jira Plans / Advanced Roadmaps plans"
+    )]
     pub async fn jira_plan_list(&self) -> Result<Json<Value>, ErrorData> {
         self.respond(self.app.plan_list().await)
     }
@@ -306,9 +327,9 @@ pub async fn run_streamable_http(host: &str, port: u16, path: &str) -> anyhow::R
 #[cfg(test)]
 mod tests {
     use rmcp::{
-        ClientHandler, ServiceExt,
         model::{CallToolRequestParams, ClientCapabilities, ClientInfo, Implementation},
         transport::StreamableHttpClientTransport,
+        ClientHandler, ServiceExt,
     };
     use serial_test::serial;
     use tempfile::TempDir;
@@ -416,7 +437,9 @@ mod tests {
             .await?;
 
         let tools = client.list_all_tools().await?;
-        assert!(tools.iter().any(|tool| tool.name == "jira_auth_set_credentials"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_auth_set_credentials"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

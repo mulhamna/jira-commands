@@ -1,7 +1,4 @@
-use rmcp::{
-    ErrorData,
-    model::ErrorCode,
-};
+use rmcp::{model::ErrorCode, ErrorData};
 use serde_json::{json, Map, Value};
 
 #[derive(Debug, Clone)]
@@ -67,7 +64,11 @@ impl AppError {
             None => Map::new(),
         };
         payload.insert("details".into(), Value::String(self.detail));
-        ErrorData::new(self.rpc_code, self.stable_code, Some(Value::Object(payload)))
+        ErrorData::new(
+            self.rpc_code,
+            self.stable_code,
+            Some(Value::Object(payload)),
+        )
     }
 
     fn new(

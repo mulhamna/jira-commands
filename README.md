@@ -14,12 +14,12 @@ Replaces the limitations of existing Jira CLIs with full custom field support, n
 
 ## Installation
 
-| Method | Command |
-|---|---|
-| **Homebrew** (macOS/Linux) | `brew tap mulhamna/tap && brew install jira-commands` |
-| **cargo** | `cargo install jira-commands` |
-| **Claude Code plugin** | Add marketplace → install (see below) |
-| **Binary** | Download from [GitHub Releases](https://github.com/mulhamna/jira-commands/releases) |
+| Method                     | Command                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| **Homebrew** (macOS/Linux) | `brew tap mulhamna/tap && brew install jira-commands`                               |
+| **cargo**                  | `cargo install jira-commands`                                                       |
+| **Claude Code plugin**     | Add marketplace → install (see below)                                               |
+| **Binary**                 | Download from [GitHub Releases](https://github.com/mulhamna/jira-commands/releases) |
 
 ### Binary downloads
 
@@ -241,24 +241,24 @@ jira tui --project MYPROJ  # Launch for a specific project
 
 **TUI keyboard shortcuts:**
 
-| Key | Action |
-|---|---|
-| `↑` / `k` | Move up |
-| `↓` / `j` | Move down |
-| `Enter` | View issue detail |
-| `c` | Create new issue |
-| `e` | Edit selected issue (summary, description, assignee, priority) |
-| `a` | Assign selected issue |
-| `w` | Add worklog to selected issue |
-| `l` | Add / remove labels |
-| `m` | Add / remove components |
-| `u` | Upload attachment |
-| `t` | Transition issue (interactive picker) |
-| `o` | Open issue in browser |
-| `r` | Refresh list |
-| `/` | Search — type JQL, press Enter |
-| `?` | Help popup |
-| `q` / `Esc` | Quit / go back |
+| Key         | Action                                                         |
+| ----------- | -------------------------------------------------------------- |
+| `↑` / `k`   | Move up                                                        |
+| `↓` / `j`   | Move down                                                      |
+| `Enter`     | View issue detail                                              |
+| `c`         | Create new issue                                               |
+| `e`         | Edit selected issue (summary, description, assignee, priority) |
+| `a`         | Assign selected issue                                          |
+| `w`         | Add worklog to selected issue                                  |
+| `l`         | Add / remove labels                                            |
+| `m`         | Add / remove components                                        |
+| `u`         | Upload attachment                                              |
+| `t`         | Transition issue (interactive picker)                          |
+| `o`         | Open issue in browser                                          |
+| `r`         | Refresh list                                                   |
+| `/`         | Search — type JQL, press Enter                                 |
+| `?`         | Help popup                                                     |
+| `q` / `Esc` | Quit / go back                                                 |
 
 ### Environment variables
 
@@ -377,14 +377,14 @@ The release workflow will:
 
 ## Roadmap
 
-| Phase | Focus | Status |
-|---|---|---|
-| 1 — Foundation | Auth, config, HTTP client, issue CRUD, TUI | ✅ Done |
-| 2 — Custom fields & Attachments | Dynamic field introspection, file upload | ✅ Done |
-| 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog, JQL builder | ✅ Done |
-| 4 — Power features | Plans API, archive, raw API passthrough | ✅ Done |
-| 5 — UX & Automation | bulk-create, clone, batch, `--json` mode, TUI edit actions, improved `--help` | ✅ Done |
-| 6 — Distribution | Homebrew tap (macOS/Linux), automated formula updates via CI | ✅ Done |
+| Phase                           | Focus                                                                         | Status |
+| ------------------------------- | ----------------------------------------------------------------------------- | ------ |
+| 1 — Foundation                  | Auth, config, HTTP client, issue CRUD, TUI                                    | ✅ Done |
+| 2 — Custom fields & Attachments | Dynamic field introspection, file upload                                      | ✅ Done |
+| 3 — Bulk ops & Advanced TUI     | Bulk edit/transition, worklog, JQL builder                                    | ✅ Done |
+| 4 — Power features              | Plans API, archive, raw API passthrough                                       | ✅ Done |
+| 5 — UX & Automation             | bulk-create, clone, batch, `--json` mode, TUI edit actions, improved `--help` | ✅ Done |
+| 6 — Distribution                | Homebrew tap (macOS/Linux), automated formula updates via CI                  | ✅ Done |
 
 ---
 

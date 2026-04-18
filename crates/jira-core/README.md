@@ -5,6 +5,8 @@
 
 Core library for the [jira-commands](https://crates.io/crates/jira-commands) CLI (`jirac`) — provides the HTTP client, auth, models, and ADF parser as a reusable Rust library.
 
+This crate is released together with the workspace packages in the `mulhamna/jira-commands` repository.
+
 [![Crates.io](https://img.shields.io/crates/v/jira-core.svg)](https://crates.io/crates/jira-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

@@ -309,8 +309,9 @@ jobs:
     steps:
       - name: Download checksums from release
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          curl -sL "https://github.com/mulhamna/jira-commands/releases/download/${GITHUB_REF_NAME}/checksums.txt" -o checksums.txt
+          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${GITHUB_REF_NAME}/checksums.txt" -o checksums.txt
           echo "=== checksums.txt ==="
           cat checksums.txt
 
@@ -318,6 +319,11 @@ jobs:
           SHA_MACOS_X86=$(grep "jirac-macos-x86_64"  checksums.txt | awk '{print $1}')
           SHA_LINUX_ARM=$(grep "jirac-linux-aarch64"  checksums.txt | awk '{print $1}')
           SHA_LINUX_X86=$(grep "jirac-linux-x86_64"   checksums.txt | awk '{print $1}')
+
+          test -n "$SHA_MACOS_ARM"
+          test -n "$SHA_MACOS_X86"
+          test -n "$SHA_LINUX_ARM"
+          test -n "$SHA_LINUX_X86"
 
           echo "VERSION=$VERSION"             >> "$GITHUB_ENV"
           echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> "$GITHUB_ENV"
@@ -331,6 +337,9 @@ jobs:
           repository: mulhamna/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
+
+      - name: Verify formula exists
+        run: test -f homebrew-tap/Formula/jira-commands.rb
 
       - name: Update formula version and SHA256
         run: |

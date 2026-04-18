@@ -5,6 +5,8 @@
 
 A fast, cross-platform Jira terminal client built in Rust.
 
+This crate is released from the Rust workspace in the `mulhamna/jira-commands` repository.
+
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

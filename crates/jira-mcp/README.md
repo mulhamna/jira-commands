@@ -2,6 +2,8 @@
 
 `jirac-mcp` exposes Jira operations over the Model Context Protocol (MCP) using the shared `jira-core` client.
 
+This crate is published from the shared Rust workspace in the `mulhamna/jira-commands` repository.
+
 ## Install
 
 ```bash

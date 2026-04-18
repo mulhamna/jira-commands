@@ -376,7 +376,7 @@ mod tests {
         let server_task = tokio::spawn(async move {
             let service = JiraMcpServer::new().serve(server_transport).await?;
             service.waiting().await?;
-            anyhow::Ok::<(), anyhow::Error>(())
+            Ok(())
         });
 
         let client = TestClient::default().serve(client_transport).await?;

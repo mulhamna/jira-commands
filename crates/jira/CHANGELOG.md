@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/mulhamna/jira-commands/compare/v0.6.0...v0.7.0) (2026-04-18)
+
+
+### Features
+
+* rename binary to jirac with backward-compat shim and install script ([e640726](https://github.com/mulhamna/jira-commands/commit/e640726558b34ba20dcf22ca79bc3728ae5ce67c))
+
 ## [0.6.0](https://github.com/mulhamna/jira-commands/compare/v0.5.0...v0.6.0) (2026-04-18)
 
 

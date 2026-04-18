@@ -4,7 +4,7 @@
 > It is **not** a replacement for Jira, and is **not** affiliated with, endorsed by, or sponsored by Atlassian.
 > All product names and trademarks are the property of their respective owners.
 
-A fast, cross-platform Jira terminal client built in Rust — and a Claude Code plugin to manage Jira without leaving your editor.
+A fast, cross-platform Jira terminal client built in Rust — plus a Claude Code plugin and an open-source MCP server to manage Jira from editor and agent workflows.
 
 Built to fill the gaps left by existing Jira CLIs: full custom field support, native attachment upload, cursor-based pagination, and compatibility with the latest Jira REST API v3.
 
@@ -23,6 +23,7 @@ Built to fill the gaps left by existing Jira CLIs: full custom field support, na
 | **curl** (macOS/Linux)     | `curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh \| bash` |
 | **Homebrew** (macOS/Linux) | `brew tap mulhamna/tap && brew install jira-commands`                               |
 | **cargo**                  | `cargo install jira-commands`                                                       |
+| **cargo (MCP server)**     | `cargo install jira-mcp`                                                            |
 | **Claude Code plugin**     | Add marketplace → install (see below)                                               |
 | **Binary**                 | Download from [GitHub Releases](https://github.com/mulhamna/jira-commands/releases) |
 
@@ -37,6 +38,94 @@ Built to fill the gaps left by existing Jira CLIs: full custom field support, na
 | Windows               | `jirac-windows-x86_64.exe`  |
 
 > Legacy `jira-*` binaries are also included in each release for backward compatibility.
+
+### MCP server
+
+Use `jirac-mcp` when you want Jira available as MCP tools inside an editor, agent, or desktop app that supports the Model Context Protocol.
+
+#### 1. Install the server
+
+```bash
+# Install from crates.io
+cargo install jira-mcp
+
+# Or install the release binary directly
+curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | BINARY=jirac-mcp bash
+```
+
+#### 2. Configure Jira credentials
+
+`jirac-mcp` reads the same credentials as `jirac`.
+
+Option A — use the CLI once:
+
+```bash
+jirac auth login
+```
+
+Option B — use environment variables:
+
+```bash
+export JIRA_URL=https://yourcompany.atlassian.net
+export JIRA_EMAIL=you@example.com
+export JIRA_TOKEN=your_api_token
+```
+
+#### 3. Start the MCP server
+
+```bash
+# Local MCP clients
+jirac-mcp serve --transport stdio
+
+# Remote MCP clients
+jirac-mcp serve --transport streamable-http --host 127.0.0.1 --port 8787 --path /mcp
+```
+
+#### 4. Register it in your MCP client
+
+Most local MCP clients use `stdio`. A typical config looks like this:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "jirac-mcp",
+      "args": ["serve", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+For HTTP-based MCP clients, point them to:
+
+```text
+http://127.0.0.1:8787/mcp
+```
+
+#### 5. Use the Jira tools
+
+Typed MCP tools include:
+
+- `jira_auth_status`, `jira_auth_set_credentials`, `jira_auth_logout`
+- `jira_issue_list`, `jira_issue_view`, `jira_issue_types_list`, `jira_issue_fields`, `jira_issue_transitions_list`
+- `jira_issue_create`, `jira_issue_update`, `jira_issue_delete`, `jira_issue_transition`, `jira_issue_attach`
+- `jira_worklog_list`, `jira_worklog_add`, `jira_worklog_delete`
+- `jira_issue_bulk_transition`, `jira_issue_bulk_update`, `jira_issue_archive`
+- `jira_plan_list`, `jira_api_request`
+
+Example prompts for an MCP client:
+
+- "List my assigned Jira issues"
+- "Show issue `PROJ-123`"
+- "Create a bug in `PROJ` titled `Login fails on Safari`"
+- "Transition `PROJ-123` to Done"
+- "Log `2h` on `PROJ-123` with comment `Implemented auth flow`"
+
+Notes:
+
+- Destructive tools like delete, archive, and bulk updates require `confirm=true`.
+- `jira_issue_attach` supports local file paths and inline base64 uploads.
+- `jira_api_request` is the escape hatch for Jira REST endpoints not yet covered by typed tools.
 
 ### Claude Code plugin
 
@@ -122,6 +211,12 @@ jirac issue bulk-transition -p PROJ -q 'status = Done AND updated < -30d' -t Clo
 jirac api get /rest/api/3/project        # raw JSON, any endpoint
 ```
 
+**Use Jira from any MCP client**
+```bash
+jirac-mcp serve --transport stdio
+```
+Expose typed Jira tools to MCP-compatible editors and agents while reusing the same Jira config as `jirac`.
+
 ---
 
 ## Features
@@ -136,6 +231,7 @@ jirac api get /rest/api/3/project        # raw JSON, any endpoint
 - **Raw API** — passthrough to any Jira REST endpoint
 - **Plans API** — Jira Premium / Advanced Roadmaps support
 - **Claude Code plugin** — 9 skills to manage Jira from within Claude Code
+- **MCP server** — typed tools for MCP clients over stdio or Streamable HTTP
 - **Cross-platform** — macOS, Linux, Windows (single binary, no runtime deps)
 - **Jira REST API v3** — latest endpoints (`/search/jql`, cursor pagination)
 
@@ -317,7 +413,7 @@ timeout_secs = 30
 
 ```toml
 [dependencies]
-jira-core = "0.6"
+jira-core = "0.7"
 ```
 
 ```rust
@@ -371,6 +467,12 @@ jira-commands/
 │   │       ├── adf.rs          # Atlassian Document Format parser
 │   │       ├── error.rs        # thiserror error types
 │   │       └── model/          # Issue, Field, Sprint, Worklog types
+│   ├── jira-mcp/               # MCP server binary (published as jira-mcp)
+│   │   └── src/
+│   │       ├── app.rs          # Jira adapter and validation layer
+│   │       ├── models.rs       # MCP tool input schemas
+│   │       ├── server.rs       # MCP tool router + transports
+│   │       └── main.rs
 │   └── jira/                   # binary (published to crates.io as jira-commands)
 │       └── src/
 │           ├── main.rs
@@ -396,9 +498,9 @@ git push origin main
 
 The release workflow will:
 1. Build binaries for all 5 targets (Linux x86_64/ARM64, macOS x86_64/ARM64, Windows x86_64)
-2. Both `jirac-*` and legacy `jira-*` binaries are included in each release
+2. Include `jirac-*`, `jirac-mcp-*`, and legacy `jira-*` binaries in each release
 3. Publish `jira-core` to crates.io
-4. Publish `jira-commands` to crates.io
+4. Publish `jira-mcp` and `jira-commands` to crates.io
 5. Create a GitHub Release with binaries and SHA256 checksums
 6. Update the Homebrew formula in [mulhamna/homebrew-tap](https://github.com/mulhamna/homebrew-tap)
 

@@ -617,28 +617,46 @@ impl JiraClient {
         issue_key: &str,
         file_path: &std::path::Path,
     ) -> Result<Vec<Attachment>> {
-        use reqwest::{header::HeaderValue, multipart};
-
-        let headers = self.auth_headers_no_content_type()?;
-        let url = self.platform_url(&format!("/issue/{issue_key}/attachments"));
-
         let file_name = file_path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("attachment")
             .to_string();
-
         let bytes = std::fs::read(file_path)?;
-
         let mime = mime_guess::from_path(file_path)
             .first_or_octet_stream()
             .to_string();
+
+        self.upload_attachment_bytes(issue_key, &file_name, bytes, Some(&mime))
+            .await
+    }
+
+    /// Upload an in-memory attachment to an issue.
+    pub async fn upload_attachment_bytes(
+        &self,
+        issue_key: &str,
+        file_name: &str,
+        bytes: Vec<u8>,
+        media_type: Option<&str>,
+    ) -> Result<Vec<Attachment>> {
+        use reqwest::{header::HeaderValue, multipart};
+
+        let headers = self.auth_headers_no_content_type()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/attachments"));
+        let mime = media_type
+            .map(|value| value.to_string())
+            .or_else(|| {
+                mime_guess::from_path(file_name)
+                    .first_raw()
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "application/octet-stream".to_string());
 
         let http = &self.http;
         let raw_attachments: Vec<Value> = self
             .request_multipart(|| {
                 let part = multipart::Part::bytes(bytes.clone())
-                    .file_name(file_name.clone())
+                    .file_name(file_name.to_string())
                     .mime_str(&mime)
                     .expect("invalid mime type");
                 let form = multipart::Form::new().part("file", part);

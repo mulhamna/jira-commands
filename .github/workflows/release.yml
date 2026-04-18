@@ -47,15 +47,17 @@ jobs:
             exit 1
           fi
 
-      - name: Verify all three versions match
+      - name: Verify all four versions match
         run: |
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
-          if [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
+          if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
             echo "ERROR: Version mismatch before release!"
             echo "  jira-core:     $CORE_VER"
+            echo "  jira-mcp:      $MCP_VER"
             echo "  jira-commands: $BIN_VER"
             echo "  plugin:        $PLUGIN_VER"
             exit 1
@@ -94,22 +96,27 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-x86_64
+            mcp_artifact: jirac-mcp-linux-x86_64
             legacy_artifact: jira-linux-x86_64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-aarch64
+            mcp_artifact: jirac-mcp-linux-aarch64
             legacy_artifact: jira-linux-aarch64
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-x86_64
+            mcp_artifact: jirac-mcp-macos-x86_64
             legacy_artifact: jira-macos-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-aarch64
+            mcp_artifact: jirac-mcp-macos-aarch64
             legacy_artifact: jira-macos-aarch64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact: jirac-windows-x86_64.exe
+            mcp_artifact: jirac-mcp-windows-x86_64.exe
             legacy_artifact: jira-windows-x86_64.exe
 
     steps:
@@ -131,16 +138,17 @@ jobs:
 
       - name: Build (zigbuild — Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands
+        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
 
       - name: Build (native)
         if: matrix.target != 'aarch64-unknown-linux-gnu'
-        run: cargo build --release --target ${{ matrix.target }} -p jira-commands
+        run: cargo build --release --target ${{ matrix.target }} -p jira-commands -p jira-mcp
 
       - name: Copy binaries (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.mcp_artifact }}
           cp target/${{ matrix.target }}/release/jira  ${{ matrix.legacy_artifact }}
 
       - name: Copy binaries (Windows)
@@ -148,12 +156,18 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
+          Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.mcp_artifact }}
           Copy-Item target/${{ matrix.target }}/release/jira.exe  ${{ matrix.legacy_artifact }}
 
       - name: Generate build provenance attestation (jirac)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: ${{ matrix.artifact }}
+
+      - name: Generate build provenance attestation (jirac-mcp)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: ${{ matrix.mcp_artifact }}
 
       - name: Generate build provenance attestation (jira legacy)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -165,6 +179,13 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+      - name: Upload artifact (jirac-mcp)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.mcp_artifact }}
+          path: ${{ matrix.mcp_artifact }}
           if-no-files-found: error
 
       - name: Upload artifact (jira legacy)
@@ -222,6 +243,16 @@ jobs:
           done
           echo "ERROR: jira-core v${VERSION} not found in sparse index after 5 minutes."
           exit 1
+
+      - name: Publish jira-mcp (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-mcp" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-mcp v${VERSION} already on crates.io — skipping publish"
+          else
+            echo "Publishing jira-mcp v${VERSION}..."
+            cargo publish -p jira-mcp --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
 
       - name: Publish jira-commands (skip if already published)
         run: |

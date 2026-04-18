@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/jira-core", "crates/jira"]
+members = ["crates/jira-core", "crates/jira", "crates/jira-mcp"]
 resolver = "2"
 
 [workspace.dependencies]

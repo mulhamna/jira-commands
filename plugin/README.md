@@ -6,6 +6,8 @@ Manage Jira issues directly from Claude Code. Create, list, view, transition, lo
 
 > **Requires** the `jirac` CLI to be installed: `cargo install jira-commands`
 
+> **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` with `cargo install jira-mcp`.
+
 ---
 
 ## Installation

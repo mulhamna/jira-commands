@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# install.sh — one-line installer for jirac
+# install.sh — one-line installer for jirac or jirac-mcp
 #
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
 #
 # What it does:
 #   1. Detects your OS and architecture
-#   2. Downloads the latest jirac binary from GitHub Releases
+#   2. Downloads the latest binary from GitHub Releases
 #   3. Verifies the SHA-256 checksum
 #   4. Installs to ~/.local/bin (or /usr/local/bin if writable and ~/.local/bin not in PATH)
 #
-# jirac is an independent CLI tool for the Jira ecosystem.
+# jirac and jirac-mcp are independent tools for the Jira ecosystem.
 # It is not affiliated with or endorsed by Atlassian.
 
 set -euo pipefail
 
 REPO="mulhamna/jira-commands"
-BINARY="jirac"
+BINARY="${BINARY:-jirac}"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -34,21 +34,28 @@ error()   { echo -e "${RED}error:${RESET} $*" >&2; exit 1; }
 detect_platform() {
   local os arch
 
+  case "$BINARY" in
+    jirac|jirac-mcp) ;;
+    *)
+      error "Unsupported BINARY='${BINARY}'. Use 'jirac' or 'jirac-mcp'."
+      ;;
+  esac
+
   os="$(uname -s)"
   arch="$(uname -m)"
 
   case "$os" in
     Linux)
       case "$arch" in
-        x86_64)           echo "jirac-linux-x86_64" ;;
-        aarch64|arm64)    echo "jirac-linux-aarch64" ;;
+        x86_64)           echo "${BINARY}-linux-x86_64" ;;
+        aarch64|arm64)    echo "${BINARY}-linux-aarch64" ;;
         *)                error "Unsupported Linux architecture: $arch" ;;
       esac
       ;;
     Darwin)
       case "$arch" in
-        x86_64)           echo "jirac-macos-x86_64" ;;
-        arm64)            echo "jirac-macos-aarch64" ;;
+        x86_64)           echo "${BINARY}-macos-x86_64" ;;
+        arm64)            echo "${BINARY}-macos-aarch64" ;;
         *)                error "Unsupported macOS architecture: $arch" ;;
       esac
       ;;
@@ -111,8 +118,8 @@ fetch_latest_tag() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 main() {
   echo ""
-  echo -e "${BOLD}jirac installer${RESET}"
-  echo "  A terminal client for the Jira ecosystem (not affiliated with Atlassian)"
+  echo -e "${BOLD}${BINARY} installer${RESET}"
+  echo "  Jira tooling for terminals and MCP clients (not affiliated with Atlassian)"
   echo ""
 
   check_deps
@@ -165,7 +172,7 @@ main() {
   mv "${tmp_dir}/${BINARY}" "$install_path"
 
   echo ""
-  echo -e "${GREEN}jirac ${tag} installed to ${install_path}${RESET}"
+  echo -e "${GREEN}${BINARY} ${tag} installed to ${install_path}${RESET}"
 
   # PATH check
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$install_dir"; then
@@ -177,7 +184,11 @@ main() {
     echo ""
   fi
 
-  echo "  Run: jirac auth login"
+  if [ "$BINARY" = "jirac" ]; then
+    echo "  Run: jirac auth login"
+  else
+    echo "  Run: jirac-mcp serve --transport stdio"
+  fi
   echo "  Docs: https://github.com/${REPO}"
   echo ""
 

@@ -38,20 +38,23 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Check version consistency (jira-core == jira-commands == plugin)
+      - name: Check version consistency (jira-core == jira-mcp == jira-commands == plugin)
         run: |
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
           echo "jira-core:     $CORE_VER"
+          echo "jira-mcp:      $MCP_VER"
           echo "jira-commands: $BIN_VER"
           echo "plugin:        $PLUGIN_VER"
 
-          if [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
+          if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
             echo ""
-            echo "ERROR: Version mismatch! All three must be equal."
+            echo "ERROR: Version mismatch! All four must be equal."
             echo "  Fix: bump version in crates/jira-core/Cargo.toml,"
+            echo "       crates/jira-mcp/Cargo.toml,"
             echo "       crates/jira/Cargo.toml (package + jira-core dep),"
             echo "       and plugin/.claude-plugin/plugin.json"
             exit 1

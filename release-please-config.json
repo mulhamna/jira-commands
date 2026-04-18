@@ -14,6 +14,7 @@
           "jsonpath": "$.version"
         },
         "/crates/jira-core/Cargo.toml",
+        "/crates/jira-mcp/Cargo.toml",
         "/crates/jira/Cargo.toml"
       ]
     }

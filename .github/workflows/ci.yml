@@ -61,8 +61,8 @@ jobs:
           fi
 
       - name: Check CHANGELOG entry exists for current version
-        # release-please writes per-package CHANGELOGs. Accept an entry in any
-        # of: root CHANGELOG.md, jira-core/CHANGELOG.md, or jira/CHANGELOG.md.
+        # release-please writes the workspace changelog to root CHANGELOG.md.
+        # Also accept historical per-package changelog locations.
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \

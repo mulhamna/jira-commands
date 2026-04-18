@@ -64,9 +64,8 @@ jobs:
           fi
 
       - name: Verify CHANGELOG has entry for this version
-        # release-please (rust strategy) writes to crates/jira/CHANGELOG.md by
-        # default. Also accept root CHANGELOG.md (manual entries) or
-        # crates/jira-core/CHANGELOG.md (if core is ever released separately).
+        # release-please writes the workspace changelog to root CHANGELOG.md.
+        # Also accept historical per-package changelog locations.
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
@@ -75,7 +74,7 @@ jobs:
             echo "✓ CHANGELOG entry found for v${VERSION}"
           else
             echo "ERROR: No CHANGELOG entry for v${VERSION} in any location."
-            echo "  release-please should have created one in crates/jira/CHANGELOG.md."
+            echo "  release-please should have created one in CHANGELOG.md."
             exit 1
           fi
 

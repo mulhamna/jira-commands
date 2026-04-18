@@ -1,21 +1,22 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-
   "include-component-in-tag": false,
-
+  "plugins": [
+    {
+      "type": "cargo-workspace"
+    }
+  ],
   "packages": {
-    "crates/jira": {
+    ".": {
       "release-type": "rust",
       "component": "jira-commands",
+      "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
           "type": "json",
           "path": "/plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
-        },
-        "/crates/jira-core/Cargo.toml",
-        "/crates/jira-mcp/Cargo.toml",
-        "/crates/jira/Cargo.toml"
+        }
       ]
     }
   }

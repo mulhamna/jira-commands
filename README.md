@@ -6,6 +6,7 @@ Replaces the limitations of existing Jira CLIs with full custom field support, n
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
+[![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap+)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Changelog](https://img.shields.io/badge/changelog-CHANGELOG.md-blue)](CHANGELOG.md)
 
@@ -22,13 +23,13 @@ Replaces the limitations of existing Jira CLIs with full custom field support, n
 
 ### Binary downloads
 
-| Platform | File |
-|---|---|
-| macOS (Apple Silicon) | `jira-macos-aarch64` |
-| macOS (Intel) | `jira-macos-x86_64` |
-| Linux (x86_64) | `jira-linux-x86_64` |
-| Linux (ARM64) | `jira-linux-aarch64` |
-| Windows | `jira-windows-x86_64.exe` |
+| Platform              | File                      |
+| --------------------- | ------------------------- |
+| macOS (Apple Silicon) | `jira-macos-aarch64`      |
+| macOS (Intel)         | `jira-macos-x86_64`       |
+| Linux (x86_64)        | `jira-linux-x86_64`       |
+| Linux (ARM64)         | `jira-linux-aarch64`      |
+| Windows               | `jira-windows-x86_64.exe` |
 
 ### Claude Code plugin
 
@@ -46,17 +47,17 @@ jira auth login
 
 Then use Jira directly from Claude Code:
 
-| Skill | Description |
-|---|---|
-| `/jira:list-issues` | List issues by project or JQL |
-| `/jira:view-issue` | View full issue detail |
-| `/jira:create-issue` | Create a new issue (interactive) |
-| `/jira:transition` | Transition an issue to a new status |
-| `/jira:worklog` | List, add, or delete worklogs |
-| `/jira:bulk-transition` | Transition multiple issues via JQL |
-| `/jira:attach` | Upload a file to an issue |
-| `/jira:jql` | Build and run a JQL query |
-| `/jira:api` | Raw REST API passthrough |
+| Skill                   | Description                         |
+| ----------------------- | ----------------------------------- |
+| `/jira:list-issues`     | List issues by project or JQL       |
+| `/jira:view-issue`      | View full issue detail              |
+| `/jira:create-issue`    | Create a new issue (interactive)    |
+| `/jira:transition`      | Transition an issue to a new status |
+| `/jira:worklog`         | List, add, or delete worklogs       |
+| `/jira:bulk-transition` | Transition multiple issues via JQL  |
+| `/jira:attach`          | Upload a file to an issue           |
+| `/jira:jql`             | Build and run a JQL query           |
+| `/jira:api`             | Raw REST API passthrough            |
 
 ---
 

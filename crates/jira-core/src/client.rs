@@ -67,7 +67,7 @@ impl JiraClient {
 
     fn auth_headers(&self) -> Result<HeaderMap> {
         let token = self.config.token.as_deref().ok_or_else(|| {
-            JiraError::Auth("No token configured. Run `jira auth login` first.".into())
+            JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
 
         let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
@@ -87,7 +87,7 @@ impl JiraClient {
     /// Auth headers without Content-Type — required for multipart uploads.
     fn auth_headers_no_content_type(&self) -> Result<HeaderMap> {
         let token = self.config.token.as_deref().ok_or_else(|| {
-            JiraError::Auth("No token configured. Run `jira auth login` first.".into())
+            JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
 
         let credentials = base64_encode(&format!("{}:{}", self.config.email, token));

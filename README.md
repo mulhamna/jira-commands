@@ -1,12 +1,16 @@
 # jira-commands
 
+> **jirac** is an independent CLI tool that helps you work with the Jira ecosystem from your terminal.
+> It is **not** a replacement for Jira, and is **not** affiliated with, endorsed by, or sponsored by Atlassian.
+> All product names and trademarks are the property of their respective owners.
+
 A fast, cross-platform Jira terminal client built in Rust — and a Claude Code plugin to manage Jira without leaving your editor.
 
-Replaces the limitations of existing Jira CLIs with full custom field support, native attachment upload, cursor-based pagination, and compatibility with the latest Jira REST API v3.
+Built to fill the gaps left by existing Jira CLIs: full custom field support, native attachment upload, cursor-based pagination, and compatibility with the latest Jira REST API v3.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
-[![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap+)
+[![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Changelog](https://img.shields.io/badge/changelog-CHANGELOG.md-blue)](CHANGELOG.md)
 
@@ -16,6 +20,7 @@ Replaces the limitations of existing Jira CLIs with full custom field support, n
 
 | Method                     | Command                                                                             |
 | -------------------------- | ----------------------------------------------------------------------------------- |
+| **curl** (macOS/Linux)     | `curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh \| bash` |
 | **Homebrew** (macOS/Linux) | `brew tap mulhamna/tap && brew install jira-commands`                               |
 | **cargo**                  | `cargo install jira-commands`                                                       |
 | **Claude Code plugin**     | Add marketplace → install (see below)                                               |
@@ -23,20 +28,22 @@ Replaces the limitations of existing Jira CLIs with full custom field support, n
 
 ### Binary downloads
 
-| Platform              | File                      |
-| --------------------- | ------------------------- |
-| macOS (Apple Silicon) | `jira-macos-aarch64`      |
-| macOS (Intel)         | `jira-macos-x86_64`       |
-| Linux (x86_64)        | `jira-linux-x86_64`       |
-| Linux (ARM64)         | `jira-linux-aarch64`      |
-| Windows               | `jira-windows-x86_64.exe` |
+| Platform              | File                        |
+| --------------------- | --------------------------- |
+| macOS (Apple Silicon) | `jirac-macos-aarch64`       |
+| macOS (Intel)         | `jirac-macos-x86_64`        |
+| Linux (x86_64)        | `jirac-linux-x86_64`        |
+| Linux (ARM64)         | `jirac-linux-aarch64`       |
+| Windows               | `jirac-windows-x86_64.exe`  |
+
+> Legacy `jira-*` binaries are also included in each release for backward compatibility.
 
 ### Claude Code plugin
 
 ```bash
 # 1. Install the CLI first (the plugin calls this binary)
 cargo install jira-commands
-jira auth login
+jirac auth login
 ```
 
 ```
@@ -61,38 +68,58 @@ Then use Jira directly from Claude Code:
 
 ---
 
+## Upgrading from v0.x
+
+The binary has been renamed from `jira` to `jirac` starting in v0.7.0.
+
+The old `jira` binary is still included in every release and continues to work — it will just print a deprecation warning. It will be removed in a future major release.
+
+**Action needed:**
+
+```bash
+# Update your aliases
+alias jira='jirac'   # optional transitional alias
+
+# Or just start using the new name directly
+jirac issue list
+```
+
+If you installed via Homebrew, `brew upgrade jira-commands` handles everything automatically (both `jirac` and a `jira` symlink are installed).
+
+---
+
 ## Use cases
 
 **Daily standup prep**
 ```bash
-jira issue list                          # or in Claude Code: /jira:list-issues
+jirac issue list                         # or in Claude Code: /jira:list-issues
 ```
 See all your in-progress issues in one command.
 
 **Create a bug from a stack trace**
 ```bash
-jira issue create -p PROJ --type Bug     # or: /jira:create-issue
+jirac issue create -p PROJ --type Bug    # or: /jira:create-issue
 ```
 Interactive prompts handle summary, description, priority, and all custom fields dynamically.
 
 **Transition after a PR merge**
 ```bash
-jira issue transition PROJ-123 --to Done  # or: /jira:transition
+jirac issue transition PROJ-123 --to Done  # or: /jira:transition
 ```
 
 **Log time at end of day**
 ```bash
-jira issue worklog add PROJ-123 --time 2h --comment "Implemented auth flow"
+jirac issue worklog add PROJ-123 --time 2h --comment "Implemented auth flow"
 ```
 
 **Bulk close resolved issues**
 ```bash
-jira issue bulk-transition -p PROJ -q 'status = Done AND updated < -30d' -t Closed
+jirac issue bulk-transition -p PROJ -q 'status = Done AND updated < -30d' -t Closed
 ```
 
 **Explore any Jira endpoint**
 ```bash
-jira api get /rest/api/3/project         # raw JSON, any endpoint
+jirac api get /rest/api/3/project        # raw JSON, any endpoint
 ```
 
 ---
@@ -123,7 +150,7 @@ Go to: https://id.atlassian.com/manage-profile/security/api-tokens → **Create 
 ### 2. Login
 
 ```bash
-jira auth login
+jirac auth login
 ```
 
 ```
@@ -138,7 +165,7 @@ Credentials are stored in `~/.config/jira/config.toml` with `600` permissions (o
 ### 3. Verify
 
 ```bash
-jira auth status
+jirac auth status
 ```
 
 ---
@@ -149,94 +176,94 @@ jira auth status
 
 ```bash
 # List issues assigned to you (default)
-jira issue list
+jirac issue list
 
 # List issues by project
-jira issue list --project MYPROJ
+jirac issue list --project MYPROJ
 
 # List issues with custom JQL
-jira issue list --jql "project = MYPROJ AND status = 'In Progress'"
+jirac issue list --jql "project = MYPROJ AND status = 'In Progress'"
 
 # View issue detail
-jira issue view MYPROJ-123
+jirac issue view MYPROJ-123
 
 # Create an issue (interactive)
-jira issue create --project MYPROJ
+jirac issue create --project MYPROJ
 
 # Update an issue
-jira issue update MYPROJ-123 --summary "Updated title"
-jira issue update MYPROJ-123 --assignee teammate@example.com
+jirac issue update MYPROJ-123 --summary "Updated title"
+jirac issue update MYPROJ-123 --assignee teammate@example.com
 
 # Transition an issue (interactive picker)
-jira issue transition MYPROJ-123
+jirac issue transition MYPROJ-123
 
 # Transition with target status
-jira issue transition MYPROJ-123 --to "In Progress"
+jirac issue transition MYPROJ-123 --to "In Progress"
 
 # Upload attachment
-jira issue attach MYPROJ-123 ./screenshot.png
+jirac issue attach MYPROJ-123 ./screenshot.png
 
 # Delete an issue
-jira issue delete MYPROJ-123
+jirac issue delete MYPROJ-123
 ```
 
 ### Worklog
 
 ```bash
-jira issue worklog list MYPROJ-123
-jira issue worklog add MYPROJ-123 --time 2h --comment "Fixed auth bug"
-jira issue worklog delete MYPROJ-123 --id 10234
+jirac issue worklog list MYPROJ-123
+jirac issue worklog add MYPROJ-123 --time 2h --comment "Fixed auth bug"
+jirac issue worklog delete MYPROJ-123 --id 10234
 ```
 
 ### Bulk operations
 
 ```bash
 # Bulk transition all matching issues
-jira issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"
+jirac issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"
 
 # Bulk update a field
-jira issue bulk-update -p MYPROJ -q 'status = Done' --field assignee --value me@example.com
+jirac issue bulk-update -p MYPROJ -q 'status = Done' --field assignee --value me@example.com
 
 # Archive issues
-jira issue archive -p MYPROJ -q 'status = Done AND updated < -90d'
+jirac issue archive -p MYPROJ -q 'status = Done AND updated < -90d'
 ```
 
 ### Interactive JQL builder
 
 ```bash
-jira issue jql
+jirac issue jql
 ```
 
 ### Auth commands
 
 ```bash
-jira auth login
-jira auth status
-jira auth update --token NEW_TOKEN
-jira auth update --url https://new.atlassian.net
-jira auth update --email new@email.com
-jira auth logout
+jirac auth login
+jirac auth status
+jirac auth update --token NEW_TOKEN
+jirac auth update --url https://new.atlassian.net
+jirac auth update --email new@email.com
+jirac auth logout
 ```
 
 ### Raw API passthrough
 
 ```bash
-jira api get /rest/api/3/serverInfo
-jira api get /rest/api/3/issue/MYPROJ-123
-jira api post /rest/api/3/issue --body '{"fields":{...}}'
+jirac api get /rest/api/3/serverInfo
+jirac api get /rest/api/3/issue/MYPROJ-123
+jirac api post /rest/api/3/issue --body '{"fields":{...}}'
 ```
 
 ### Plans (Jira Premium)
 
 ```bash
-jira plan list
+jirac plan list
 ```
 
 ### TUI
 
 ```bash
-jira tui                   # Launch for assigned issues (currentUser)
-jira tui --project MYPROJ  # Launch for a specific project
+jirac tui                   # Launch for assigned issues (currentUser)
+jirac tui --project MYPROJ  # Launch for a specific project
 ```
 
 **TUI keyboard shortcuts:**
@@ -290,7 +317,7 @@ timeout_secs = 30
 
 ```toml
 [dependencies]
-jira-core = "0.4"
+jira-core = "0.6"
 ```
 
 ```rust
@@ -330,6 +357,7 @@ cargo build --all
 ```
 jira-commands/
 ├── Cargo.toml                  # workspace root
+├── install.sh                  # one-line curl installer
 ├── plugin/                     # Claude Code plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json
@@ -359,7 +387,7 @@ Releases are fully automated via [release-please](https://github.com/googleapis/
 
 ```bash
 # 1. Push commits to main using Conventional Commits
-git commit -m "feat: add new command"
+git commit -m "feat: rename binary to jirac"
 git push origin main
 
 # 2. release-please automatically creates/updates a Release PR
@@ -368,10 +396,11 @@ git push origin main
 
 The release workflow will:
 1. Build binaries for all 5 targets (Linux x86_64/ARM64, macOS x86_64/ARM64, Windows x86_64)
-2. Publish `jira-core` to crates.io
-3. Publish `jira-commands` to crates.io
-4. Create a GitHub Release with binaries and SHA256 checksums
-5. Update the Homebrew formula in [mulhamna/homebrew-tap](https://github.com/mulhamna/homebrew-tap)
+2. Both `jirac-*` and legacy `jira-*` binaries are included in each release
+3. Publish `jira-core` to crates.io
+4. Publish `jira-commands` to crates.io
+5. Create a GitHub Release with binaries and SHA256 checksums
+6. Update the Homebrew formula in [mulhamna/homebrew-tap](https://github.com/mulhamna/homebrew-tap)
 
 ---
 
@@ -385,6 +414,7 @@ The release workflow will:
 | 4 — Power features              | Plans API, archive, raw API passthrough                                       | ✅ Done |
 | 5 — UX & Automation             | bulk-create, clone, batch, `--json` mode, TUI edit actions, improved `--help` | ✅ Done |
 | 6 — Distribution                | Homebrew tap (macOS/Linux), automated formula updates via CI                  | ✅ Done |
+| 7 — Rename & Install            | Binary rename `jira` → `jirac`, curl install script, ecosystem positioning    | ✅ Done |
 
 ---
 

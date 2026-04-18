@@ -11,6 +11,13 @@ keywords = ["jira", "atlassian", "cli", "tui"]
 categories = ["command-line-utilities"]
 
 [[bin]]
+name = "jirac"
+path = "src/main.rs"
+
+# Legacy shim — kept for backward compatibility.
+# Prints a deprecation warning then runs the same code.
+# Will be removed in a future major release.
+[[bin]]
 name = "jira"
 path = "src/main.rs"
 

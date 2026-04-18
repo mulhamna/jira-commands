@@ -1,6 +1,9 @@
 # jira-core
 
-Core library for the [jira-commands](https://crates.io/crates/jira-commands) Jira CLI — provides the HTTP client, auth, models, and ADF parser as a reusable Rust library.
+> **jira-core** is an independent Rust library for the Jira ecosystem.
+> It is **not** affiliated with, endorsed by, or sponsored by Atlassian.
+
+Core library for the [jira-commands](https://crates.io/crates/jira-commands) CLI (`jirac`) — provides the HTTP client, auth, models, and ADF parser as a reusable Rust library.
 
 [![Crates.io](https://img.shields.io/crates/v/jira-core.svg)](https://crates.io/crates/jira-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -9,7 +12,7 @@ Core library for the [jira-commands](https://crates.io/crates/jira-commands) Jir
 
 ```toml
 [dependencies]
-jira-core = "0.5"
+jira-core = "0.6"
 ```
 
 ```rust
@@ -64,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
 
 ## Auth
 
-Credentials are loaded automatically from `~/.config/jira/config.toml` (managed by `jira auth login`) or from environment variables:
+Credentials are loaded automatically from `~/.config/jira/config.toml` (managed by `jirac auth login`) or from environment variables:
 
 ```bash
 JIRA_URL=https://yourcompany.atlassian.net

@@ -18,7 +18,7 @@ pub enum AuthCommand {
     /// Remove the stored API token
     ///
     /// Clears only the token — URL and email are preserved.
-    /// Run `jira auth login` again to set a new token.
+    /// Run `jirac auth login` again to set a new token.
     Logout,
 
     /// Show current authentication status and configuration
@@ -133,7 +133,7 @@ async fn status() -> Result<()> {
     let config = JiraConfig::load().unwrap_or_default();
 
     if config.base_url.is_empty() || config.email.is_empty() {
-        println!("Not configured. Run `jira auth login` to set up.");
+        println!("Not configured. Run `jirac auth login` to set up.");
         return Ok(());
     }
 
@@ -145,7 +145,7 @@ async fn status() -> Result<()> {
     if config.token.is_some() {
         println!("  Token: ✓ stored in {}", config_file_path().display());
     } else {
-        println!("  Token: ✗ not found — run `jira auth login`");
+        println!("  Token: ✗ not found — run `jirac auth login`");
     }
 
     if let Some(project) = &config.project {

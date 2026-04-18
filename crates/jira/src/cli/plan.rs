@@ -10,7 +10,7 @@ pub enum PlanCommand {
     /// This command will return an error on Standard and Free tiers.
     ///
     /// To check your Jira tier:
-    ///   jira api get /rest/api/3/serverInfo
+    ///   jirac api get /rest/api/3/serverInfo
     ///
     /// Shows: plan ID, name, and status.
     List,

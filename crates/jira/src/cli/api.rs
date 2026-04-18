@@ -20,9 +20,9 @@ pub enum ApiCommand {
     ///   /rest/agile/1.0/board/42/sprint             sprints for a board
     ///
     /// Examples:
-    ///   jira api get /rest/api/3/serverInfo
-    ///   jira api get /rest/api/3/myself
-    ///   jira api get /rest/api/3/issue/PROJ-123/transitions
+    ///   jirac api get /rest/api/3/serverInfo
+    ///   jirac api get /rest/api/3/myself
+    ///   jirac api get /rest/api/3/issue/PROJ-123/transitions
     #[command(name = "get")]
     Get {
         /// API path starting with /rest/... (e.g. /rest/api/3/serverInfo)
@@ -34,10 +34,10 @@ pub enum ApiCommand {
     /// Prints the response JSON on success, or nothing on 201/204 No Content.
     ///
     /// Examples:
-    ///   jira api post /rest/api/3/issue \
+    ///   jirac api post /rest/api/3/issue \
     ///     --body '{"fields":{"project":{"key":"PROJ"},"summary":"Test","issuetype":{"name":"Task"}}}'
     ///
-    ///   jira api post /rest/api/3/issue/PROJ-123/comment \
+    ///   jirac api post /rest/api/3/issue/PROJ-123/comment \
     ///     --body '{"body":{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}}'
     #[command(name = "post")]
     Post {
@@ -53,7 +53,7 @@ pub enum ApiCommand {
     /// PUT replaces the resource entirely. For partial field updates, use PATCH.
     ///
     /// Examples:
-    ///   jira api put /rest/api/3/issue/PROJ-123 \
+    ///   jirac api put /rest/api/3/issue/PROJ-123 \
     ///     --body '{"fields":{"summary":"New title","priority":{"name":"High"}}}'
     #[command(name = "put")]
     Put {
@@ -67,9 +67,9 @@ pub enum ApiCommand {
     /// Send a DELETE request — no output on success (204 No Content)
     ///
     /// Examples:
-    ///   jira api delete /rest/api/3/issue/PROJ-123
-    ///   jira api delete /rest/api/3/issue/PROJ-123/worklog/12345
-    ///   jira api delete /rest/api/3/issue/PROJ-123/attachments/67890
+    ///   jirac api delete /rest/api/3/issue/PROJ-123
+    ///   jirac api delete /rest/api/3/issue/PROJ-123/worklog/12345
+    ///   jirac api delete /rest/api/3/issue/PROJ-123/attachments/67890
     #[command(name = "delete")]
     Delete {
         /// API path starting with /rest/...
@@ -81,7 +81,7 @@ pub enum ApiCommand {
     /// PATCH applies partial updates — only the fields in the body are changed.
     ///
     /// Examples:
-    ///   jira api patch /rest/api/3/issue/PROJ-123 \
+    ///   jirac api patch /rest/api/3/issue/PROJ-123 \
     ///     --body '{"fields":{"priority":{"name":"High"}}}'
     #[command(name = "patch")]
     Patch {

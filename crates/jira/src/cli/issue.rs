@@ -22,11 +22,11 @@ pub enum IssueCommand {
     /// Use --project for a project overview, or --jql for full control.
     ///
     /// Examples:
-    ///   jira issue list                              # your assigned issues
-    ///   jira issue list -p PROJ                      # all issues in project
-    ///   jira issue list -p PROJ -l 50                # up to 50 results
-    ///   jira issue list --jql 'status = "In Progress" AND project = PROJ'
-    ///   jira issue list --jql 'sprint = openSprints() AND assignee = me'
+    ///   jirac issue list                              # your assigned issues
+    ///   jirac issue list -p PROJ                      # all issues in project
+    ///   jirac issue list -p PROJ -l 50                # up to 50 results
+    ///   jirac issue list --jql 'status = "In Progress" AND project = PROJ'
+    ///   jirac issue list --jql 'sprint = openSprints() AND assignee = me'
     List {
         /// Project key (e.g. PROJ). Overrides default project from config.
         #[arg(short, long, value_name = "PROJECT")]
@@ -48,8 +48,8 @@ pub enum IssueCommand {
     /// created/updated timestamps, attachment list, and rendered description.
     ///
     /// Examples:
-    ///   jira issue view PROJ-123
-    ///   jira issue view PROJ-123 --json
+    ///   jirac issue view PROJ-123
+    ///   jirac issue view PROJ-123 --json
     View {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -70,15 +70,15 @@ pub enum IssueCommand {
     /// --field takes any field ID (including customfield_XXXXX) as key=value.
     ///
     /// To discover available fields and their IDs for a project, run:
-    ///   jira issue fields -p PROJ --issue-type Bug
+    ///   jirac issue fields -p PROJ --issue-type Bug
     ///
     /// Examples:
-    ///   jira issue create                                         # fully interactive
-    ///   jira issue create -p PROJ -s "Fix login bug" -t Bug
-    ///   jira issue create -p PROJ -s "API story" -t Story --assignee me --labels "backend,api"
-    ///   jira issue create -p PROJ -s "Sub-task" -t Sub-task --parent PROJ-100
-    ///   jira issue create -p PROJ -s "Feat" --description-file description.md
-    ///   jira issue create -p PROJ -s "Fix" --field story_points=5 --field customfield_10020=sprint1
+    ///   jirac issue create                                         # fully interactive
+    ///   jirac issue create -p PROJ -s "Fix login bug" -t Bug
+    ///   jirac issue create -p PROJ -s "API story" -t Story --assignee me --labels "backend,api"
+    ///   jirac issue create -p PROJ -s "Sub-task" -t Sub-task --parent PROJ-100
+    ///   jirac issue create -p PROJ -s "Feat" --description-file description.md
+    ///   jirac issue create -p PROJ -s "Fix" --field story_points=5 --field customfield_10020=sprint1
     Create {
         /// Project key (e.g. PROJ)
         #[arg(short, long, value_name = "PROJECT")]
@@ -124,7 +124,7 @@ pub enum IssueCommand {
         /// Select fields:    --field customfield_10020='{"value":"Option A"}'
         /// Multi-select:     --field customfield_10021='[{"value":"A"},{"value":"B"}]'
         ///
-        /// Run `jira issue fields -p PROJ --issue-type Bug` to list all field IDs.
+        /// Run `jirac issue fields -p PROJ --issue-type Bug` to list all field IDs.
         #[arg(long, value_name = "FIELD_ID=VALUE")]
         field: Vec<String>,
         /// Skip required custom field prompts (fields will be omitted)
@@ -141,11 +141,11 @@ pub enum IssueCommand {
     /// Assignee can be an email address or "me" (resolves to current user's accountId).
     ///
     /// Examples:
-    ///   jira issue update PROJ-123 --summary "Updated title"
-    ///   jira issue update PROJ-123 --assignee me --priority High
-    ///   jira issue update PROJ-123 --description-file updated.md
-    ///   jira issue update PROJ-123 --labels "bug,backend" --components "auth"
-    ///   jira issue update PROJ-123 --field story_points=8
+    ///   jirac issue update PROJ-123 --summary "Updated title"
+    ///   jirac issue update PROJ-123 --assignee me --priority High
+    ///   jirac issue update PROJ-123 --description-file updated.md
+    ///   jirac issue update PROJ-123 --labels "bug,backend" --components "auth"
+    ///   jirac issue update PROJ-123 --field story_points=8
     Update {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -183,7 +183,7 @@ pub enum IssueCommand {
         /// Custom fields:    --field customfield_10016=5
         /// Select fields:    --field customfield_10020='{"value":"Option A"}'
         ///
-        /// Run `jira issue fields -p PROJ --issue-type Bug` to list all field IDs.
+        /// Run `jirac issue fields -p PROJ --issue-type Bug` to list all field IDs.
         #[arg(long, value_name = "FIELD_ID=VALUE")]
         field: Vec<String>,
         /// Re-fetch and output the updated issue as JSON
@@ -197,8 +197,8 @@ pub enum IssueCommand {
     /// Subtasks are also deleted along with the parent issue.
     ///
     /// Examples:
-    ///   jira issue delete PROJ-123
-    ///   jira issue delete PROJ-123 --force      # skip confirmation prompt
+    ///   jirac issue delete PROJ-123
+    ///   jirac issue delete PROJ-123 --force      # skip confirmation prompt
     Delete {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -214,13 +214,13 @@ pub enum IssueCommand {
     ///
     /// The transition argument accepts a name (case-insensitive) or numeric ID.
     /// To see available transitions and IDs for an issue:
-    ///   jira api get /rest/api/3/issue/PROJ-123/transitions
+    ///   jirac api get /rest/api/3/issue/PROJ-123/transitions
     ///
     /// Examples:
-    ///   jira issue transition PROJ-123                 # interactive picker
-    ///   jira issue transition PROJ-123 "In Progress"
-    ///   jira issue transition PROJ-123 Done
-    ///   jira issue transition PROJ-123 31              # by transition ID
+    ///   jirac issue transition PROJ-123                 # interactive picker
+    ///   jirac issue transition PROJ-123 "In Progress"
+    ///   jirac issue transition PROJ-123 Done
+    ///   jirac issue transition PROJ-123 31              # by transition ID
     Transition {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -237,9 +237,9 @@ pub enum IssueCommand {
     /// from the file extension. Multiple files can be attached in one command.
     ///
     /// Examples:
-    ///   jira issue attach PROJ-123 screenshot.png
-    ///   jira issue attach PROJ-123 report.pdf logs.txt dump.zip
-    ///   jira issue attach PROJ-123 ~/Downloads/output.json
+    ///   jirac issue attach PROJ-123 screenshot.png
+    ///   jirac issue attach PROJ-123 report.pdf logs.txt dump.zip
+    ///   jirac issue attach PROJ-123 ~/Downloads/output.json
     Attach {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -257,9 +257,9 @@ pub enum IssueCommand {
     /// create/update commands. Custom fields have IDs like customfield_10016.
     ///
     /// Examples:
-    ///   jira issue fields -p PROJ               # interactive issue type picker
-    ///   jira issue fields -p PROJ --issue-type Bug
-    ///   jira issue fields -p PROJ --issue-type Story --required-only
+    ///   jirac issue fields -p PROJ               # interactive issue type picker
+    ///   jirac issue fields -p PROJ --issue-type Bug
+    ///   jirac issue fields -p PROJ --issue-type Story --required-only
     Fields {
         /// Project key (e.g. PROJ) — interactive prompt if omitted
         #[arg(short, long, value_name = "PROJECT")]
@@ -283,10 +283,10 @@ pub enum IssueCommand {
     /// Note: 1d = 8 working hours (default Jira configuration).
     ///
     /// Examples:
-    ///   jira issue worklog list PROJ-123
-    ///   jira issue worklog add PROJ-123 --time "2h 30m"
-    ///   jira issue worklog add PROJ-123 --time 1d --comment "Implemented auth"
-    ///   jira issue worklog delete PROJ-123 <worklog-id>
+    ///   jirac issue worklog list PROJ-123
+    ///   jirac issue worklog add PROJ-123 --time "2h 30m"
+    ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented auth"
+    ///   jirac issue worklog delete PROJ-123 <worklog-id>
     Worklog {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -304,8 +304,8 @@ pub enum IssueCommand {
     /// The transition is validated against the first matching issue.
     ///
     /// Examples:
-    ///   jira issue bulk-transition --jql 'project = PROJ AND status = "To Do"' --to "In Progress"
-    ///   jira issue bulk-transition --jql 'assignee = me AND sprint = openSprints()' --to Done --force
+    ///   jirac issue bulk-transition --jql 'project = PROJ AND status = "To Do"' --to "In Progress"
+    ///   jirac issue bulk-transition --jql 'assignee = me AND sprint = openSprints()' --to Done --force
     BulkTransition {
         /// JQL query to select issues (use quotes for values with spaces)
         #[arg(long, value_name = "JQL")]
@@ -328,8 +328,8 @@ pub enum IssueCommand {
     /// Prompts for confirmation unless --force is used.
     ///
     /// Examples:
-    ///   jira issue bulk-update --jql 'project = PROJ AND assignee = EMPTY' --assignee me
-    ///   jira issue bulk-update --jql 'project = PROJ AND priority = Low' --priority High --force
+    ///   jirac issue bulk-update --jql 'project = PROJ AND assignee = EMPTY' --assignee me
+    ///   jirac issue bulk-update --jql 'project = PROJ AND priority = Low' --priority High --force
     BulkUpdate {
         /// JQL query to select issues
         #[arg(long, value_name = "JQL")]
@@ -356,8 +356,8 @@ pub enum IssueCommand {
     /// Note: this action cannot be reversed from this CLI.
     ///
     /// Examples:
-    ///   jira issue archive --jql 'project = PROJ AND status = Done AND updated < -1y'
-    ///   jira issue archive --jql 'project = PROJ AND status = Done' --force
+    ///   jirac issue archive --jql 'project = PROJ AND status = Done AND updated < -1y'
+    ///   jirac issue archive --jql 'project = PROJ AND status = Done' --force
     Archive {
         /// JQL query to select issues to archive
         #[arg(long, value_name = "JQL")]
@@ -377,11 +377,11 @@ pub enum IssueCommand {
     /// Use --json to output the created clone as JSON.
     ///
     /// Examples:
-    ///   jira issue clone PROJ-123                      # clone in same project
-    ///   jira issue clone PROJ-123 --project NEWPROJ    # clone to another project
-    ///   jira issue clone PROJ-123 --summary "Copy: original title"
-    ///   jira issue clone PROJ-123 --move               # clone then delete original
-    ///   jira issue clone PROJ-123 --project OTHER --json
+    ///   jirac issue clone PROJ-123                      # clone in same project
+    ///   jirac issue clone PROJ-123 --project NEWPROJ    # clone to another project
+    ///   jirac issue clone PROJ-123 --summary "Copy: original title"
+    ///   jirac issue clone PROJ-123 --move               # clone then delete original
+    ///   jirac issue clone PROJ-123 --project OTHER --json
     Clone {
         /// Source issue key (e.g. PROJ-123)
         key: String,
@@ -411,8 +411,8 @@ pub enum IssueCommand {
     /// Use --run to immediately execute the query and display results.
     ///
     /// Examples:
-    ///   jira issue jql              # build query, print it
-    ///   jira issue jql --run        # build and run immediately
+    ///   jirac issue jql              # build query, print it
+    ///   jirac issue jql --run        # build and run immediately
     ///
     /// ── JQL Quick Reference ────────────────────────────────────────────────
     ///
@@ -467,7 +467,7 @@ pub enum IssueCommand {
     /// Create multiple issues from a JSON manifest file
     ///
     /// The manifest is a JSON array of issue objects. Each object supports
-    /// the same fields as `jira issue create` flags.
+    /// the same fields as `jirac issue create` flags.
     ///
     /// Manifest format (JSON array):
     /// [
@@ -489,7 +489,7 @@ pub enum IssueCommand {
     /// Output: prints each created issue key and summary.
     ///
     /// Examples:
-    ///   jira issue bulk-create --manifest issues.json
+    ///   jirac issue bulk-create --manifest issues.json
     /// Run mixed operations from a JSON manifest file
     ///
     /// Each entry in the manifest is an object with an "op" field specifying
@@ -512,8 +512,8 @@ pub enum IssueCommand {
     /// Output: per-op result summary. Use --json for machine-readable output.
     ///
     /// Examples:
-    ///   jira issue batch --manifest ops.json
-    ///   jira issue batch --manifest ops.json --json
+    ///   jirac issue batch --manifest ops.json
+    ///   jirac issue batch --manifest ops.json --json
     Batch {
         /// Path to the JSON manifest file (array of op objects)
         #[arg(long, value_name = "FILE")]
@@ -549,8 +549,8 @@ pub enum WorklogCommand {
     /// Note: 1d = 8 working hours in default Jira configuration.
     ///
     /// Examples:
-    ///   jira issue worklog add PROJ-123 --time "2h 30m"
-    ///   jira issue worklog add PROJ-123 --time 1d --comment "Implemented login"
+    ///   jirac issue worklog add PROJ-123 --time "2h 30m"
+    ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented login"
     Add {
         /// Time spent in Jira duration format (e.g. "2h", "30m", "1d", "1h 30m")
         #[arg(short, long, value_name = "DURATION")]
@@ -562,14 +562,14 @@ pub enum WorklogCommand {
 
     /// Delete a worklog entry
     ///
-    /// Use `jira issue worklog list KEY` to find the worklog ID.
+    /// Use `jirac issue worklog list KEY` to find the worklog ID.
     /// Prompts for confirmation unless --force is used.
     ///
     /// Examples:
-    ///   jira issue worklog delete PROJ-123 12345
-    ///   jira issue worklog delete PROJ-123 12345 --force
+    ///   jirac issue worklog delete PROJ-123 12345
+    ///   jirac issue worklog delete PROJ-123 12345 --force
     Delete {
-        /// Worklog ID (see: jira issue worklog list PROJ-123)
+        /// Worklog ID (see: jirac issue worklog list PROJ-123)
         id: String,
         /// Skip confirmation prompt
         #[arg(short, long)]

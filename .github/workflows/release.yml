@@ -93,19 +93,24 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: jira-linux-x86_64
+            artifact: jirac-linux-x86_64
+            legacy_artifact: jira-linux-x86_64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact: jira-linux-aarch64
+            artifact: jirac-linux-aarch64
+            legacy_artifact: jira-linux-aarch64
           - target: x86_64-apple-darwin
             os: macos-latest
-            artifact: jira-macos-x86_64
+            artifact: jirac-macos-x86_64
+            legacy_artifact: jira-macos-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
-            artifact: jira-macos-aarch64
+            artifact: jirac-macos-aarch64
+            legacy_artifact: jira-macos-aarch64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            artifact: jira-windows-x86_64.exe
+            artifact: jirac-windows-x86_64.exe
+            legacy_artifact: jira-windows-x86_64.exe
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -132,25 +137,41 @@ jobs:
         if: matrix.target != 'aarch64-unknown-linux-gnu'
         run: cargo build --release --target ${{ matrix.target }} -p jira-commands
 
-      - name: Rename binary (Unix)
+      - name: Copy binaries (Unix)
         if: matrix.os != 'windows-latest'
-        run: cp target/${{ matrix.target }}/release/jira ${{ matrix.artifact }}
+        run: |
+          cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/jira  ${{ matrix.legacy_artifact }}
 
-      - name: Rename binary (Windows)
+      - name: Copy binaries (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
-        run: Copy-Item target/${{ matrix.target }}/release/jira.exe ${{ matrix.artifact }}
+        run: |
+          Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
+          Copy-Item target/${{ matrix.target }}/release/jira.exe  ${{ matrix.legacy_artifact }}
 
-      - name: Generate build provenance attestation
+      - name: Generate build provenance attestation (jirac)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: ${{ matrix.artifact }}
 
-      - name: Upload artifact
+      - name: Generate build provenance attestation (jira legacy)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: ${{ matrix.legacy_artifact }}
+
+      - name: Upload artifact (jirac)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+      - name: Upload artifact (jira legacy)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.legacy_artifact }}
+          path: ${{ matrix.legacy_artifact }}
           if-no-files-found: error
 
   # ── 2. Publish to crates.io ───────────────────────────────────────────────
@@ -263,10 +284,10 @@ jobs:
           echo "=== checksums.txt ==="
           cat checksums.txt
 
-          SHA_MACOS_ARM=$(grep "jira-macos-aarch64" checksums.txt | awk '{print $1}')
-          SHA_MACOS_X86=$(grep "jira-macos-x86_64"  checksums.txt | awk '{print $1}')
-          SHA_LINUX_ARM=$(grep "jira-linux-aarch64"  checksums.txt | awk '{print $1}')
-          SHA_LINUX_X86=$(grep "jira-linux-x86_64"   checksums.txt | awk '{print $1}')
+          SHA_MACOS_ARM=$(grep "jirac-macos-aarch64" checksums.txt | awk '{print $1}')
+          SHA_MACOS_X86=$(grep "jirac-macos-x86_64"  checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM=$(grep "jirac-linux-aarch64"  checksums.txt | awk '{print $1}')
+          SHA_LINUX_X86=$(grep "jirac-linux-x86_64"   checksums.txt | awk '{print $1}')
 
           echo "VERSION=$VERSION"             >> "$GITHUB_ENV"
           echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> "$GITHUB_ENV"
@@ -292,10 +313,10 @@ jobs:
 
           version      = os.environ["VERSION"]
           sha_map = {
-              "jira-macos-aarch64": os.environ["SHA_MACOS_ARM"],
-              "jira-macos-x86_64":  os.environ["SHA_MACOS_X86"],
-              "jira-linux-aarch64": os.environ["SHA_LINUX_ARM"],
-              "jira-linux-x86_64":  os.environ["SHA_LINUX_X86"],
+              "jirac-macos-aarch64": os.environ["SHA_MACOS_ARM"],
+              "jirac-macos-x86_64":  os.environ["SHA_MACOS_X86"],
+              "jirac-linux-aarch64": os.environ["SHA_LINUX_ARM"],
+              "jirac-linux-x86_64":  os.environ["SHA_LINUX_X86"],
           }
 
           # Bump version field

@@ -1,5 +1,8 @@
 # jira-commands
 
+> **jirac** is an independent CLI tool that helps you work with the Jira ecosystem from your terminal.
+> It is **not** affiliated with, endorsed by, or sponsored by Atlassian.
+
 A fast, cross-platform Jira terminal client built in Rust.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
@@ -9,6 +12,9 @@ A fast, cross-platform Jira terminal client built in Rust.
 ## Installation
 
 ```bash
+# curl (macOS/Linux) — quickest
+curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
+
 # Homebrew (macOS/Linux)
 brew tap mulhamna/tap && brew install jira-commands
 
@@ -22,42 +28,50 @@ Or download a pre-built binary from [GitHub Releases](https://github.com/mulhamn
 
 ```bash
 # Set up credentials
-jira auth login
+jirac auth login
 
 # List your issues
-jira issue list
+jirac issue list
 
 # List issues by project
-jira issue list -p MYPROJ
+jirac issue list -p MYPROJ
 
 # View an issue
-jira issue view MYPROJ-123
+jirac issue view MYPROJ-123
 
 # Create an issue (interactive)
-jira issue create -p MYPROJ
+jirac issue create -p MYPROJ
 
 # Transition an issue
-jira issue transition MYPROJ-123 --to "In Progress"
+jirac issue transition MYPROJ-123 --to "In Progress"
 
 # Upload an attachment
-jira issue attach MYPROJ-123 ./screenshot.png
+jirac issue attach MYPROJ-123 ./screenshot.png
 
 # Log time
-jira issue worklog add MYPROJ-123 --time 2h --comment "Fixed auth bug"
+jirac issue worklog add MYPROJ-123 --time 2h --comment "Fixed auth bug"
 
 # Bulk transition
-jira issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"
+jirac issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"
 
 # Raw API passthrough
-jira api get /rest/api/3/serverInfo
+jirac api get /rest/api/3/serverInfo
 
 # Interactive TUI
-jira tui -p MYPROJ
+jirac tui -p MYPROJ
 ```
+
+## Upgrading from v0.x
+
+The binary was renamed from `jira` to `jirac` in v0.7.0. The old `jira` binary is still included for backward compatibility but will be removed in a future major release. Please update your scripts and aliases to use `jirac`.
 
 ## Claude Code plugin
 
 Install the plugin to manage Jira directly from Claude Code:
+
+```bash
+jirac auth login   # set up credentials first
+```
 
 ```
 /plugin marketplace add mulhamna/jira-commands

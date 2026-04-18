@@ -8,9 +8,9 @@ mod tui;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "jira",
-    about = "Jira CLI — terminal client for Atlassian Jira",
-    long_about = "A fast Jira terminal client built in Rust.\n\nQuick start:\n  jira auth login                      Set up credentials\n  jira issue list                      List your assigned issues\n  jira issue list -p MYPROJ            List issues by project\n  jira issue view PROJ-123             View issue detail\n  jira issue create -p MYPROJ          Create an issue (interactive)\n  jira issue transition PROJ-123       Transition an issue (interactive)\n  jira issue attach PROJ-123 file.png  Upload attachment\n  jira issue worklog list PROJ-123     List worklogs on an issue\n  jira issue bulk-transition PROJ -q 'status = \"To Do\"'\n  jira plan list                       List Jira Plans (Premium)\n  jira api get /rest/api/3/serverInfo  Raw API passthrough\n  jira tui -p MYPROJ                   Launch interactive TUI\n\nConfig file: ~/.config/jira/config.toml\nEnv vars:    JIRA_URL, JIRA_EMAIL, JIRA_TOKEN",
+    name = "jirac",
+    about = "jirac — terminal client for the Jira ecosystem",
+    long_about = "A fast Jira terminal client built in Rust.\n\nQuick start:\n  jirac auth login                      Set up credentials\n  jirac issue list                      List your assigned issues\n  jirac issue list -p MYPROJ            List issues by project\n  jirac issue view PROJ-123             View issue detail\n  jirac issue create -p MYPROJ          Create an issue (interactive)\n  jirac issue transition PROJ-123       Transition an issue (interactive)\n  jirac issue attach PROJ-123 file.png  Upload attachment\n  jirac issue worklog list PROJ-123     List worklogs on an issue\n  jirac issue bulk-transition PROJ -q 'status = \"To Do\"'\n  jirac plan list                       List Jira Plans (Premium)\n  jirac api get /rest/api/3/serverInfo  Raw API passthrough\n  jirac tui -p MYPROJ                   Launch interactive TUI\n\nConfig file: ~/.config/jira/config.toml\nEnv vars:    JIRA_URL, JIRA_EMAIL, JIRA_TOKEN",
     version
 )]
 struct Cli {
@@ -49,8 +49,8 @@ enum Commands {
     ///   q                    Quit
     ///
     /// Examples:
-    ///   jira tui                   # uses default project from config, or your assigned issues
-    ///   jira tui -p PROJ           # start filtered to a specific project
+    ///   jirac tui                   # uses default project from config, or your assigned issues
+    ///   jirac tui -p PROJ           # start filtered to a specific project
     Tui {
         /// Project key to filter issues (e.g. PROJ). Falls back to config default, then assignee = currentUser()
         #[arg(short, long, value_name = "PROJECT")]
@@ -72,6 +72,21 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Detect if invoked via the legacy 'jira' binary name and warn the user.
+    if std::env::args().next().is_some_and(|a| {
+        let name = std::path::Path::new(&a)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        name == "jira"
+    }) {
+        eprintln!(
+            "warning: the 'jira' binary is deprecated and will be removed in a future release."
+        );
+        eprintln!("         Please switch to 'jirac'. Everything else works the same.");
+        eprintln!();
+    }
+
     let cli = Cli::parse();
 
     // Initialize tracing
@@ -118,19 +133,19 @@ fn build_client() -> Result<JiraClient> {
 
     if config.base_url.is_empty() {
         anyhow::bail!(
-            "Jira URL not configured. Run `jira auth login` or set JIRA_URL environment variable."
+            "Jira URL not configured. Run `jirac auth login` or set JIRA_URL environment variable."
         );
     }
 
     if config.email.is_empty() {
         anyhow::bail!(
-            "Email not configured. Run `jira auth login` or set JIRA_EMAIL environment variable."
+            "Email not configured. Run `jirac auth login` or set JIRA_EMAIL environment variable."
         );
     }
 
     if config.token.is_none() {
         anyhow::bail!(
-            "API token not found. Run `jira auth login` or set JIRA_TOKEN environment variable."
+            "API token not found. Run `jirac auth login` or set JIRA_TOKEN environment variable."
         );
     }
 

@@ -2,7 +2,9 @@
 
 Manage Jira issues directly from Claude Code. Create, list, view, transition, log time, and run bulk operations without leaving your editor.
 
-> **Requires** the `jira` CLI to be installed: `cargo install jira-commands`
+> **jirac** is an independent Claude Code plugin for the Jira ecosystem. Not affiliated with or endorsed by Atlassian.
+
+> **Requires** the `jirac` CLI to be installed: `cargo install jira-commands`
 
 ---
 
@@ -12,7 +14,7 @@ Manage Jira issues directly from Claude Code. Create, list, view, transition, lo
 
 ```bash
 cargo install jira-commands
-jira auth login
+jirac auth login
 ```
 
 **Step 2 — Add marketplace and install plugin inside Claude Code:**
@@ -86,7 +88,7 @@ Claude calls `/jira:api` with the appropriate REST endpoint and shows the raw JS
 
 ## Configuration
 
-Credentials are stored at `~/.config/jira/config.toml` after running `jira auth login`. The plugin reads from the same config — no extra setup needed.
+Credentials are stored at `~/.config/jira/config.toml` after running `jirac auth login`. The plugin reads from the same config — no extra setup needed.
 
 You can also use environment variables:
 

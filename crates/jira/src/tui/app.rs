@@ -1343,7 +1343,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ORDER BY updated DESC                sort order"),
         Line::from(""),
         Line::from(Span::styled(
-            "Tip: combine with AND / OR — run `jira issue jql --help` for more",
+            "Tip: combine with AND / OR — run `jirac issue jql --help` for more",
             Style::default().fg(Color::DarkGray),
         )),
         Line::from(""),

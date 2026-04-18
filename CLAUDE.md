@@ -471,7 +471,7 @@ git push origin main
 ### Aturan Claude Code plugin marketplace
 
 - Versi di `plugin/.claude-plugin/plugin.json` di-bump otomatis oleh release-please (via `extra-files` di `release-please-config.json`)
-- Plugin menggunakan binary `jira` yang sudah terinstall — pastikan README dokumentasikan `cargo install jira-commands` sebagai prerequisite
+- Plugin menggunakan binary `jirac` yang sudah terinstall — pastikan README dokumentasikan `cargo install jira-commands` sebagai prerequisite
 - Setiap ada skill baru atau perubahan perilaku skill, update description di `plugin/skills/<skill>/SKILL.md` dan update tabel di README.md
 
 ---
@@ -516,3 +516,4 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 | 2026-04-17 | Phase B–E selesai — improved --help, non-interactive create/update, bulk-create, clone, batch, --json mode, TUI edit actions (c/e/a/w/l/m/u), CI security job, SECURITY.md |
 | 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md |
 | 2026-04-17 | Phase 6 — Homebrew tap: Formula/jira-commands.rb di mulhamna/homebrew-tap, job update-homebrew di release.yml (auto-update SHA256 + version setiap release); update semua README + CLAUDE.md |
+| 2026-04-18 | Phase 7 — Rename binary `jira` → `jirac`: dual binary shim (argv[0] deprecation warning), curl install script (install.sh), ecosystem disclaimer di semua README, Homebrew caveats + symlink, update release.yml artifacts |

@@ -68,15 +68,19 @@ Rust CLI untuk Atlassian Jira yang menggantikan / memperbaiki keterbatasan
 ```
 jira-commands/
 ├── CLAUDE.md
+├── AGENTS.md               # symlink → CLAUDE.md (untuk Codex/agent lain)
 ├── SECURITY.md             # responsible disclosure policy
 ├── CHANGELOG.md            # generated/updated by release-please
-├── Cargo.toml              # workspace root
+├── Cargo.toml              # workspace root — [workspace.package] version dikontrol release-please
 ├── crates/
 │   ├── jira-core/          # PUBLIC LIBRARY: API client, auth, model, ADF parser
 │   │   ├── Cargo.toml      # dipublish ke crates.io sebagai "jira-core"
 │   │   └── src/
-│   └── jira/               # BINARY: clap commands, TUI, wiring semua crate
-│       ├── Cargo.toml      # dipublish ke crates.io sebagai "jira-commands"
+│   ├── jira/               # BINARY: clap commands, TUI, wiring semua crate
+│   │   ├── Cargo.toml      # dipublish ke crates.io sebagai "jira-commands"
+│   │   └── src/
+│   └── jira-mcp/           # MCP SERVER: Model Context Protocol tools via rmcp
+│       ├── Cargo.toml      # dipublish ke crates.io sebagai "jira-mcp"
 │       └── src/
 ├── plugin/
 │   └── .claude-plugin/     # Claude Code plugin (9 skills)
@@ -115,15 +119,23 @@ Orang lain bisa pakai `jira-core` sebagai library dependency tanpa harus pakai C
 
 ```toml
 [dependencies]
-jira-core = "0.4"
+jira-core = "0.7"
 ```
 
-**`jira/` (binary)** — tidak perlu stabil sebagai API publik:
+**`jira/` (binary `jirac`)** — tidak perlu stabil sebagai API publik:
 
 - Semua `clap` command definitions
 - TUI dengan `ratatui` + `crossterm`
 - Interactive prompt dengan `inquire`
 - Hanya re-export hal yang perlu dari `jira-core`
+- Binary `jirac` (primary) + `jira` (legacy shim, prints deprecation warning)
+
+**`jira-mcp/` (binary `jirac-mcp`)** — MCP server, tidak perlu stabil sebagai API publik:
+
+- Model Context Protocol server via `rmcp`
+- Typed Jira tools: create, view, search, transition, worklog, dll.
+- Expose operasi `jira-core` sebagai MCP tools ke LLM clients
+- Binary `jirac-mcp`, bisa dipakai oleh Claude Desktop / MCP-compatible clients
 
 ---
 
@@ -428,6 +440,8 @@ cargo build --all
 | 4 — Power features            | Plans API, archive, raw API passthrough, Claude Code plugin                                                                        | **Done** |
 | 5 — UX & Automation           | Improved `--help`, non-interactive create/update, `--json` mode, `bulk-create`, `clone`, `batch`, TUI edit actions (c/e/a/w/l/m/u) | **Done** |
 | 6 — Distribution              | Homebrew tap (macOS/Linux), automated formula updates via CI/CD                                                                    | **Done** |
+| 7 — Binary rename             | `jira` → `jirac` primary binary, legacy shim dengan deprecation warning, curl install script                                       | **Done** |
+| 8 — MCP server                | `jira-mcp` crate (`jirac-mcp` binary) — typed Jira tools via Model Context Protocol untuk LLM clients                             | **Done** |
 
 ---
 
@@ -471,7 +485,8 @@ git push origin main
 - **Jangan publish manual** — publish selalu via GitHub Actions setelah Release PR di-merge
 - Urutan publish: `jira-core` dulu → tunggu 90 detik → baru `jira-commands`
 - Kalau publish gagal di tengah jalan: cek apakah salah satu sudah terpublish di crates.io — versi yang sama tidak bisa di-publish ulang
-- CI hanya menjalankan `cargo publish --dry-run -p jira-core`. `jira-commands` tidak di-dry-run karena depend ke `jira-core` versi baru yang belum ada di crates.io
+- CI hanya menjalankan `cargo publish --dry-run -p jira-core`. `jira-mcp` dan `jira-commands` tidak di-dry-run karena depend ke `jira-core` versi baru yang belum ada di crates.io
+- Urutan publish: `jira-core` → tunggu sparse index → `jira-mcp` → `jira-commands`
 
 ### Aturan Claude Code plugin marketplace
 
@@ -522,3 +537,6 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 | 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md                                                                                                                                  |
 | 2026-04-17 | Phase 6 — Homebrew tap: Formula/jira-commands.rb di mulhamna/homebrew-tap, job update-homebrew di release.yml (auto-update SHA256 + version setiap release); update semua README + CLAUDE.md                                                     |
 | 2026-04-18 | Phase 7 — Rename binary `jira` → `jirac`: dual binary shim (argv[0] deprecation warning), curl install script (install.sh), ecosystem disclaimer di semua README, Homebrew caveats + symlink, update release.yml artifacts                       |
+| 2026-04-19 | Phase 8 — MCP server: tambah crate `jira-mcp` (binary `jirac-mcp`) via rmcp, update workspace Cargo.toml + release-please config + release.yml untuk publish 3 crates (jira-core → jira-mcp → jira-commands)                                    |
+| 2026-04-19 | Fix release-please: tambah `[workspace.package]` di root Cargo.toml, tambah annotation `# x-release-please-version` di jira-commands, hapus redundant extra-files Cargo.toml dari config                                                        |
+| 2026-04-19 | AGENTS.md dibuat sebagai symlink ke CLAUDE.md (untuk kompatibilitas Codex/agent lain yang baca AGENTS.md)                                                                                                                                        |

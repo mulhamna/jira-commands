@@ -2,6 +2,9 @@
 members = ["crates/jira-core", "crates/jira", "crates/jira-mcp"]
 resolver = "2"
 
+[workspace.package]
+version = "0.7.0" # x-release-please-version
+
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

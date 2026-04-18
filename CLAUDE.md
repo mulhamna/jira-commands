@@ -422,6 +422,7 @@ cargo build --all
 | 3 — Bulk ops & Advanced TUI | Bulk edit/transition, worklog CRUD, JQL builder interaktif | **Done** |
 | 4 — Power features | Plans API, archive, raw API passthrough, Claude Code plugin | **Done** |
 | 5 — UX & Automation | Improved `--help`, non-interactive create/update, `--json` mode, `bulk-create`, `clone`, `batch`, TUI edit actions (c/e/a/w/l/m/u) | **Done** |
+| 6 — Distribution | Homebrew tap (macOS/Linux), automated formula updates via CI/CD | **Done** |
 
 ---
 
@@ -514,3 +515,4 @@ Kalau ada perubahan arsitektur, aturan baru, atau temuan soal Jira API:
 | 2026-04-16 | Fix TUI JQL search: tambah f.set_cursor_position() di render_search_bar() supaya cursor terminal muncul saat user ketik JQL; hapus fake █ cursor di footer; update plugin list-issues skill |
 | 2026-04-17 | Phase B–E selesai — improved --help, non-interactive create/update, bulk-create, clone, batch, --json mode, TUI edit actions (c/e/a/w/l/m/u), CI security job, SECURITY.md |
 | 2026-04-17 | Ganti alur release: hapus manual version bump/tag, gunakan release-please via CI/CD — update CLAUDE.md, TASK.md |
+| 2026-04-17 | Phase 6 — Homebrew tap: Formula/jira-commands.rb di mulhamna/homebrew-tap, job update-homebrew di release.yml (auto-update SHA256 + version setiap release); update semua README + CLAUDE.md |

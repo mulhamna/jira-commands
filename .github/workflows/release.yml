@@ -246,3 +246,81 @@ jobs:
           files: |
             artifacts/**/*
             checksums.txt
+
+  # ── 4. Update Homebrew tap ────────────────────────────────────────────────
+  update-homebrew:
+    name: Update Homebrew formula
+    runs-on: ubuntu-latest
+    needs: create-release
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Download checksums from release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          curl -sL "https://github.com/mulhamna/jira-commands/releases/download/${GITHUB_REF_NAME}/checksums.txt" -o checksums.txt
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+          SHA_MACOS_ARM=$(grep "jira-macos-aarch64" checksums.txt | awk '{print $1}')
+          SHA_MACOS_X86=$(grep "jira-macos-x86_64"  checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM=$(grep "jira-linux-aarch64"  checksums.txt | awk '{print $1}')
+          SHA_LINUX_X86=$(grep "jira-linux-x86_64"   checksums.txt | awk '{print $1}')
+
+          echo "VERSION=$VERSION"             >> "$GITHUB_ENV"
+          echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> "$GITHUB_ENV"
+          echo "SHA_MACOS_X86=$SHA_MACOS_X86" >> "$GITHUB_ENV"
+          echo "SHA_LINUX_ARM=$SHA_LINUX_ARM" >> "$GITHUB_ENV"
+          echo "SHA_LINUX_X86=$SHA_LINUX_X86" >> "$GITHUB_ENV"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: mulhamna/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula version and SHA256
+        run: |
+          python3 - <<'EOF'
+          import re, os
+
+          formula_path = "homebrew-tap/Formula/jira-commands.rb"
+          with open(formula_path) as f:
+              content = f.read()
+
+          version      = os.environ["VERSION"]
+          sha_map = {
+              "jira-macos-aarch64": os.environ["SHA_MACOS_ARM"],
+              "jira-macos-x86_64":  os.environ["SHA_MACOS_X86"],
+              "jira-linux-aarch64": os.environ["SHA_LINUX_ARM"],
+              "jira-linux-x86_64":  os.environ["SHA_LINUX_X86"],
+          }
+
+          # Bump version field
+          content = re.sub(r'version "[^"]+"', f'version "{version}"', content)
+
+          # Bump sha256 for each binary — match url line then the sha256 on the next line
+          for binary, sha in sha_map.items():
+              content = re.sub(
+                  rf'(url "[^"]*{re.escape(binary)}[^"]*"\n\s+sha256 ")[^"]+"',
+                  rf'\g<1>{sha}"',
+                  content,
+              )
+
+          with open(formula_path, "w") as f:
+              f.write(content)
+
+          print(f"Formula updated to v{version}")
+          EOF
+
+      - name: Commit and push to homebrew-tap
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/jira-commands.rb
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: bump jira-commands to v${VERSION}"
+          git push

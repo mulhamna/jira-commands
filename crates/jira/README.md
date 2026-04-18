@@ -9,6 +9,10 @@ A fast, cross-platform Jira terminal client built in Rust.
 ## Installation
 
 ```bash
+# Homebrew (macOS/Linux)
+brew tap mulhamna/tap && brew install jira-commands
+
+# cargo
 cargo install jira-commands
 ```
 

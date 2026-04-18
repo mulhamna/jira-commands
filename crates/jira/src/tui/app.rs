@@ -47,6 +47,8 @@ pub struct App {
     default_project: Option<String>,
     /// Buffer while the user is typing in Search mode
     search_input: String,
+    /// Cursor position (char index) within search_input
+    search_cursor: usize,
     /// Bottom status bar message (text, is_error)
     status: Option<(String, bool)>,
     /// Transitions for the selected issue (id, name)
@@ -86,6 +88,7 @@ impl App {
             jql,
             default_project,
             search_input: String::new(),
+            search_cursor: 0,
             status: None,
             transitions: Vec::new(),
             transition_list_state: ListState::default(),
@@ -203,6 +206,7 @@ impl App {
             KeyCode::Char('o') => AppAction::OpenBrowser,
             KeyCode::Char('/') => {
                 self.search_input = self.jql.clone();
+                self.search_cursor = self.search_input.chars().count();
                 self.mode = Mode::Search;
                 AppAction::None
             }
@@ -331,12 +335,71 @@ impl App {
                     AppAction::ExecuteSearch(jql)
                 }
             }
+            KeyCode::Left => {
+                if self.search_cursor > 0 {
+                    self.search_cursor -= 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Right => {
+                if self.search_cursor < self.search_input.chars().count() {
+                    self.search_cursor += 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Home => {
+                self.search_cursor = 0;
+                AppAction::None
+            }
+            KeyCode::End => {
+                self.search_cursor = self.search_input.chars().count();
+                AppAction::None
+            }
             KeyCode::Backspace => {
-                self.search_input.pop();
+                if self.search_cursor > 0 {
+                    self.search_cursor -= 1;
+                    let byte_pos = self
+                        .search_input
+                        .char_indices()
+                        .nth(self.search_cursor)
+                        .map(|(i, _)| i)
+                        .unwrap_or(self.search_input.len());
+                    let char_len = self.search_input[byte_pos..]
+                        .chars()
+                        .next()
+                        .map(|c| c.len_utf8())
+                        .unwrap_or(0);
+                    self.search_input.drain(byte_pos..byte_pos + char_len);
+                }
+                AppAction::None
+            }
+            KeyCode::Delete => {
+                let len = self.search_input.chars().count();
+                if self.search_cursor < len {
+                    let byte_pos = self
+                        .search_input
+                        .char_indices()
+                        .nth(self.search_cursor)
+                        .map(|(i, _)| i)
+                        .unwrap_or(self.search_input.len());
+                    let char_len = self.search_input[byte_pos..]
+                        .chars()
+                        .next()
+                        .map(|c| c.len_utf8())
+                        .unwrap_or(0);
+                    self.search_input.drain(byte_pos..byte_pos + char_len);
+                }
                 AppAction::None
             }
             KeyCode::Char(c) => {
-                self.search_input.push(c);
+                let byte_pos = self
+                    .search_input
+                    .char_indices()
+                    .nth(self.search_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.search_input.len());
+                self.search_input.insert(byte_pos, c);
+                self.search_cursor += 1;
                 AppAction::None
             }
             _ => AppAction::None,
@@ -937,7 +1000,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(1), // header
             Constraint::Min(0),    // content
-            Constraint::Length(1), // footer
+            Constraint::Length(2), // footer (2 lines to accommodate keybinding hints)
         ])
         .split(size);
 
@@ -1013,20 +1076,24 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let footer = Paragraph::new(text).style(Style::default().fg(Color::DarkGray));
+    let footer = Paragraph::new(text)
+        .style(Style::default().fg(Color::DarkGray))
+        .wrap(Wrap { trim: false });
     f.render_widget(footer, area);
 }
 
 fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let header_cells = ["Key", "Type", "Priority", "Status", "Assignee", "Summary"]
-        .iter()
-        .map(|h| {
-            Cell::from(*h).style(
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )
-        });
+    let header_cells = [
+        "Key", "Type", "Priority", "Status", "Assignee", "Created", "Updated", "Summary",
+    ]
+    .iter()
+    .map(|h| {
+        Cell::from(*h).style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    });
     let header = Row::new(header_cells).height(1).bottom_margin(1);
 
     let rows = app.issues.iter().map(|issue| {
@@ -1035,6 +1102,16 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
         } else {
             issue.summary.clone()
         };
+        let created = issue
+            .created
+            .get(..10)
+            .unwrap_or(&issue.created)
+            .to_string();
+        let updated = issue
+            .updated
+            .get(..10)
+            .unwrap_or(&issue.updated)
+            .to_string();
         Row::new(vec![
             Cell::from(issue.key.clone()).style(Style::default().fg(Color::Cyan)),
             Cell::from(issue.issue_type.clone()),
@@ -1042,6 +1119,8 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
             Cell::from(issue.status.clone())
                 .style(Style::default().fg(status_color(&issue.status))),
             Cell::from(issue.assignee.clone().unwrap_or_else(|| "-".into())),
+            Cell::from(created).style(Style::default().fg(Color::DarkGray)),
+            Cell::from(updated).style(Style::default().fg(Color::DarkGray)),
             Cell::from(summary),
         ])
         .height(1)
@@ -1052,10 +1131,12 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
         [
             Constraint::Length(12),
             Constraint::Length(8),
-            Constraint::Length(10),
-            Constraint::Length(18),
-            Constraint::Length(20),
-            Constraint::Min(20),
+            Constraint::Length(8),
+            Constraint::Length(14),
+            Constraint::Length(16),
+            Constraint::Length(11),
+            Constraint::Length(11),
+            Constraint::Min(15),
         ],
     )
     .header(header)
@@ -1165,9 +1246,10 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Clear, popup);
     f.render_widget(input, popup);
 
-    // Place the terminal cursor at the end of the input text so the user can
-    // see where they are typing. popup inner area starts at x+1, y+1 (border).
-    let cursor_x = popup.x + 1 + app.search_input.len() as u16;
+    // Place the terminal cursor at the current cursor position within the input.
+    // popup inner area starts at x+1, y+1 (border).
+    let before_cursor: String = app.search_input.chars().take(app.search_cursor).collect();
+    let cursor_x = popup.x + 1 + before_cursor.len() as u16;
     let cursor_y = popup.y + 1;
     f.set_cursor_position((cursor_x, cursor_y));
 }
@@ -1200,7 +1282,7 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_help_popup(f: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(60, 85, area);
+    let popup_area = centered_rect(70, 95, area);
 
     let lines = vec![
         Line::from(Span::styled(
@@ -1240,7 +1322,30 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled("Search:", Style::default().fg(Color::Yellow))),
         Line::from("  Type JQL, press Enter to search"),
-        Line::from("  Esc       Cancel"),
+        Line::from("  Left/Right  Move cursor   Home/End  Jump   Del  Delete forward"),
+        Line::from("  Esc         Cancel"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "JQL Quick Reference:",
+            Style::default().fg(Color::Yellow),
+        )),
+        Line::from("  project = PROJ                       issues in a project"),
+        Line::from("  assignee = currentUser()             assigned to me"),
+        Line::from("  assignee = \"email@example.com\"       assigned to someone"),
+        Line::from("  status = \"In Progress\"               by status"),
+        Line::from("  status in (\"To Do\", \"In Progress\")   multiple statuses"),
+        Line::from("  priority = High                      by priority"),
+        Line::from("  sprint = openSprints()               current sprint"),
+        Line::from("  updated >= -7d                       updated in last 7 days"),
+        Line::from("  created >= -30d                      created in last 30 days"),
+        Line::from("  text ~ \"login bug\"                   full-text search"),
+        Line::from("  labels = backend                     by label"),
+        Line::from("  ORDER BY updated DESC                sort order"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Tip: combine with AND / OR — run `jira issue jql --help` for more",
+            Style::default().fg(Color::DarkGray),
+        )),
         Line::from(""),
         Line::from(Span::styled(
             "Press any key to close",

@@ -2,7 +2,7 @@
 name = "jira-commands"
 version = "0.5.0"
 edition = "2021"
-description = "Jira CLI — terminal client for Atlassian Jira"
+description = "Jira CLI — fast terminal client for Atlassian Jira with TUI, Homebrew support, and Claude Code plugin"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/mulhamna/jira-commands"

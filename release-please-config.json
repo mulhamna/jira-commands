@@ -2,10 +2,18 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "include-component-in-tag": false,
   "packages": {
-    ".": {
+    "crates/jira": {
       "release-type": "rust",
       "component": "jira-commands",
       "changelog-path": "/CHANGELOG.md",
+      "include-paths": [
+        "crates/jira",
+        "crates/jira-core",
+        "crates/jira-mcp",
+        "plugin",
+        "Cargo.toml",
+        "Cargo.lock"
+      ],
       "extra-files": [
         {
           "type": "json",
@@ -15,10 +23,6 @@
         {
           "type": "generic",
           "path": "/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "/crates/jira/Cargo.toml"
         },
         {
           "type": "generic",

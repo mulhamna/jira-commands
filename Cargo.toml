@@ -6,5 +6,6 @@ resolver = "2"
 version = "0.7.0" # x-release-please-version
 
 [workspace.dependencies]
+jira-core = { path = "crates/jira-core", version = "0.7.0" } # x-release-please-version
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

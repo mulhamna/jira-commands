@@ -15,7 +15,7 @@ name = "jirac-mcp"
 path = "src/main.rs"
 
 [dependencies]
-jira-core = { path = "../jira-core", version = "0.7.0" } # x-release-please-version
+jira-core = { workspace = true }
 anyhow = "1"
 axum = "0.8"
 base64 = "0.22"

@@ -18,10 +18,6 @@
         },
         {
           "type": "generic",
-          "path": "/crates/jira/Cargo.toml"
-        },
-        {
-          "type": "generic",
           "path": "/crates/jira-core/Cargo.toml"
         },
         {

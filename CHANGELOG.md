@@ -6,6 +6,16 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.8.1](https://github.com/mulhamna/jira-commands/compare/v0.8.0...v0.8.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* **ci:** broaden release-please package path from crates/jira to workspace root ([3e28357](https://github.com/mulhamna/jira-commands/commit/3e28357fe6e0618d76fc6d835fbee28c6278a931))
+* **ci:** revert release-please package path and widen scope via include-paths ([02a7d05](https://github.com/mulhamna/jira-commands/commit/02a7d05b1159fcbf89bb87005f9859aa3f5b3af9))
+* **ci:** rework release-please to scope whole repo via simple + VERSION ([87202a0](https://github.com/mulhamna/jira-commands/commit/87202a0ed383edbeb969126d3d0708af14c90098))
+* **jira-mcp:** shorten keyword to fit crates.io 20-char limit ([437540e](https://github.com/mulhamna/jira-commands/commit/437540ebb16dec94c9d73d73c6647aea5da5cd0b))
+
 ## [0.8.0](https://github.com/mulhamna/jira-commands/compare/v0.7.0...v0.8.0) (2026-04-19)
 
 

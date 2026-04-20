@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - id: filter
-        uses: dorny/paths-filter@45125827bcd3e8e9cc13bd6228836c76ca91ca84 # v3
+        uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
         with:
           filters: |
             workflows:

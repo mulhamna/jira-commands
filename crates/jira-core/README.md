@@ -3,19 +3,29 @@
 > **jira-core** is an independent Rust library for the Jira ecosystem.
 > It is **not** affiliated with, endorsed by, or sponsored by Atlassian.
 
-Core library for the [jira-commands](https://crates.io/crates/jira-commands) CLI (`jirac`) — provides the HTTP client, auth, models, and ADF parser as a reusable Rust library.
+`jira-core` is the shared library crate behind the `jirac` CLI and `jirac-mcp`. It provides the Jira HTTP client, authentication/config loading, typed models, field metadata helpers, and ADF conversion utilities.
 
-This crate is released together with the workspace packages in the `mulhamna/jira-commands` repository.
+This crate is versioned and released from the `mulhamna/jira-commands` workspace.
 
 [![Crates.io](https://img.shields.io/crates/v/jira-core.svg)](https://crates.io/crates/jira-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Usage
+## Install
 
 ```toml
 [dependencies]
-jira-core = "0.6"
+jira-core = "0.10"
 ```
+
+## What this crate provides
+
+- `JiraClient` for Jira REST API v3 operations
+- `JiraConfig` for config/env loading
+- `FieldCache` for field metadata reuse
+- issue, worklog, transition, attachment, and bulk-operation helpers
+- Atlassian Document Format helpers for text and Markdown conversion
+
+## Example
 
 ```rust
 use jira_core::{JiraClient, JiraConfig};
@@ -25,58 +35,33 @@ async fn main() -> anyhow::Result<()> {
     let config = JiraConfig::load()?;
     let client = JiraClient::new(config);
 
-    // Search issues
     let results = client
-        .search_issues("project = MYPROJ AND status = 'In Progress'", None, Some(50))
+        .search_issues("project = MYPROJ AND status = 'In Progress'", None, Some(25))
         .await?;
 
     for issue in results.issues {
         println!("{}: {}", issue.key, issue.summary);
     }
 
-    // Get a single issue
-    let issue = client.get_issue("MYPROJ-123").await?;
-    println!("{}", issue.description.unwrap_or_default());
-
-    // Transition an issue
-    let transitions = client.get_transitions("MYPROJ-123").await?;
-    client.transition_issue("MYPROJ-123", &transitions[0]["id"].as_str().unwrap()).await?;
-
-    // Upload attachment
-    client.upload_attachment("MYPROJ-123", "./screenshot.png").await?;
-
-    // Add worklog
-    client.add_worklog("MYPROJ-123", "2h", Some("Fixed auth bug")).await?;
-
     Ok(())
 }
 ```
 
-## Features
+## Configuration
 
-- `JiraClient` — full Jira REST API v3 client
-  - Issue CRUD (create, read, update, delete, transition)
-  - JQL search with cursor-based pagination (`/search/jql`)
-  - Attachment upload (multipart/form-data)
-  - Worklog management
-  - Bulk operations and archive
-  - Raw API passthrough
-  - Plans API (Jira Premium)
-- `JiraConfig` — config loading from file (`~/.config/jira/config.toml`) and env vars
-- `FieldCache` — in-memory field metadata cache with TTL
-- ADF parser — Atlassian Document Format ↔ Markdown conversion
-- `thiserror`-based error types
+Credentials are loaded from:
+- `~/.config/jira/config.toml`
+- `JIRA_URL`
+- `JIRA_EMAIL`
+- `JIRA_TOKEN`
 
-## Auth
+That makes it easy to share config with `jirac` and `jirac-mcp`.
 
-Credentials are loaded automatically from `~/.config/jira/config.toml` (managed by `jirac auth login`) or from environment variables:
+## Related crates
 
-```bash
-JIRA_URL=https://yourcompany.atlassian.net
-JIRA_EMAIL=you@example.com
-JIRA_TOKEN=your_api_token
-```
+- `jira-commands` for the CLI
+- `jira-mcp` for MCP server integrations
 
-## Full documentation
+## More docs
 
-See [github.com/mulhamna/jira-commands](https://github.com/mulhamna/jira-commands).
+See the root README for workspace-level installation and feature overview.

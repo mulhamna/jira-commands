@@ -1,8 +1,9 @@
 # jira-mcp
 
-`jirac-mcp` exposes Jira operations over the Model Context Protocol (MCP) using the shared `jira-core` client.
+> **jirac-mcp** exposes Jira operations over the Model Context Protocol (MCP).
+> It is **not** affiliated with, endorsed by, or sponsored by Atlassian.
 
-This crate is published from the shared Rust workspace in the `mulhamna/jira-commands` repository.
+`jira-mcp` is the MCP server crate in the `mulhamna/jira-commands` workspace. It reuses `jira-core` and exposes typed Jira tools for editors, assistants, and remote MCP clients.
 
 ## Install
 
@@ -10,55 +11,49 @@ This crate is published from the shared Rust workspace in the `mulhamna/jira-com
 cargo install jira-mcp
 ```
 
-## Run MCP
+## Run
 
 ```bash
-# Local MCP clients
+# Local stdio transport
 jirac-mcp serve --transport stdio
 
-# Remote / HTTP MCP clients
+# Streamable HTTP transport
 jirac-mcp serve --transport streamable-http --host 127.0.0.1 --port 8787 --path /mcp
 ```
 
-## Configuration
+## Shared configuration
 
-The server reuses the same configuration as `jirac`:
+The server reuses the same credentials/config as `jirac`:
+- `~/.config/jira/config.toml`
+- `JIRA_URL`
+- `JIRA_EMAIL`
+- `JIRA_TOKEN`
 
-- Environment variables: `JIRA_URL`, `JIRA_EMAIL`, `JIRA_TOKEN`
-- Config file: `~/.config/jira/config.toml`
-
-You can manage credentials through MCP tools or the existing CLI:
+You can also initialize credentials with:
 
 ```bash
 jirac auth login
 ```
 
-## Tools
+## Tool coverage
 
-- `jira_auth_status`
-- `jira_auth_set_credentials`
-- `jira_auth_logout`
-- `jira_issue_list`
-- `jira_issue_view`
-- `jira_issue_types_list`
-- `jira_issue_fields`
-- `jira_issue_transitions_list`
-- `jira_issue_create`
-- `jira_issue_update`
-- `jira_issue_delete`
-- `jira_issue_transition`
-- `jira_issue_attach`
-- `jira_worklog_list`
-- `jira_worklog_add`
-- `jira_worklog_delete`
-- `jira_issue_bulk_transition`
-- `jira_issue_bulk_update`
-- `jira_issue_archive`
-- `jira_plan_list`
-- `jira_api_request`
+The MCP server includes tools for:
+- auth status and credential updates
+- issue list, view, create, update, delete
+- field and transition discovery
+- attachment upload
+- worklog operations
+- bulk transition and bulk update
+- archive
+- plans
+- raw Jira REST API requests
 
 ## Notes
 
-- The server is tools-only in v1. It does not expose MCP prompts, resources, or the TUI.
+- Current focus is tools, not prompts/resources/UI.
 - Destructive operations require `confirm: true`.
-- Attachment uploads support either local file paths or inline base64 payloads.
+- Attachment uploads support local file paths or inline base64 payloads.
+
+## More docs
+
+See the root README for example client configuration and workspace-level context.

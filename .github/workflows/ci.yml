@@ -59,7 +59,7 @@ jobs:
               - '.github/dependabot.yml'
               - 'install.sh'
               - 'SECURITY.md'
-          predicate-quantifier: 'or'
+          predicate-quantifier: 'some'
 
       - id: any_code
         run: |

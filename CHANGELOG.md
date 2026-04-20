@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.10.0](https://github.com/mulhamna/jira-commands/compare/v0.9.0...v0.10.0) (2026-04-20)
+
+
+### Features
+
+* add plausible analytics snippet for jirac docs ([9ee32cf](https://github.com/mulhamna/jira-commands/commit/9ee32cf132e71bc43335baa9001837652b3458ae))
+
 ## [0.9.0](https://github.com/mulhamna/jira-commands/compare/v0.8.1...v0.9.0) (2026-04-19)
 
 

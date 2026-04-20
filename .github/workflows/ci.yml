@@ -1,27 +1,15 @@
 name: CI
 
-# ── SHA PINNING REMINDER ─────────────────────────────────────────────────────
-# All actions below use version tags. For supply-chain hardening, pin every
-# action to its full commit SHA. Dependabot (see dependabot.yml) will keep
-# the SHA pins up-to-date automatically via weekly PRs.
-#
-# One-time pin (run once, then commit):
-#   npx pin-github-action@latest .github/workflows/ci.yml
-# ─────────────────────────────────────────────────────────────────────────────
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
-# Cancel in-flight CI runs for the same ref (saves minutes on fast pushes)
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Minimal read-only permissions for the whole workflow.
-# Individual jobs that need more (e.g. security-events) declare it themselves.
 permissions:
   contents: read
 
@@ -30,10 +18,66 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # ── 1. Docs & version consistency ──────────────────────────────────────────
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      workflows: ${{ steps.filter.outputs.workflows }}
+      rust: ${{ steps.filter.outputs.rust }}
+      plugin: ${{ steps.filter.outputs.plugin }}
+      docs: ${{ steps.filter.outputs.docs }}
+      release: ${{ steps.filter.outputs.release }}
+      workspace_meta: ${{ steps.filter.outputs.workspace_meta }}
+      any_code: ${{ steps.filter.outputs.any_code }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - id: filter
+        uses: dorny/paths-filter@45125827bcd3e8e9cc13bd6228836c76ca91ca84 # v3
+        with:
+          filters: |
+            workflows:
+              - '.github/workflows/**'
+            rust:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'deny.toml'
+              - 'crates/**'
+            plugin:
+              - 'plugin/**'
+            docs:
+              - 'README.md'
+              - 'docs/**'
+              - '.github/PULL_REQUEST_TEMPLATE.md'
+            release:
+              - 'release-please-config.json'
+              - '.release-please-manifest.json'
+              - 'VERSION'
+              - 'CHANGELOG.md'
+            workspace_meta:
+              - '.github/CODEOWNERS'
+              - '.github/dependabot.yml'
+              - 'install.sh'
+              - 'SECURITY.md'
+          predicate-quantifier: 'or'
+
+      - id: any_code
+        run: |
+          if [ "${{ steps.filter.outputs.workflows }}" = 'true' ] || \
+             [ "${{ steps.filter.outputs.rust }}" = 'true' ] || \
+             [ "${{ steps.filter.outputs.plugin }}" = 'true' ] || \
+             [ "${{ steps.filter.outputs.release }}" = 'true' ] || \
+             [ "${{ steps.filter.outputs.workspace_meta }}" = 'true' ]; then
+            echo "any_code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "any_code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   docs-check:
     name: Docs & version check
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.any_code == 'true' || needs.changes.outputs.docs == 'true'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -53,16 +97,10 @@ jobs:
           if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
             echo ""
             echo "ERROR: Version mismatch! All four must be equal."
-            echo "  Fix: bump version in crates/jira-core/Cargo.toml,"
-            echo "       crates/jira-mcp/Cargo.toml,"
-            echo "       crates/jira/Cargo.toml (package + jira-core dep),"
-            echo "       and plugin/.claude-plugin/plugin.json"
             exit 1
           fi
 
       - name: Check CHANGELOG entry exists for current version
-        # release-please writes the workspace changelog to root CHANGELOG.md.
-        # Also accept historical per-package changelog locations.
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
@@ -71,37 +109,33 @@ jobs:
             echo "✓ CHANGELOG entry found for v${VERSION}"
           else
             echo "WARNING: No CHANGELOG entry found for v${VERSION} in any location."
-            echo "  release-please will create per-package CHANGELOGs automatically."
           fi
 
       - name: Check README.md jira-core version is up to date
-        # WARNING only — README version lags on patch bumps by design.
-        # On minor/major bumps, update README.md manually before merging.
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           if ! grep -qF "jira-core = \"${MAJOR_MINOR}\"" README.md; then
             echo "WARNING: README.md library example may reference an old jira-core version."
-            echo "  Consider updating 'jira-core = \"..\"' to \"${MAJOR_MINOR}\" in README."
           fi
 
       - name: Install Rust stable (for dry-run publish check)
+        if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.workflows == 'true'
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo
+        if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.workflows == 'true'
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
-      # Dry-run only jira-core (no workspace deps — always resolvable from crates.io).
-      # jira-commands is intentionally skipped: it depends on jira-core at the *new*
-      # version which isn't published yet, so cargo would fail to resolve it from
-      # crates.io. The release workflow handles jira-commands after jira-core is live.
       - name: cargo publish --dry-run (jira-core)
+        if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.workflows == 'true'
         run: cargo publish --dry-run -p jira-core
 
-  # ── 2. Build, lint, test ───────────────────────────────────────────────────
   check:
-    name: Check (${{ matrix.os }})
+    name: Rust check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -128,10 +162,34 @@ jobs:
       - name: Tests
         run: cargo test --all
 
-  # ── 3. Security audit ──────────────────────────────────────────────────────
+  plugin-check:
+    name: Plugin structure check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Validate plugin metadata and skills
+        run: |
+          jq -e '.name and .version and .description and .repository' plugin/.claude-plugin/plugin.json >/dev/null
+          test -d plugin/skills
+          count=$(find plugin/skills -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
+          if [ "$count" -lt 1 ]; then
+            echo "ERROR: expected at least one plugin skill"
+            exit 1
+          fi
+          find plugin/skills -mindepth 2 -maxdepth 2 -name SKILL.md -print0 | while IFS= read -r -d '' file; do
+            grep -q '^---' "$file" || { echo "Missing frontmatter: $file"; exit 1; }
+            grep -q '^description:' "$file" || { echo "Missing description in $file"; exit 1; }
+          done
+
   security:
     name: Security audit
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.release == 'true' || github.event_name == 'push'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

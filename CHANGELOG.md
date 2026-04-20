@@ -6,6 +6,22 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.11.0](https://github.com/mulhamna/jira-commands/compare/v0.10.0...v0.11.0) (2026-04-20)
+
+
+### Features
+
+* add table ADF support and plugin skill coverage ([1999948](https://github.com/mulhamna/jira-commands/commit/1999948cab85bb85ea6dc91852cf2b6cca8ef71a))
+
+
+### Bug Fixes
+
+* align ADF table conversion with comrak ([63ae954](https://github.com/mulhamna/jira-commands/commit/63ae9548fa3fc6fe3b1d35fb156640458124bfc7))
+* correct paths-filter predicate setting ([899a504](https://github.com/mulhamna/jira-commands/commit/899a504ae1a48d4050c4862c21cf47f6714e9277))
+* keep ADF table rendering read-side only ([b0fc2cd](https://github.com/mulhamna/jira-commands/commit/b0fc2cde8215659a0d7bd7205800c0cf216faa5c))
+* remove stray blank line in adf formatter output ([b2954bd](https://github.com/mulhamna/jira-commands/commit/b2954bd0a0e405f47908e93921d7adf2f68e04fb))
+* repair CI action pin and tidy crate READMEs ([150a5f5](https://github.com/mulhamna/jira-commands/commit/150a5f51ac331478b92294315d4baf5f839e5dbd))
+
 ## [0.10.0](https://github.com/mulhamna/jira-commands/compare/v0.9.0...v0.10.0) (2026-04-20)
 
 

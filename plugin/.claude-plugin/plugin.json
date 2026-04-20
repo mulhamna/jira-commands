@@ -1,6 +1,6 @@
 {
   "name": "jira",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Jira CLI integration for Claude Code — create, list, view, transition, and manage Jira issues directly from Claude Code. Requires jira-commands CLI to be installed (`cargo install jira-commands`).",
   "author": {
     "name": "mulhamna",

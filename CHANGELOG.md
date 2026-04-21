@@ -6,6 +6,20 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.12.0](https://github.com/mulhamna/jira-commands/compare/v0.11.0...v0.12.0) (2026-04-21)
+
+
+### Features
+
+* add Jira issue comment support ([511ec27](https://github.com/mulhamna/jira-commands/commit/511ec279591d592ef628de299e24396c20db718d))
+
+
+### Bug Fixes
+
+* align adf table tests and jirac migration docs ([f395763](https://github.com/mulhamna/jira-commands/commit/f3957632811049cc3e427195ca67fd3f14661390))
+* avoid unsupported comrak text_contents helper ([a09c313](https://github.com/mulhamna/jira-commands/commit/a09c31337dfb3001e0fa04211241f68d1ad837e2))
+* match rustfmt output for comment model ([daf43db](https://github.com/mulhamna/jira-commands/commit/daf43dbefe0d31d905a258cf9cdbc2f0d0bcc0f1))
+
 ## [0.11.0](https://github.com/mulhamna/jira-commands/compare/v0.10.0...v0.11.0) (2026-04-20)
 
 

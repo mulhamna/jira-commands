@@ -1,6 +1,6 @@
 [package]
 name = "jira-mcp"
-version = "0.11.0" # x-release-please-version
+version = "0.12.0" # x-release-please-version
 edition = "2021"
 description = "MCP server for Jira — typed Model Context Protocol tools powered by jira-core"
 readme = "README.md"

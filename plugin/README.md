@@ -37,6 +37,7 @@ jirac auth login
 | `/jira:create-issue` | Create a new issue with interactive field prompts |
 | `/jira:update-issue` | Update summary, description, assignee, labels, versions, or custom fields |
 | `/jira:transition` | Move an issue to a new status (e.g. In Progress, Done) |
+| `/jira:comment` | List comments or add a new Markdown comment on an issue |
 | `/jira:worklog` | List, add, or delete time entries on an issue |
 | `/jira:bulk-transition` | Transition multiple issues at once via JQL query |
 | `/jira:attach` | Upload a file or image to an issue |
@@ -66,6 +67,13 @@ Claude runs `/jira:create-issue`, sets type to Bug, and uses the stack trace as 
 > "mark PROJ-123 as done"
 
 Claude runs `/jira:transition` and moves the issue to Done in one step.
+
+---
+
+**Leave a follow-up comment**
+> "comment on PROJ-456 that QA verified the fix in staging"
+
+Claude runs `/jira:comment` and adds the requested Markdown comment.
 
 ---
 

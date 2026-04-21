@@ -275,6 +275,22 @@ pub enum IssueCommand {
         json: bool,
     },
 
+    /// Manage comments on an issue
+    ///
+    /// List existing comments or add a new comment in Markdown.
+    /// Markdown is converted to ADF before sending to Jira.
+    ///
+    /// Examples:
+    ///   jirac issue comment list PROJ-123
+    ///   jirac issue comment add PROJ-123 --body "Need follow-up from backend"
+    ///   jirac issue comment add PROJ-123 --file note.md
+    Comment {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        #[command(subcommand)]
+        command: CommentCommand,
+    },
+
     /// Manage time tracking (worklogs) on an issue
     ///
     /// Log time, list existing entries, or delete a worklog.
@@ -535,6 +551,26 @@ pub enum IssueCommand {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum CommentCommand {
+    /// List all comments on the issue
+    List,
+
+    /// Add a comment to an issue
+    ///
+    /// Examples:
+    ///   jirac issue comment add PROJ-123 --body "Please verify in staging"
+    ///   jirac issue comment add PROJ-123 --file note.md
+    Add {
+        /// Comment body in Markdown
+        #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
+        body: Option<String>,
+        /// Read comment body from a Markdown file
+        #[arg(long, value_name = "FILE", conflicts_with = "body")]
+        file: Option<std::path::PathBuf>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 pub enum WorklogCommand {
     /// List all worklog entries for the issue
     ///
@@ -680,6 +716,7 @@ pub async fn handle(
             )
             .await
         }
+        IssueCommand::Comment { key, command } => comment(client, key, command).await,
         IssueCommand::Worklog { key, command } => worklog(client, key, command).await,
         IssueCommand::BulkTransition {
             jql,
@@ -1458,6 +1495,69 @@ fn truncate(s: &str, max_len: usize) -> String {
     } else {
         format!("{}…", &s[..max_len.saturating_sub(1)])
     }
+}
+
+// ─── comment ─────────────────────────────────────────────────────────────────
+
+async fn comment(client: JiraClient, key: String, cmd: CommentCommand) -> Result<()> {
+    match cmd {
+        CommentCommand::List => comment_list(client, key).await,
+        CommentCommand::Add { body, file } => comment_add(client, key, body, file).await,
+    }
+}
+
+async fn comment_list(client: JiraClient, key: String) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching comments for {key}..."));
+    let comments = client
+        .get_comments(&key)
+        .await
+        .context("Failed to fetch comments")?;
+    spinner.finish_and_clear();
+
+    if comments.is_empty() {
+        println!("No comments found for {key}.");
+        return Ok(());
+    }
+
+    for c in comments {
+        println!("#{}", c.id);
+        if let Some(author) = &c.author {
+            println!("  Author : {}", author);
+        }
+        if !c.created.is_empty() {
+            println!("  Created: {}", c.created);
+        }
+        if let Some(body) = &c.body {
+            println!("  Body   : {}", body.replace('\n', "\n           "));
+        }
+        println!();
+    }
+
+    Ok(())
+}
+
+async fn comment_add(
+    client: JiraClient,
+    key: String,
+    body: Option<String>,
+    file: Option<std::path::PathBuf>,
+) -> Result<()> {
+    let comment_body = match (body, file) {
+        (Some(body), None) if !body.trim().is_empty() => body,
+        (None, Some(path)) => std::fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read comment file {}", path.display()))?,
+        _ => anyhow::bail!("Provide exactly one of --body or --file with non-empty content"),
+    };
+
+    let spinner = spinner_new(format!("Adding comment to {key}..."));
+    let comment = client
+        .add_comment(&key, &comment_body)
+        .await
+        .context("Failed to add comment")?;
+    spinner.finish_and_clear();
+
+    println!("✓ Added comment {} to {}", comment.id, key);
+    Ok(())
 }
 
 // ─── worklog ─────────────────────────────────────────────────────────────────

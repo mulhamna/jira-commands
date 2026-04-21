@@ -70,6 +70,7 @@ enum AppAction {
     CreateIssue,
     EditIssue(String),
     AssignIssue(String),
+    AddComment(String),
     AddWorklog(String),
     EditLabels(String),
     EditComponents(String),
@@ -230,6 +231,13 @@ impl App {
                     AppAction::None
                 }
             }
+            KeyCode::Char(';') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AddComment(key)
+                } else {
+                    AppAction::None
+                }
+            }
             KeyCode::Char('w') => {
                 if let Some(key) = self.selected_issue_key() {
                     AppAction::AddWorklog(key)
@@ -284,6 +292,13 @@ impl App {
             KeyCode::Char('a') => {
                 if let Some(key) = self.selected_issue_key() {
                     AppAction::AssignIssue(key)
+                } else {
+                    AppAction::None
+                }
+            }
+            KeyCode::Char(';') => {
+                if let Some(key) = self.selected_issue_key() {
+                    AppAction::AddComment(key)
                 } else {
                     AppAction::None
                 }
@@ -639,6 +654,17 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 }
             }
 
+            AppAction::AddComment(key) => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_add_comment(&client, &key).await;
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(true) => app.set_status(format!("✓ Comment added to {key}"), false),
+                    Ok(false) => app.set_status("Comment cancelled", false),
+                    Err(e) => app.set_status(format!("Comment failed: {e}"), true),
+                }
+            }
+
             AppAction::AddWorklog(key) => {
                 suspend_tui(&mut terminal)?;
                 let result = tui_add_worklog(&client, &key).await;
@@ -873,6 +899,22 @@ async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
     Ok(true)
 }
 
+/// Add a comment to an issue.
+async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bool> {
+    use inquire::Text;
+
+    println!("\n── Add Comment to {key} ──────────────────────────────");
+
+    let body = match Text::new("Comment (blank to cancel):").prompt_skippable()? {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return Ok(false),
+    };
+
+    client.add_comment(key, &body).await?;
+    println!("✓ Comment added to {key}");
+    Ok(true)
+}
+
 /// Add a worklog entry to an issue.
 async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bool> {
     use inquire::Text;
@@ -1045,11 +1087,11 @@ fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     let text = match &app.mode {
         Mode::List => {
-            " j/k:move  Enter:view  t:transition  c:create  e:edit  a:assign  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:view  t:transition  c:create  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::View => {
-            " Esc:back  t:transition  e:edit  a:assign  w:worklog  l:labels  m:comps  u:upload  o:browser  ?:help  q:quit"
+            " Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -1301,6 +1343,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  c         Create new issue"),
         Line::from("  e         Edit selected issue (summary/assignee/priority)"),
         Line::from("  a         Assign selected issue"),
+        Line::from("  ;         Add comment to selected issue"),
         Line::from("  w         Add worklog to selected issue"),
         Line::from("  l         Set labels on selected issue"),
         Line::from("  m         Set components on selected issue"),

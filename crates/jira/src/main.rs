@@ -4,6 +4,7 @@ use jira_core::{config::JiraConfig, JiraClient};
 use tracing_subscriber::{fmt, EnvFilter};
 
 mod cli;
+mod datetime;
 mod tui;
 
 #[derive(Debug, Parser)]

@@ -1394,6 +1394,7 @@ name = "jira-commands"
 version = "0.12.1"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "crossterm 0.28.1",
  "indicatif",

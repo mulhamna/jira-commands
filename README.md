@@ -41,6 +41,8 @@ Download from [GitHub Releases](https://github.com/mulhamna/jira-commands/releas
 
 For manual installs, prefer the packaged archives. They include the binary plus license files and README.
 
+Releases now publish the supported binaries `jirac` and `jirac-mcp`. The legacy `jira` binary is no longer shipped in release artifacts.
+
 | Platform              | Raw binary                 | Preferred archive            |
 | --------------------- | -------------------------- | ---------------------------- |
 | macOS (Apple Silicon) | `jirac-macos-aarch64`      | `jirac-macos-aarch64.tar.gz` |

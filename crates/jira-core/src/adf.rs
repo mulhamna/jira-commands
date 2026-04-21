@@ -401,7 +401,15 @@ fn collect_inline<'a>(
             );
         }
         NodeValue::Image(link) => {
-            let label = node.text_contents();
+            let mut inner: Vec<Value> = Vec::new();
+            for child in node.children() {
+                collect_inline(child, &mut inner, unsupported);
+            }
+            let label = inner
+                .iter()
+                .filter_map(|item| item.get("text").and_then(|value| value.as_str()))
+                .collect::<Vec<_>>()
+                .join("");
             let text = if label.trim().is_empty() {
                 link.url.clone()
             } else {

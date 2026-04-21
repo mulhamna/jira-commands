@@ -100,42 +100,32 @@ jobs:
             os: ubuntu-latest
             artifact: jirac-linux-x86_64
             mcp_artifact: jirac-mcp-linux-x86_64
-            legacy_artifact: jira-linux-x86_64
             archive_artifact: jirac-linux-x86_64.tar.gz
             mcp_archive_artifact: jirac-mcp-linux-x86_64.tar.gz
-            legacy_archive_artifact: jira-linux-x86_64.tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-aarch64
             mcp_artifact: jirac-mcp-linux-aarch64
-            legacy_artifact: jira-linux-aarch64
             archive_artifact: jirac-linux-aarch64.tar.gz
             mcp_archive_artifact: jirac-mcp-linux-aarch64.tar.gz
-            legacy_archive_artifact: jira-linux-aarch64.tar.gz
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-x86_64
             mcp_artifact: jirac-mcp-macos-x86_64
-            legacy_artifact: jira-macos-x86_64
             archive_artifact: jirac-macos-x86_64.tar.gz
             mcp_archive_artifact: jirac-mcp-macos-x86_64.tar.gz
-            legacy_archive_artifact: jira-macos-x86_64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-aarch64
             mcp_artifact: jirac-mcp-macos-aarch64
-            legacy_artifact: jira-macos-aarch64
             archive_artifact: jirac-macos-aarch64.tar.gz
             mcp_archive_artifact: jirac-mcp-macos-aarch64.tar.gz
-            legacy_archive_artifact: jira-macos-aarch64.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact: jirac-windows-x86_64.exe
             mcp_artifact: jirac-mcp-windows-x86_64.exe
-            legacy_artifact: jira-windows-x86_64.exe
             archive_artifact: jirac-windows-x86_64.zip
             mcp_archive_artifact: jirac-mcp-windows-x86_64.zip
-            legacy_archive_artifact: jira-windows-x86_64.zip
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -168,7 +158,6 @@ jobs:
         run: |
           cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
           cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.mcp_artifact }}
-          cp target/${{ matrix.target }}/release/jira  ${{ matrix.legacy_artifact }}
 
       - name: Copy binaries (Windows)
         if: matrix.os == 'windows-latest'
@@ -176,36 +165,29 @@ jobs:
         run: |
           Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
           Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.mcp_artifact }}
-          Copy-Item target/${{ matrix.target }}/release/jira.exe  ${{ matrix.legacy_artifact }}
 
       - name: Package archives (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          mkdir -p dist/jirac dist/jirac-mcp dist/jira
+          mkdir -p dist/jirac dist/jirac-mcp
           cp ${{ matrix.artifact }} dist/jirac/
           cp ${{ matrix.mcp_artifact }} dist/jirac-mcp/
-          cp ${{ matrix.legacy_artifact }} dist/jira/
           cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac/
           cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
-          cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jira/
           tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
           tar -czf ${{ matrix.mcp_archive_artifact }} -C dist/jirac-mcp .
-          tar -czf ${{ matrix.legacy_archive_artifact }} -C dist/jira .
 
       - name: Package archives (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp, dist/jira | Out-Null
+          New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp | Out-Null
           Copy-Item ${{ matrix.artifact }} dist/jirac/
           Copy-Item ${{ matrix.mcp_artifact }} dist/jirac-mcp/
-          Copy-Item ${{ matrix.legacy_artifact }} dist/jira/
           Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac/
           Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
-          Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jira/
           Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
           Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.mcp_archive_artifact }}
-          Compress-Archive -Path dist/jira/* -DestinationPath ${{ matrix.legacy_archive_artifact }}
 
       - name: Generate build provenance attestation (jirac)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -216,11 +198,6 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: ${{ matrix.mcp_artifact }}
-
-      - name: Generate build provenance attestation (jira legacy)
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-path: ${{ matrix.legacy_artifact }}
 
       - name: Upload artifact (jirac)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -240,14 +217,6 @@ jobs:
             ${{ matrix.mcp_archive_artifact }}
           if-no-files-found: error
 
-      - name: Upload artifact (jira legacy)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ${{ matrix.legacy_artifact }}
-          path: |
-            ${{ matrix.legacy_artifact }}
-            ${{ matrix.legacy_archive_artifact }}
-          if-no-files-found: error
 
   # ── 2. Publish to crates.io ───────────────────────────────────────────────
   publish-crates:

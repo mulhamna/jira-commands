@@ -13,7 +13,7 @@
 cargo install jira-mcp
 ```
 
-You can also use the workspace install script or download packaged release archives from GitHub Releases.
+You can also use the workspace shell installer on macOS/Linux, the PowerShell installer flow on Windows, or download packaged release archives from GitHub Releases.
 
 ## Run
 

@@ -29,6 +29,22 @@ brew tap mulhamna/tap && brew install jira-commands
 curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
 ```
 
+### PowerShell installer (Windows)
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"
+```
+
+This installs `jirac.exe` to `%LOCALAPPDATA%\Programs\jirac\bin` and adds that directory to your user PATH.
+
+### Winget (Windows)
+
+Winget manifest sources live in `packaging/winget/` in this repo. After each GitHub release, update the manifest version, archive URL, and SHA256, validate them, then submit to the Windows Package Manager community repository. Once published there, install will be as simple as:
+
+```powershell
+winget install mulhamna.jirac
+```
+
 ### Cargo
 
 ```bash
@@ -199,10 +215,16 @@ export JIRA_TOKEN=your_api_token
 cargo install jira-mcp
 ```
 
-Or via the install script, which downloads the correct packaged release for your platform:
+Or via the installer flow that matches your platform:
 
 ```bash
+# macOS / Linux
 curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | BINARY=jirac-mcp bash
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))" -Binary jirac-mcp
 ```
 
 ### Run
@@ -278,7 +300,7 @@ The `jira-core` crate can be used independently as a Rust library:
 
 ```toml
 [dependencies]
-jira-core = "0.10"
+jira-core = "0.12"
 ```
 
 ```rust
@@ -323,18 +345,24 @@ Releases are automated via [release-please](https://github.com/googleapis/releas
 
 ## Upgrading from `jira` to `jirac`
 
-The binary was renamed from `jira` to `jirac` in v0.7.0. The legacy `jira` binary is still included in every release with a deprecation warning, and will be removed in a future major release.
+The supported CLI binary is `jirac`.
+
+If you still have old scripts, aliases, or wrappers that call `jira`, update them before upgrading. Release artifacts now ship `jirac` and `jirac-mcp` only.
 
 ```bash
-# Update aliases if needed
+# Example shell alias update
 alias jira='jirac'
 ```
 
-Homebrew users: `brew upgrade jira-commands` handles the transition automatically.
-
 ## License
 
-[MIT](LICENSE)
+Licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
+
+## Windows packaging roadmap
+
+- `install.ps1` is the direct Windows installer entrypoint
+- Winget manifest sources are maintained in `packaging/winget/`
+- GitHub Releases remain the source for signed release archives and checksums
 
 ---
 

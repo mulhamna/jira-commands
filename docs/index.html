@@ -255,7 +255,7 @@ $ jirac issue transition CORE-183 --to Done
         </article>
         <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
           <h3 class="font-semibold">Cross-platform</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">macOS, Linux, and Windows releases with single binary.</p>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">macOS, Linux, and Windows releases with focused CLI binaries for terminal and MCP workflows.</p>
         </article>
       </div>
     </section>
@@ -264,7 +264,7 @@ $ jirac issue transition CORE-183 --to Done
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Quick Guide for Non-Tech Users</h2>
         <ol class="mt-6 grid gap-4 md:grid-cols-2">
-          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">1. Install</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Ask your IT/dev teammate to install <code>jirac</code> once so it is ready on your machine.</p><div class="mini-command"><span class="mini-command-label">Tool</span><code>jirac</code></div></li>
+          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">1. Install</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use the installer that matches your machine. Windows users can use PowerShell, while macOS and Linux can use the shell installer.</p><div class="mini-command"><span class="mini-command-label">Tool</span><code>jirac</code></div></li>
           <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">2. Login</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use your Jira URL, email, and API token to connect your account the first time.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac auth login</code></div></li>
           <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">3. View your tasks</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">See issues assigned to you in a simple terminal list.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac issue list</code></div></li>
           <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">4. Move issue status</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Select an issue and move it to the next status when work changes.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac issue transition PROJ-123</code></div></li>
@@ -279,9 +279,11 @@ $ jirac issue transition CORE-183 --to Done
           <h3 class="font-semibold">Installation options</h3>
           <div class="mt-3 space-y-3 text-sm">
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-curl" class="break-all">curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-curl">Copy</button></div>
+            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-powershell" class="break-all">powershell -ExecutionPolicy Bypass -Command "&amp; ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-powershell">Copy</button></div>
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-brew" class="break-all">brew tap mulhamna/tap && brew install jira-commands</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-brew">Copy</button></div>
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-cargo" class="break-all">cargo install jira-commands</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-cargo">Copy</button></div>
           </div>
+          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Winget manifests are maintained in-repo and are meant to be validated and submitted after each GitHub release.</p>
         </article>
         <article class="doc-card rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
           <h3 class="font-semibold">First login</h3>
@@ -295,7 +297,7 @@ $ jirac issue transition CORE-183 --to Done
     <section id="commands" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Command Reference</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Common commands for daily workflow.</p>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Common commands for daily workflow. Releases ship `jirac` and `jirac-mcp`, and Windows installation is available through PowerShell now with Winget manifests maintained in-repo.</p>
         <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
           <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
             <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -338,6 +340,7 @@ $ jirac issue transition CORE-183 --to Done
             <tr><td class="px-4 py-3"><span class="keycap">c</span></td><td class="px-4 py-3">Create a new issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">e</span></td><td class="px-4 py-3">Edit the selected issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">t</span></td><td class="px-4 py-3">Change issue status (transition).</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">C</span></td><td class="px-4 py-3">Choose which table columns stay visible and persist that preference.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add worklog to the issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">u</span></td><td class="px-4 py-3">Upload an attachment to the issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">?</span></td><td class="px-4 py-3">Show shortcut help.</td></tr>
@@ -349,7 +352,7 @@ $ jirac issue transition CORE-183 --to Done
     <section id="mcp" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">MCP Server</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use <code>jirac-mcp</code> to expose Jira tools to MCP clients.</p>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use <code>jirac-mcp</code> to expose Jira tools to MCP clients. Install it with Cargo or the release installer flow, depending on your environment.</p>
         <div class="mt-4 grid gap-6 lg:grid-cols-2">
           <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
             <h3 class="font-semibold">Install and run</h3>
@@ -358,6 +361,8 @@ $ jirac issue transition CORE-183 --to Done
                 <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="cmd-mcp-install-run">Copy</button>
               </div>
               <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="cmd-mcp-install-run">cargo install jira-mcp
+# macOS / Linux: curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | BINARY=jirac-mcp bash
+# Windows: powershell -ExecutionPolicy Bypass -Command "&amp; ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))" -Binary jirac-mcp
 jirac-mcp serve --transport stdio</code></pre>
             </div>
           </article>
@@ -383,7 +388,7 @@ jirac-mcp serve --transport stdio</code></pre>
 
     <section id="contributing" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Contributing</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Contributions are welcome for bug fixes, docs improvements, tests, and new features.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Contributions are welcome for bug fixes, docs improvements, tests, release automation follow-through, and new features.</p>
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
           <h3 class="font-semibold">Quick contribution flow</h3>
@@ -462,6 +467,7 @@ cargo build --all</code></pre>
     <div class="mx-auto max-w-7xl px-4 py-8 text-sm text-slate-600 dark:text-slate-400 sm:px-6 lg:px-8">
       <p><strong>jc / jira-commands</strong> - Rust CLI for Jira ecosystem.</p>
       <p class="mt-1">Repository: <a class="text-brand-700 hover:underline" href="https://github.com/mulhamna/jira-commands">github.com/mulhamna/jira-commands</a></p>
+      <p class="mt-1">License: MIT OR Apache-2.0</p>
     </div>
   </footer>
   <script>

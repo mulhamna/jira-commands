@@ -14,7 +14,7 @@ This crate is versioned and released from the `mulhamna/jira-commands` workspace
 
 ```toml
 [dependencies]
-jira-core = "0.10"
+jira-core = "0.12"
 ```
 
 ## What this crate provides

@@ -6,6 +6,8 @@ Manage Jira issues directly from Claude Code. Create, list, view, transition, co
 
 > **Requires** the `jirac` CLI to be installed: `cargo install jira-commands`
 >
+> You can also install `jirac` from the workspace shell installer on macOS/Linux, the PowerShell installer on Windows, or GitHub Releases.
+>
 > **Compatibility note:** the next release requires `jirac`. If you still have old scripts or aliases that call `jira`, update them before upgrading.
 
 > **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` with `cargo install jira-mcp`.

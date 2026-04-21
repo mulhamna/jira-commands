@@ -17,7 +17,8 @@ cargo install jira-commands
 
 Or use one of the workspace-level install options from the root README:
 - Homebrew
-- install script
+- shell installer on macOS/Linux
+- PowerShell installer on Windows
 - GitHub Releases archives and raw binaries
 
 ## What this crate provides

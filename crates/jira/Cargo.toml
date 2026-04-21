@@ -28,3 +28,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 indicatif = "0.17"
 open = "5"
+chrono = { version = "0.4", default-features = true }

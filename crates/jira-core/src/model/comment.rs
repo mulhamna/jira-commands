@@ -23,15 +23,13 @@ impl Comment {
                 .and_then(|a| a.get("displayName").or_else(|| a.get("emailAddress")))
                 .and_then(|n| n.as_str())
                 .map(|s| s.to_string()),
-            body: v
-                .get("body")
-                .and_then(|body| {
-                    if body.is_object() {
-                        Some(adf_to_text(body))
-                    } else {
-                        body.as_str().map(|s| s.to_string())
-                    }
-                }),
+            body: v.get("body").and_then(|body| {
+                if body.is_object() {
+                    Some(adf_to_text(body))
+                } else {
+                    body.as_str().map(|s| s.to_string())
+                }
+            }),
             created: v
                 .get("created")
                 .and_then(|t| t.as_str())

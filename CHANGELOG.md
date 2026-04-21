@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.14.0](https://github.com/mulhamna/jira-commands/compare/v0.13.0...v0.14.0) (2026-04-21)
+
+
+### Features
+
+* add started date/time prompts to TUI worklog ([af561a8](https://github.com/mulhamna/jira-commands/commit/af561a8ee98ffc490425313fd8de33ce1227ee40))
+* add started timestamp options for worklog CLI ([e51ce98](https://github.com/mulhamna/jira-commands/commit/e51ce986ebbf29deec9e46284a5922b33bdc1654))
+
 ## [0.13.0](https://github.com/mulhamna/jira-commands/compare/v0.12.1...v0.13.0) (2026-04-21)
 
 

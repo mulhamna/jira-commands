@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.13.0](https://github.com/mulhamna/jira-commands/compare/v0.12.1...v0.13.0) (2026-04-21)
+
+
+### Features
+
+* **tui:** add saved columns and searchable assignee picker ([a865c0d](https://github.com/mulhamna/jira-commands/commit/a865c0d6a59e105f1bad5bfa036b8aa66c3fabc8))
+
 ## [0.12.1](https://github.com/mulhamna/jira-commands/compare/v0.12.0...v0.12.1) (2026-04-21)
 
 

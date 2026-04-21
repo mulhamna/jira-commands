@@ -25,6 +25,7 @@
 - [ ] No new `unsafe` blocks without explanation
 - [ ] No outbound network calls added outside of `jira-core/src/client.rs`
 - [ ] No changes to `.github/workflows/` without explaining why in this PR
+- [ ] If release or installer surfaces changed, docs/install notes were updated to match
 - [ ] Dependencies sourced only from crates.io (no `git = "..."` deps without justification)
 
 ## Merge behavior

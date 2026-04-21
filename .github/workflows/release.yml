@@ -316,10 +316,23 @@ jobs:
           echo "=== checksums.txt ==="
           cat ../checksums.txt
 
+      - name: Build release notes footer
+        run: |
+          cat > release-notes-footer.md <<'EOF'
+          ## Packaging notes
+
+          - Release artifacts ship `jirac` and `jirac-mcp`.
+          - Windows installer entrypoint: `install.ps1`.
+          - Winget source manifests live in `packaging/winget/` and should be updated from the published release artifacts before submission.
+          - If you still have scripts that call `jira`, update them to `jirac` before using this release.
+          EOF
+
       - name: Create release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
+          append_body: true
+          body_path: release-notes-footer.md
           files: |
             artifacts/**/*
             checksums.txt
@@ -345,17 +358,20 @@ jobs:
           SHA_MACOS_X86=$(grep "jirac-macos-x86_64"  checksums.txt | awk '{print $1}')
           SHA_LINUX_ARM=$(grep "jirac-linux-aarch64"  checksums.txt | awk '{print $1}')
           SHA_LINUX_X86=$(grep "jirac-linux-x86_64"   checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_X86=$(grep "jirac-windows-x86_64" checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"
           test -n "$SHA_LINUX_ARM"
           test -n "$SHA_LINUX_X86"
+          test -n "$SHA_WINDOWS_X86"
 
-          echo "VERSION=$VERSION"             >> "$GITHUB_ENV"
-          echo "SHA_MACOS_ARM=$SHA_MACOS_ARM" >> "$GITHUB_ENV"
-          echo "SHA_MACOS_X86=$SHA_MACOS_X86" >> "$GITHUB_ENV"
-          echo "SHA_LINUX_ARM=$SHA_LINUX_ARM" >> "$GITHUB_ENV"
-          echo "SHA_LINUX_X86=$SHA_LINUX_X86" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION"                 >> "$GITHUB_ENV"
+          echo "SHA_MACOS_ARM=$SHA_MACOS_ARM"     >> "$GITHUB_ENV"
+          echo "SHA_MACOS_X86=$SHA_MACOS_X86"     >> "$GITHUB_ENV"
+          echo "SHA_LINUX_ARM=$SHA_LINUX_ARM"     >> "$GITHUB_ENV"
+          echo "SHA_LINUX_X86=$SHA_LINUX_X86"     >> "$GITHUB_ENV"
+          echo "SHA_WINDOWS_X86=$SHA_WINDOWS_X86" >> "$GITHUB_ENV"
 
       - name: Checkout homebrew-tap
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

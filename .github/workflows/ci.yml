@@ -64,6 +64,12 @@ jobs:
               - 'README.md'
               - 'docs/**'
               - '.github/PULL_REQUEST_TEMPLATE.md'
+              - 'plugin/README.md'
+              - 'crates/jira/README.md'
+              - 'crates/jira-core/README.md'
+              - 'crates/jira-mcp/README.md'
+              - 'packaging/winget/**'
+              - 'install.ps1'
             release:
               - 'release-please-config.json'
               - '.release-please-manifest.json'
@@ -126,12 +132,18 @@ jobs:
             echo "WARNING: No CHANGELOG entry found for v${VERSION} in any location."
           fi
 
-      - name: Check README.md jira-core version is up to date
+      - name: Check README examples and install docs are up to date
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           if ! grep -qF "jira-core = \"${MAJOR_MINOR}\"" README.md; then
             echo "WARNING: README.md library example may reference an old jira-core version."
+          fi
+          if ! grep -qF "jira-core = \"${MAJOR_MINOR}\"" crates/jira-core/README.md; then
+            echo "WARNING: crates/jira-core/README.md may reference an old jira-core version."
+          fi
+          if [ -f install.ps1 ] && ! grep -qF "install.ps1" README.md; then
+            echo "WARNING: install.ps1 exists but root README.md does not mention it."
           fi
 
       - name: Install Rust stable (for dry-run publish check)

@@ -14,13 +14,6 @@ categories = ["command-line-utilities"]
 name = "jirac"
 path = "src/main.rs"
 
-# Legacy shim — kept for backward compatibility.
-# Prints a deprecation warning then runs the same code.
-# Will be removed in a future major release.
-[[bin]]
-name = "jira"
-path = "src/main.rs"
-
 [dependencies]
 jira-core = { workspace = true }
 clap = { version = "4", features = ["derive"] }

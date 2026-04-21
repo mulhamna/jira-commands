@@ -205,7 +205,24 @@ pub fn markdown_to_adf(markdown: &str) -> Value {
     let root = parse_document(&arena, markdown, &options);
 
     let mut content: Vec<Value> = Vec::new();
-    convert_node(root, &mut content);
+    let mut unsupported: Vec<&'static str> = Vec::new();
+    convert_node(root, &mut content, &mut unsupported);
+
+    if !unsupported.is_empty() {
+        content.push(json!({
+            "type": "blockquote",
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": format!(
+                        "Unsupported Markdown constructs were flattened during conversion: {}",
+                        unsupported.join(", ")
+                    )
+                }]
+            }]
+        }));
+    }
 
     json!({
         "version": 1,
@@ -214,20 +231,21 @@ pub fn markdown_to_adf(markdown: &str) -> Value {
     })
 }
 
-fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) {
+fn convert_node<'a>(
+    node: &'a comrak::nodes::AstNode<'a>,
+    out: &mut Vec<Value>,
+    unsupported: &mut Vec<&'static str>,
+) {
     use comrak::nodes::{ListType, NodeValue};
 
     match &node.data.borrow().value {
         NodeValue::Document => {
             for child in node.children() {
-                convert_node(child, out);
+                convert_node(child, out, unsupported);
             }
         }
         NodeValue::Paragraph => {
-            let mut inline_content: Vec<Value> = Vec::new();
-            for child in node.children() {
-                collect_inline(child, &mut inline_content);
-            }
+            let inline_content = collect_inline_children(node, unsupported);
             if !inline_content.is_empty() {
                 out.push(json!({
                     "type": "paragraph",
@@ -236,10 +254,7 @@ fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) 
             }
         }
         NodeValue::Heading(heading) => {
-            let mut inline_content: Vec<Value> = Vec::new();
-            for child in node.children() {
-                collect_inline(child, &mut inline_content);
-            }
+            let inline_content = collect_inline_children(node, unsupported);
             out.push(json!({
                 "type": "heading",
                 "attrs": { "level": heading.level },
@@ -250,7 +265,7 @@ fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) 
             let mut items: Vec<Value> = Vec::new();
             for child in node.children() {
                 let mut item_content: Vec<Value> = Vec::new();
-                convert_node(child, &mut item_content);
+                convert_node(child, &mut item_content, unsupported);
                 items.push(json!({
                     "type": "listItem",
                     "content": item_content
@@ -266,12 +281,9 @@ fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) 
             }));
         }
         NodeValue::Item(_) => {
-            // Handled by parent list node
-            let mut para_content: Vec<Value> = Vec::new();
             for child in node.children() {
-                convert_node(child, &mut para_content);
+                convert_node(child, out, unsupported);
             }
-            out.extend(para_content);
         }
         NodeValue::CodeBlock(code) => {
             let language = code.info.trim().to_string();
@@ -285,31 +297,70 @@ fn convert_node<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) 
         NodeValue::BlockQuote => {
             let mut inner: Vec<Value> = Vec::new();
             for child in node.children() {
-                convert_node(child, &mut inner);
+                convert_node(child, &mut inner, unsupported);
             }
             out.push(json!({
                 "type": "blockquote",
                 "content": inner
             }));
         }
+        NodeValue::Table(_) => {
+            out.push(render_markdown_table(node, unsupported));
+        }
         NodeValue::ThematicBreak => {
             out.push(json!({ "type": "rule" }));
         }
-        NodeValue::LineBreak | NodeValue::SoftBreak => {
-            // handled inline
-        }
-        _ => {
-            // For other block-level nodes, recurse
-            let mut child_content: Vec<Value> = Vec::new();
-            for child in node.children() {
-                convert_node(child, &mut child_content);
+        NodeValue::HtmlBlock(html) => {
+            note_unsupported(unsupported, "html block");
+            let text = html.literal.trim_end_matches('\n');
+            if !text.is_empty() {
+                out.push(json!({
+                    "type": "codeBlock",
+                    "attrs": { "language": "html" },
+                    "content": [{ "type": "text", "text": text }]
+                }));
             }
-            out.extend(child_content);
+        }
+        NodeValue::DescriptionList
+        | NodeValue::DescriptionItem(_)
+        | NodeValue::DescriptionTerm
+        | NodeValue::DescriptionDetails => {
+            note_unsupported(unsupported, "description list");
+            for child in node.children() {
+                convert_node(child, out, unsupported);
+            }
+        }
+        NodeValue::FootnoteDefinition(_) => {
+            note_unsupported(unsupported, "footnote");
+            for child in node.children() {
+                convert_node(child, out, unsupported);
+            }
+        }
+        NodeValue::LineBreak | NodeValue::SoftBreak => {}
+        _ => {
+            for child in node.children() {
+                convert_node(child, out, unsupported);
+            }
         }
     }
 }
 
-fn collect_inline<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>) {
+fn collect_inline_children<'a>(
+    node: &'a comrak::nodes::AstNode<'a>,
+    unsupported: &mut Vec<&'static str>,
+) -> Vec<Value> {
+    let mut inline_content: Vec<Value> = Vec::new();
+    for child in node.children() {
+        collect_inline(child, &mut inline_content, unsupported);
+    }
+    inline_content
+}
+
+fn collect_inline<'a>(
+    node: &'a comrak::nodes::AstNode<'a>,
+    out: &mut Vec<Value>,
+    unsupported: &mut Vec<&'static str>,
+) {
     use comrak::nodes::NodeValue;
 
     match &node.data.borrow().value {
@@ -330,53 +381,105 @@ fn collect_inline<'a>(node: &'a comrak::nodes::AstNode<'a>, out: &mut Vec<Value>
             }));
         }
         NodeValue::Strong => {
-            let mut inner: Vec<Value> = Vec::new();
-            for child in node.children() {
-                collect_inline(child, &mut inner);
-            }
-            for mut item in inner {
-                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
-                let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
-                marks_arr.push(json!({ "type": "strong" }));
-                item["marks"] = json!(marks_arr);
-                out.push(item);
-            }
+            apply_mark(node, out, unsupported, json!({ "type": "strong" }));
         }
         NodeValue::Emph => {
-            let mut inner: Vec<Value> = Vec::new();
-            for child in node.children() {
-                collect_inline(child, &mut inner);
-            }
-            for mut item in inner {
-                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
-                let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
-                marks_arr.push(json!({ "type": "em" }));
-                item["marks"] = json!(marks_arr);
-                out.push(item);
-            }
+            apply_mark(node, out, unsupported, json!({ "type": "em" }));
+        }
+        NodeValue::Strikethrough => {
+            apply_mark(node, out, unsupported, json!({ "type": "strike" }));
         }
         NodeValue::Link(link) => {
+            apply_mark(
+                node,
+                out,
+                unsupported,
+                json!({
+                    "type": "link",
+                    "attrs": { "href": link.url.clone() }
+                }),
+            );
+        }
+        NodeValue::Image(link) => {
             let mut inner: Vec<Value> = Vec::new();
             for child in node.children() {
-                collect_inline(child, &mut inner);
+                collect_inline(child, &mut inner, unsupported);
             }
-            let url = link.url.clone();
-            for mut item in inner {
-                let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
-                let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
-                marks_arr.push(json!({
-                    "type": "link",
-                    "attrs": { "href": url }
-                }));
-                item["marks"] = json!(marks_arr);
-                out.push(item);
-            }
+            let label = inner
+                .iter()
+                .filter_map(|item| item.get("text").and_then(|value| value.as_str()))
+                .collect::<Vec<_>>()
+                .join("");
+            let text = if label.trim().is_empty() {
+                link.url.clone()
+            } else {
+                format!("{} ({})", label.trim(), link.url)
+            };
+            out.push(json!({ "type": "text", "text": text }));
+        }
+        NodeValue::HtmlInline(html) => {
+            note_unsupported(unsupported, "inline html");
+            out.push(json!({ "type": "text", "text": html }));
         }
         _ => {
             for child in node.children() {
-                collect_inline(child, out);
+                collect_inline(child, out, unsupported);
             }
         }
+    }
+}
+
+fn apply_mark<'a>(
+    node: &'a comrak::nodes::AstNode<'a>,
+    out: &mut Vec<Value>,
+    unsupported: &mut Vec<&'static str>,
+    mark: Value,
+) {
+    let mut inner: Vec<Value> = Vec::new();
+    for child in node.children() {
+        collect_inline(child, &mut inner, unsupported);
+    }
+    for mut item in inner {
+        let marks = item.get("marks").cloned().unwrap_or_else(|| json!([]));
+        let mut marks_arr = marks.as_array().cloned().unwrap_or_default();
+        marks_arr.push(mark.clone());
+        item["marks"] = json!(marks_arr);
+        out.push(item);
+    }
+}
+
+fn render_markdown_table<'a>(
+    table: &'a comrak::nodes::AstNode<'a>,
+    unsupported: &mut Vec<&'static str>,
+) -> Value {
+    let mut rows: Vec<Value> = Vec::new();
+
+    for (row_idx, row) in table.children().enumerate() {
+        let mut cells: Vec<Value> = Vec::new();
+        for cell in row.children() {
+            let mut block_content: Vec<Value> = Vec::new();
+            for child in cell.children() {
+                convert_node(child, &mut block_content, unsupported);
+            }
+            if block_content.is_empty() {
+                block_content.push(json!({ "type": "paragraph", "content": [] }));
+            }
+            cells.push(json!({
+                "type": if row_idx == 0 { "tableHeader" } else { "tableCell" },
+                "content": block_content
+            }));
+        }
+        if !cells.is_empty() {
+            rows.push(json!({ "type": "tableRow", "content": cells }));
+        }
+    }
+
+    json!({ "type": "table", "content": rows })
+}
+
+fn note_unsupported(unsupported: &mut Vec<&'static str>, value: &'static str) {
+    if !unsupported.contains(&value) {
+        unsupported.push(value);
     }
 }
 
@@ -421,6 +524,26 @@ mod tests {
         let adf = markdown_to_adf("# My Heading");
         assert_eq!(adf["content"][0]["type"], "heading");
         assert_eq!(adf["content"][0]["attrs"]["level"], 1);
+    }
+
+    #[test]
+    fn test_markdown_to_adf_table_falls_back_without_table_extension() {
+        let adf = markdown_to_adf("| Name | Status |\n| --- | --- |\n| API | Done |");
+        assert_eq!(adf["content"][0]["type"], "paragraph");
+    }
+
+    #[test]
+    fn test_markdown_to_adf_list_link_and_code_block() {
+        let adf = markdown_to_adf("- [docs](https://example.com)\n\n```rust\nfn main() {}\n```");
+        assert_eq!(adf["content"][0]["type"], "bulletList");
+        assert_eq!(adf["content"][1]["type"], "codeBlock");
+    }
+
+    #[test]
+    fn test_markdown_to_adf_unsupported_note() {
+        let adf = markdown_to_adf("<div>raw html</div>");
+        assert_eq!(adf["content"][0]["type"], "codeBlock");
+        assert_eq!(adf["content"][1]["type"], "blockquote");
     }
 
     #[test]

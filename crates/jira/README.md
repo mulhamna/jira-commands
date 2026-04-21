@@ -3,7 +3,7 @@
 > **jirac** is an independent CLI tool for working with Jira from the terminal.
 > It is **not** affiliated with, endorsed by, or sponsored by Atlassian.
 
-`jira-commands` is the CLI crate in the `mulhamna/jira-commands` workspace. It ships the `jirac` binary, the legacy `jira` compatibility shim, interactive issue workflows, bulk operations, and the TUI.
+`jira-commands` is the CLI crate in the `mulhamna/jira-commands` workspace. It ships the `jirac` binary, interactive issue workflows, bulk operations, and the TUI.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
@@ -23,7 +23,6 @@ Or use one of the workspace-level install options from the root README:
 ## What this crate provides
 
 - `jirac` primary CLI binary
-- `jira` legacy binary shim for backward compatibility
 - issue listing, viewing, create, update, transition, delete
 - worklog, attachment, bulk-update, bulk-transition, archive
 - interactive TUI flows
@@ -39,11 +38,11 @@ jirac issue create -p MYPROJ
 jirac tui -p MYPROJ
 ```
 
-## Binary rename note
+## Migration note
 
-The preferred binary name is `jirac`.
+The supported CLI binary is `jirac`.
 
-The old `jira` binary is still included as a compatibility shim, but it is deprecated and may be removed in a future major release. Update scripts and aliases to use `jirac`.
+If you still have old scripts, aliases, or local wrappers that call `jira`, update them to use `jirac` before upgrading.
 
 ## Claude Code plugin
 
@@ -61,6 +60,7 @@ Useful skills include:
 - `/jira:update-issue`
 - `/jira:transition`
 - `/jira:fields`
+- `/jira:comment`
 - `/jira:worklog`
 - `/jira:bulk-transition`
 - `/jira:attach`

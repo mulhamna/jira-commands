@@ -13,6 +13,7 @@ use crate::{
     error::{JiraError, Result},
     model::{
         attachment::Attachment,
+        comment::Comment,
         field::Field,
         issue::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
@@ -736,6 +737,50 @@ impl JiraClient {
             .await?;
 
         self.get_issue(&resp.key).await
+    }
+
+    // ── Comments ─────────────────────────────────────────────────────────────
+
+    /// List all comments for an issue.
+    pub async fn get_comments(&self, issue_key: &str) -> Result<Vec<Comment>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
+
+        #[derive(serde::Deserialize)]
+        struct CommentResponse {
+            comments: Vec<Value>,
+        }
+
+        let http = &self.http;
+        let resp: CommentResponse = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(resp
+            .comments
+            .iter()
+            .filter_map(|v| Comment::from_value(v, issue_key))
+            .collect())
+    }
+
+    /// Add a comment to an issue.
+    pub async fn add_comment(&self, issue_key: &str, body: &str) -> Result<Comment> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
+
+        let payload = json!({
+            "body": markdown_to_adf(body)
+        });
+
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.post(&url).headers(headers.clone()).json(&payload))
+            .await?;
+
+        Comment::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse comment".into(),
+        })
     }
 
     // ── Worklog ──────────────────────────────────────────────────────────────

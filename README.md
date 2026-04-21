@@ -247,6 +247,8 @@ cargo install jira-commands
 jirac auth login
 ```
 
+The plugin namespace remains `/jira:*`, but the CLI binary it invokes is `jirac`.
+
 ```
 # 2. In Claude Code
 /plugin marketplace add mulhamna/jira-commands
@@ -260,6 +262,7 @@ jirac auth login
 | `/jira:create-issue`    | Create a new issue                  |
 | `/jira:update-issue`    | Update an existing issue            |
 | `/jira:transition`      | Transition an issue                 |
+| `/jira:comment`         | List comments or add a Markdown comment |
 | `/jira:worklog`         | List, add, or delete worklogs       |
 | `/jira:fields`          | Inspect available field metadata    |
 | `/jira:bulk-transition` | Bulk transition issues via JQL      |

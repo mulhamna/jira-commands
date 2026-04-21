@@ -195,8 +195,8 @@ main() {
   # Migration note for existing 'jira' users
   if command -v jira &>/dev/null; then
     warn "You have an existing 'jira' command in your PATH."
-    echo "  If it is the old jira-commands binary, you can remove it:"
-    echo "    rm \"\$(which jira)\""
+    echo "  This release supports 'jirac' as the CLI binary."
+    echo "  Update old scripts and aliases that still call 'jira'."
   fi
 }
 

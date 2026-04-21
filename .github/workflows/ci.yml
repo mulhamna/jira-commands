@@ -24,6 +24,9 @@ jobs:
     outputs:
       workflows: ${{ steps.filter.outputs.workflows }}
       rust: ${{ steps.filter.outputs.rust }}
+      rust_core: ${{ steps.filter.outputs.rust_core }}
+      rust_cli: ${{ steps.filter.outputs.rust_cli }}
+      rust_mcp: ${{ steps.filter.outputs.rust_mcp }}
       plugin: ${{ steps.filter.outputs.plugin }}
       docs: ${{ steps.filter.outputs.docs }}
       release: ${{ steps.filter.outputs.release }}
@@ -43,6 +46,18 @@ jobs:
               - 'Cargo.lock'
               - 'deny.toml'
               - 'crates/**'
+            rust_core:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'crates/jira-core/**'
+            rust_cli:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'crates/jira/**'
+            rust_mcp:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'crates/jira-mcp/**'
             plugin:
               - 'plugin/**'
             docs:
@@ -160,10 +175,70 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Tests
-        run: cargo test --all
+      - name: Workspace compile check
+        run: cargo check --workspace --all-targets
+
+  test-core:
+    name: Core regression & unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.rust_core == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Run jira-core tests
+        run: cargo test -p jira-core
+
+  test-cli:
+    name: CLI regression & unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.rust_cli == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Run jira-commands tests
+        run: cargo test -p jira-commands
+
+  test-mcp:
+    name: MCP regression & unit tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.rust_mcp == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Run jira-mcp tests
+        run: cargo test -p jira-mcp
 
   plugin-check:
     name: Plugin structure check

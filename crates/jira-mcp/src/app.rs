@@ -17,9 +17,9 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
-        BulkUpdateArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
-        WorklogAddArgs, WorklogDeleteArgs,
+        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs,
+        IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -274,6 +274,21 @@ impl JiraApp {
             "key": args.key,
             "attachments": uploaded
         }))
+    }
+
+    pub async fn comment_list(&self, args: IssueKeyArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let comments = client.get_comments(&args.key).await?;
+        Ok(json!({
+            "key": args.key,
+            "comments": comments
+        }))
+    }
+
+    pub async fn comment_add(&self, args: CommentAddArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let comment = client.add_comment(&args.key, &args.body).await?;
+        to_value(comment)
     }
 
     pub async fn worklog_list(&self, args: IssueKeyArgs) -> AppResult<Value> {

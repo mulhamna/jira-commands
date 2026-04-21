@@ -18,9 +18,9 @@ use crate::{
     error::AppResult,
     models::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs,
-        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ToolResponse,
-        WorklogAddArgs, WorklogDeleteArgs,
+        CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
+        IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
+        ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -200,6 +200,28 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueAttachArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_attach(args).await)
+    }
+
+    #[tool(
+        name = "jira_comment_list",
+        description = "List comments on a Jira issue"
+    )]
+    pub async fn jira_comment_list(
+        &self,
+        Parameters(args): Parameters<IssueKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.comment_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_comment_add",
+        description = "Add a Markdown comment to a Jira issue"
+    )]
+    pub async fn jira_comment_add(
+        &self,
+        Parameters(args): Parameters<CommentAddArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.comment_add(args).await)
     }
 
     #[tool(

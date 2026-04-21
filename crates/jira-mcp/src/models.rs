@@ -105,6 +105,12 @@ pub struct IssueAttachArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CommentAddArgs {
+    pub key: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorklogAddArgs {
     pub key: String,
     pub time_spent: String,

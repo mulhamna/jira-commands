@@ -11,14 +11,13 @@ This directory stores the source manifests for publishing `jirac` to the Windows
 ## Update flow
 
 1. Publish a GitHub release with the Windows archive asset.
-2. Compute the archive SHA256 from the released `jirac-windows-x86_64.zip` file.
-3. Update `PackageVersion`, `InstallerUrl`, `InstallerSha256`, and `ReleaseDate`.
-4. Validate the manifest set with `winget validate` or the Windows Package Manager validation tooling.
-5. Submit the updated manifests to the Windows Package Manager community repository.
+2. Release CI refreshes the in-repo manifests under `packaging/winget/` using the published release version, URL, SHA256, and release date.
+3. Validate the manifest set with `winget validate` or the Windows Package Manager validation tooling.
+4. Submit the updated manifests to the Windows Package Manager community repository.
 
 ## Contributor note
 
-These files are source manifests kept in this repository for repeatable release operations. GitHub Actions can derive the released Windows SHA256, but submission to the community repository is still a manual follow-up.
+These files are source manifests kept in this repository for repeatable release operations. GitHub Actions now refreshes them after each published release, but submission to the community repository is still a manual follow-up.
 
 ## Notes
 

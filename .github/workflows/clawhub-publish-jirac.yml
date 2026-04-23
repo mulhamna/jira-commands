@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@0d5404e32756923281b081b103c8834d5f05282d # v4.4.0
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 

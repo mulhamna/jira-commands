@@ -1,5 +1,5 @@
 ---
-name: jira-commands
+name: jirac
 description: Use the jirac CLI from OpenClaw to list, view, create, update, transition, comment on, and manage Jira issues from agent workflows.
 metadata: {"openclaw":{"emoji":"🎫","requires":{"bins":["jirac"]},"install":[{"id":"cargo","kind":"download","label":"Install jirac from GitHub Releases","url":"https://github.com/mulhamna/jira-commands/releases","extract":false}],"homepage":"https://github.com/mulhamna/jira-commands"}}
 ---

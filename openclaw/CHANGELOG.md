@@ -7,4 +7,4 @@ All notable changes to the OpenClaw / ClawHub integration surface for jira-comma
 ### Added
 - Initial OpenClaw / ClawHub release-lane scaffolding with dedicated VERSION and CHANGELOG files.
 - Boundary documentation clarifying that this surface is separate from the Claude Code plugin lane.
-- First `openclaw/SKILL.md` artifact to model the OpenClaw-facing Jira integration as a ClawHub skill surface.
+- First `openclaw/SKILL.md` artifact to model the OpenClaw-facing `jirac` integration as a ClawHub skill surface.

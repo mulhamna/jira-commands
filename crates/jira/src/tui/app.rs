@@ -1110,14 +1110,20 @@ async fn prompt_project_components(
         return Ok(None);
     }
 
-    let selected = MultiSelect::new("Pick components (space to toggle, enter to confirm):", options)
-        .prompt_skippable()?;
+    let selected = MultiSelect::new(
+        "Pick components (space to toggle, enter to confirm):",
+        options,
+    )
+    .prompt_skippable()?;
 
     let Some(selected) = selected else {
         return Ok(None);
     };
 
-    let values = selected.into_iter().map(|option| option.value).collect::<Vec<_>>();
+    let values = selected
+        .into_iter()
+        .map(|option| option.value)
+        .collect::<Vec<_>>();
     Ok(Some(values))
 }
 
@@ -1168,10 +1174,8 @@ async fn tui_create_issue(
         "Task".to_string()
     };
 
-    let assignee = prompt_assignee_selection(
-        client,
-        "Search assignee (name/email, blank to skip):",
-    )?;
+    let assignee =
+        prompt_assignee_selection(client, "Search assignee (name/email, blank to skip):")?;
 
     let priority = Text::new("Priority (blank to skip):")
         .prompt_skippable()?
@@ -1221,10 +1225,8 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
             }
         });
 
-    let assignee = prompt_assignee_selection(
-        client,
-        "Search new assignee (name/email, blank to skip):",
-    )?;
+    let assignee =
+        prompt_assignee_selection(client, "Search new assignee (name/email, blank to skip):")?;
 
     let priority = Text::new("New priority (blank to skip):")
         .prompt_skippable()?
@@ -1257,10 +1259,9 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
 async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
     println!("\n── Assign {key} ─────────────────────────────────────");
 
-    let Some(assignee) = prompt_assignee_selection(
-        client,
-        "Search assignee (name/email, blank to cancel):",
-    )? else {
+    let Some(assignee) =
+        prompt_assignee_selection(client, "Search assignee (name/email, blank to cancel):")?
+    else {
         return Ok(false);
     };
 
@@ -1395,11 +1396,8 @@ async fn tui_edit_components(client: &JiraClient, key: &str) -> Result<bool> {
 
     println!("  Components are limited to project {project_key}.");
 
-    let Some(components) = prompt_project_components(
-        client,
-        &project_key,
-        "Search components (blank to cancel):",
-    )?
+    let Some(components) =
+        prompt_project_components(client, &project_key, "Search components (blank to cancel):")?
     else {
         return Ok(false);
     };

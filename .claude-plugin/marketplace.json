@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Claude Code plugin for Jira — manage issues, worklogs, transitions, and more from within Claude Code.",
-    "version": "0.3.0"
+    "version": "0.14.0"
   },
   "plugins": [
     {
@@ -18,7 +18,7 @@
         "ref": "main"
       },
       "description": "Manage Jira issues from Claude Code — list, view, create, transition, comment, worklog, bulk ops, and raw API passthrough. Requires the `jirac` CLI from `jira-commands` (`cargo install jira-commands`).",
-      "version": "0.3.0",
+      "version": "0.14.0",
       "author": {
         "name": "mulhamna"
       },

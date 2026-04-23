@@ -1,6 +1,6 @@
-# jira-commands for OpenClaw
+# jirac for OpenClaw
 
-This directory is reserved for the OpenClaw / ClawHub integration surface for `jira-commands`.
+This directory is reserved for the OpenClaw / ClawHub integration surface for `jirac`.
 
 It is intentionally separate from the Claude Code plugin under `plugin/` because the packaging model, installation flow, invocation style, and release lifecycle are different.
 

@@ -11,6 +11,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release (for manual recovery runs, e.g. v0.15.0)'
+        required: false
+        type: string
 
 # No global permissions — each job declares only what it needs.
 permissions: {}
@@ -34,6 +39,9 @@ jobs:
       - name: Verify tag matches VERSION file
         run: |
           TAG="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            TAG="${{ inputs.release_tag }}"
+          fi
           VER=$(cat VERSION | tr -d '[:space:]')
           EXPECTED_TAG="v${VER}"
 
@@ -362,6 +370,10 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            VERSION="${{ inputs.release_tag }}"
+            VERSION="${VERSION#v}"
+          fi
           RELEASE_DATE=$(date -u +%F)
           curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${GITHUB_REF_NAME}/checksums.txt" -o checksums.txt
           echo "=== checksums.txt ==="

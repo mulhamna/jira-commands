@@ -10,6 +10,7 @@ Use `jirac` as the Jira execution surface.
 
 - Require the `jirac` binary from the official `jira-commands` release source.
 - Require Jira authentication to be configured before use, typically via `jirac auth login` in the target environment.
+- Prefer confirming the active Jira site or profile before running issue operations in multi-tenant environments.
 - Treat Jira credentials, local config, and attachment paths as sensitive.
 
 ## Workflow

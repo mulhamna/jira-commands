@@ -1175,7 +1175,7 @@ async fn tui_create_issue(
     };
 
     let assignee =
-        prompt_assignee_selection(client, "Search assignee (name/email, blank to skip):")?;
+        prompt_assignee_selection(client, "Search assignee (name/email, blank to skip):").await?;
 
     let priority = Text::new("Priority (blank to skip):")
         .prompt_skippable()?
@@ -1226,7 +1226,7 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
         });
 
     let assignee =
-        prompt_assignee_selection(client, "Search new assignee (name/email, blank to skip):")?;
+        prompt_assignee_selection(client, "Search new assignee (name/email, blank to skip):").await?;
 
     let priority = Text::new("New priority (blank to skip):")
         .prompt_skippable()?
@@ -1260,7 +1260,7 @@ async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
     println!("\n── Assign {key} ─────────────────────────────────────");
 
     let Some(assignee) =
-        prompt_assignee_selection(client, "Search assignee (name/email, blank to cancel):")?
+        prompt_assignee_selection(client, "Search assignee (name/email, blank to cancel):").await?
     else {
         return Ok(false);
     };
@@ -1396,8 +1396,12 @@ async fn tui_edit_components(client: &JiraClient, key: &str) -> Result<bool> {
 
     println!("  Components are limited to project {project_key}.");
 
-    let Some(components) =
-        prompt_project_components(client, &project_key, "Search components (blank to cancel):")?
+    let Some(components) = prompt_project_components(
+        client,
+        &project_key,
+        "Search components (blank to cancel):",
+    )
+    .await?
     else {
         return Ok(false);
     };

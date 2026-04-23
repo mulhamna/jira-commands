@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.16.0](https://github.com/mulhamna/jira-commands/compare/v0.15.5...v0.16.0) (2026-04-23)
+
+
+### Features
+
+* **actions:** auto-submit winget PRs ([#86](https://github.com/mulhamna/jira-commands/issues/86)) ([764d326](https://github.com/mulhamna/jira-commands/commit/764d32660e51b9f51b298ce31235026b8083ea49))
+
 ## [0.15.5](https://github.com/mulhamna/jira-commands/compare/v0.15.4...v0.15.5) (2026-04-23)
 
 

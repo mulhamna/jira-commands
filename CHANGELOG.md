@@ -6,6 +6,15 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.3](https://github.com/mulhamna/jira-commands/compare/v0.15.2...v0.15.3) (2026-04-23)
+
+
+### Bug Fixes
+
+* **actions:** quote workflow on keys ([#67](https://github.com/mulhamna/jira-commands/issues/67)) ([261b1c4](https://github.com/mulhamna/jira-commands/commit/261b1c4ada8768a727bd2307e7ec0a8d37b64345))
+* **actions:** restore release workflow dispatch inputs ([#70](https://github.com/mulhamna/jira-commands/issues/70)) ([5fffd85](https://github.com/mulhamna/jira-commands/commit/5fffd85defbad9eced62fa7544693e24c8ae42d1))
+* **actions:** simplify release dispatch triggers ([#69](https://github.com/mulhamna/jira-commands/issues/69)) ([9eeefa7](https://github.com/mulhamna/jira-commands/commit/9eeefa7c7686d1ffa751a67831af7d6bcbef4c4a))
+
 ## [0.15.2](https://github.com/mulhamna/jira-commands/compare/v0.15.1...v0.15.2) (2026-04-23)
 
 

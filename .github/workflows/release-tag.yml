@@ -11,11 +11,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Tag to release (for manual recovery runs, e.g. v0.15.0)'
-        required: false
-        type: string
 
 # No global permissions — each job declares only what it needs.
 permissions: {}

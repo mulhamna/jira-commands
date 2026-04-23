@@ -175,24 +175,34 @@ jirac tui -p PROJ
 
 Common shortcuts:
 
-| Key         | Action                         |
-| ----------- | ------------------------------ |
-| `j` / `k`   | Navigate up / down             |
-| `Enter`     | View issue                     |
-| `C`         | Choose visible table columns   |
-| `c`         | Create issue                   |
-| `e`         | Edit issue                     |
-| `a`         | Assign issue                   |
-| `t`         | Transition issue               |
-| `w`         | Add worklog                    |
-| `l`         | Manage labels                  |
-| `m`         | Manage components              |
-| `u`         | Upload attachment              |
-| `o`         | Open in browser                |
-| `r`         | Refresh                        |
-| `/`         | JQL search                     |
-| `?`         | Show in-app help               |
+| Key         | Action |
+| ----------- | ------ |
+| `j` / `k`   | Navigate up / down |
+| `Enter`     | View issue |
+| `C`         | Open column settings popup |
+| `c`         | Create issue |
+| `e`         | Edit issue |
+| `a`         | Search and assign issue |
+| `t`         | Transition issue |
+| `w`         | Add worklog |
+| `l`         | Manage labels |
+| `m`         | Search and set project-scoped components |
+| `u`         | Upload attachment |
+| `o`         | Open in browser |
+| `r`         | Refresh issue list |
+| `/`         | JQL search |
+| `?`         | Show in-app help |
 | `q` / `Esc` | Quit or go back, depending on context |
+
+Inside column settings:
+
+| Key | Action |
+| --- | ------ |
+| `Space` | Toggle selected column |
+| `a` | Select all available columns |
+| `r` | Reset to default columns |
+| `s` / `Enter` | Save preferences |
+| `Esc` | Cancel without saving |
 
 ## Configuration
 
@@ -274,13 +284,15 @@ Destructive tools (delete, archive, bulk operations) require `confirm: true`. Th
 
 ## Claude Code plugin
 
+The plugin namespace remains `/jira:*`, but the binary it invokes is `jirac`.
+
+ClawHub and the Claude Code marketplace are the discovery surfaces for the plugin/package. The `jirac` CLI itself should still be installed through Homebrew, Winget, install scripts, GitHub Releases, or Cargo.
+
 ```bash
 # 1. Install the CLI that the plugin calls
 cargo install jira-commands
 jirac auth login
 ```
-
-The plugin namespace remains `/jira:*`, but the binary it invokes is `jirac`.
 
 ```text
 # 2. In Claude Code

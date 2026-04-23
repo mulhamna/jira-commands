@@ -26,7 +26,7 @@ Or use one of the workspace-level install options from the root README:
 - `jirac` primary CLI binary
 - issue listing, viewing, create, update, transition, delete
 - worklog, attachment, bulk-update, bulk-transition, archive
-- interactive TUI flows
+- interactive TUI flows, including searchable assignee picker, project-scoped component picker, and saved column settings
 - raw Jira REST API passthrough
 
 ## Quick start
@@ -53,6 +53,8 @@ If you want Claude Code integration, install the plugin from the main workspace 
 /plugin marketplace add mulhamna/jira-commands
 /plugin install jira@jira-commands
 ```
+
+The plugin/package is the right discovery surface for ClawHub or Claude Code marketplace flows. Keep the `jirac` binary installation on the normal CLI distribution paths.
 
 Useful skills include:
 - `/jira:list-issues`

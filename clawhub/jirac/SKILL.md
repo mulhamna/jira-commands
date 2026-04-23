@@ -1,13 +1,14 @@
 ---
 name: jirac
 description: Jira issue management skill for OpenClaw using the jirac CLI. Requires the `jirac` binary to be installed and authenticated before use. Use when listing, viewing, creating, updating, transitioning, commenting on, attaching files to, or logging work against Jira issues from agent workflows.
+metadata: {"openclaw":{"emoji":"🎫","requires":{"bins":["jirac"]},"install":[{"id":"github-releases","kind":"download","label":"Install jirac from GitHub Releases","url":"https://github.com/mulhamna/jira-commands/releases","extract":false}],"homepage":"https://github.com/mulhamna/jira-commands"}}
 ---
 
 Use `jirac` as the Jira execution surface.
 
 ## Requirements
 
-- Require the `jirac` binary from a trusted installation source.
+- Require the `jirac` binary from the official `jira-commands` release source.
 - Require Jira authentication to be configured before use, typically via `jirac auth login` in the target environment.
 - Treat Jira credentials, local config, and attachment paths as sensitive.
 

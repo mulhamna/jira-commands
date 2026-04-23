@@ -1004,16 +1004,15 @@ impl std::fmt::Display for PickerOption {
 fn prompt_search_term(prompt: &str) -> Result<Option<String>> {
     use inquire::Text;
 
-    Text::new(prompt).prompt_skippable().map(|input| {
-        input.and_then(|s| {
-            let trimmed = s.trim().to_string();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed)
-            }
-        })
-    })
+    let input = Text::new(prompt).prompt_skippable()?;
+    Ok(input.and_then(|s| {
+        let trimmed = s.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    }))
 }
 
 async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<Option<String>> {

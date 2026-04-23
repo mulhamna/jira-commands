@@ -175,12 +175,36 @@ jobs:
           test -f openclaw/VERSION
           test -f openclaw/CHANGELOG.md
           test -f openclaw/SKILL.md
+          test -f openclaw/README.md
           grep -q '^---' openclaw/SKILL.md
           grep -q '^name:' openclaw/SKILL.md
           grep -q '^description:' openclaw/SKILL.md
-          if ! grep -qF "[$(cat openclaw/VERSION | tr -d '[:space:]')]" openclaw/CHANGELOG.md; then
-            echo "WARNING: openclaw/CHANGELOG.md may be missing an entry for $(cat openclaw/VERSION | tr -d '[:space:]')."
+          grep -q '^metadata:' openclaw/SKILL.md
+          OPENCLAW_VER=$(cat openclaw/VERSION | tr -d '[:space:]')
+          if ! grep -qF "[${OPENCLAW_VER}]" openclaw/CHANGELOG.md; then
+            echo "WARNING: openclaw/CHANGELOG.md may be missing an entry for ${OPENCLAW_VER}."
           fi
+          grep -qF 'name: jirac' openclaw/SKILL.md
+          grep -qF 'ClawHub' openclaw/README.md
+          grep -qF 'OpenClaw' openclaw/README.md
+
+      - name: Package OpenClaw lane artifact
+        if: needs.changes.outputs.openclaw == 'true' || needs.changes.outputs.openclaw_release == 'true' || needs.changes.outputs.workflows == 'true'
+        run: |
+          mkdir -p dist/openclaw/jirac
+          cp openclaw/SKILL.md dist/openclaw/jirac/
+          cp openclaw/VERSION dist/openclaw/jirac/
+          cp openclaw/CHANGELOG.md dist/openclaw/jirac/
+          cp openclaw/README.md dist/openclaw/jirac/
+          tar -czf openclaw-jirac-skill.tar.gz -C dist/openclaw jirac
+
+      - name: Upload OpenClaw lane artifact
+        if: needs.changes.outputs.openclaw == 'true' || needs.changes.outputs.openclaw_release == 'true' || needs.changes.outputs.workflows == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openclaw-jirac-skill
+          path: openclaw-jirac-skill.tar.gz
+          if-no-files-found: error
 
       - name: Check README examples and install docs are up to date
         run: |

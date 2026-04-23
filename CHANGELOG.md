@@ -6,6 +6,16 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.4](https://github.com/mulhamna/jira-commands/compare/v0.15.3...v0.15.4) (2026-04-23)
+
+
+### Bug Fixes
+
+* **actions:** retry clawhub publish on transient failures ([#75](https://github.com/mulhamna/jira-commands/issues/75)) ([227766a](https://github.com/mulhamna/jira-commands/commit/227766aa1c8f1d5950f64004b37421a04be47574))
+* **actions:** use valid setup-node ref for clawhub publish ([#73](https://github.com/mulhamna/jira-commands/issues/73)) ([63ee8e7](https://github.com/mulhamna/jira-commands/commit/63ee8e7f70552ad4a9bc04ed6d4cde4b56ebb876))
+* **clawhub:** add install metadata for jirac skill ([#77](https://github.com/mulhamna/jira-commands/issues/77)) ([70ac319](https://github.com/mulhamna/jira-commands/commit/70ac31936b654d4b1c416ca7b3b039a75ee20afc))
+* **clawhub:** clarify jirac requirements and safety ([#76](https://github.com/mulhamna/jira-commands/issues/76)) ([ffc7396](https://github.com/mulhamna/jira-commands/commit/ffc73965e6c4392a718b28215d91fcb68999ce4f))
+
 ## [0.15.3](https://github.com/mulhamna/jira-commands/compare/v0.15.2...v0.15.3) (2026-04-23)
 
 

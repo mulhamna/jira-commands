@@ -465,6 +465,108 @@ jobs:
             packaging/winget/jirac.locale.en-US.yaml
             packaging/winget/jirac.installer.yaml
 
+      - name: Submit Winget package to microsoft/winget-pkgs
+        if: ${{ secrets.WINGET_PKGS_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          SHA_WINDOWS_X86: ${{ steps.vars.outputs.sha_windows_x86 }}
+          RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
+        run: |
+          set -euo pipefail
+
+          git config --global user.name 'Mulham'
+          git config --global user.email 'mulhamna@gmail.com'
+
+          workdir=$(mktemp -d)
+          trap 'rm -rf "$workdir"' EXIT
+
+          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/mulhamna/winget-pkgs.git "$workdir/winget-pkgs"
+          cd "$workdir/winget-pkgs"
+
+          branch=chore/jirac-winget-v${VERSION}
+          git switch -C "$branch"
+
+          manifest_dir=manifests/m/mulhamna/jirac/${VERSION}
+          mkdir -p "$manifest_dir"
+
+          cat > "$manifest_dir/mulhamna.jirac.yaml" <<EOF
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
+PackageIdentifier: mulhamna.jirac
+PackageVersion: ${VERSION}
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.9.0
+EOF
+
+          cat > "$manifest_dir/mulhamna.jirac.installer.yaml" <<EOF
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+PackageIdentifier: mulhamna.jirac
+PackageVersion: ${VERSION}
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: jirac.exe
+    PortableCommandAlias: jirac
+ReleaseDate: ${RELEASE_DATE}
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v${VERSION}/jirac-windows-x86_64.zip
+    InstallerSha256: ${SHA_WINDOWS_X86}
+ManifestType: installer
+ManifestVersion: 1.9.0
+EOF
+
+          cat > "$manifest_dir/mulhamna.jirac.locale.en-US.yaml" <<EOF
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: mulhamna.jirac
+PackageVersion: ${VERSION}
+PackageLocale: en-US
+Publisher: mulhamna
+PublisherUrl: https://github.com/mulhamna
+PublisherSupportUrl: https://github.com/mulhamna/jira-commands/issues
+Author: mulhamna
+PackageName: jirac
+PackageUrl: https://github.com/mulhamna/jira-commands
+License: MIT OR Apache-2.0
+LicenseUrl: https://github.com/mulhamna/jira-commands/blob/main/LICENSE
+ShortDescription: Jira terminal client with TUI, MCP support, and release archives for Windows, macOS, and Linux.
+Description: jirac is a Rust-based Jira CLI with interactive TUI flows, issue transitions, comments, worklogs, attachments, and jirac-mcp for editor and agent integrations.
+Moniker: jirac
+Tags:
+  - jira
+  - atlassian
+  - cli
+  - tui
+  - mcp
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
+EOF
+
+          git add "$manifest_dir"
+
+          if git diff --cached --quiet; then
+            echo "No Winget manifest changes to submit for ${VERSION}."
+            exit 0
+          fi
+
+          git commit -m "Add version: mulhamna.jirac version ${VERSION}"
+          git push --force-with-lease origin "$branch"
+
+          upstream_repo=microsoft/winget-pkgs
+          existing_upstream=$(gh pr list --repo "$upstream_repo" --head "mulhamna:$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing_upstream" ]; then
+            echo "Upstream PR already open: #$existing_upstream"
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "$upstream_repo" \
+            --head "mulhamna:$branch" \
+            --base master \
+            --title "Add version: mulhamna.jirac version ${VERSION}" \
+            --body "Automated submission for jirac ${VERSION} generated from the published GitHub release assets."
+
   # ── 5. Update Homebrew tap ────────────────────────────────────────────────
   update-homebrew:
     name: Update Homebrew formula

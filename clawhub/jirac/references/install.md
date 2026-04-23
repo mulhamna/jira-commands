@@ -35,25 +35,9 @@ Common release artifacts include:
 
 After extracting, place `jirac` on your `PATH`.
 
-## Installer scripts (optional)
+## Additional note
 
-Use these only if you prefer the project-provided installer flow. Review the script before running it.
-
-### Windows PowerShell installer
-
-```powershell
-Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1' -OutFile install.ps1
-Get-Content ./install.ps1
-powershell -ExecutionPolicy Bypass -File ./install.ps1
-```
-
-### macOS / Linux installer
-
-```bash
-curl -fsSLo install.sh https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh
-cat ./install.sh
-bash ./install.sh
-```
+Project-provided installer scripts also exist in the repository for users who prefer to inspect them manually, but the recommended ClawHub install paths are Homebrew, Cargo, or a verified GitHub Releases download.
 
 ## Verify install
 

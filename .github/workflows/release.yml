@@ -9,7 +9,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v*'
   workflow_dispatch:
 
 # No global permissions — each job declares only what it needs.

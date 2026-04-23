@@ -392,23 +392,23 @@ jobs:
           mkdir -p "$MANIFEST_DIR"
 
           python3 - <<'PYEOF'
-          from pathlib import Path
-          import os
+from pathlib import Path
+import os
 
-          manifest_dir = Path(os.environ['MANIFEST_DIR'])
-          version = os.environ['VERSION']
-          release_date = os.environ['RELEASE_DATE']
-          sha_windows = os.environ['SHA_WINDOWS_X86']
+manifest_dir = Path(os.environ['MANIFEST_DIR'])
+version = os.environ['VERSION']
+release_date = os.environ['RELEASE_DATE']
+sha_windows = os.environ['SHA_WINDOWS_X86']
 
-          files = {
-              manifest_dir / 'mulhamna.jirac.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
+files = {
+    manifest_dir / 'mulhamna.jirac.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
 PackageVersion: {version}
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.9.0
 """,
-              manifest_dir / 'mulhamna.jirac.installer.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+    manifest_dir / 'mulhamna.jirac.installer.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
 PackageVersion: {version}
 InstallerType: zip
@@ -424,7 +424,7 @@ Installers:
 ManifestType: installer
 ManifestVersion: 1.9.0
 """,
-              manifest_dir / 'mulhamna.jirac.locale.en-US.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+    manifest_dir / 'mulhamna.jirac.locale.en-US.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
 PackageVersion: {version}
 PackageLocale: en-US
@@ -448,11 +448,11 @@ Tags:
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0
 """,
-          }
+}
 
-          for path, content in files.items():
-              path.write_text(content)
-          PYEOF
+for path, content in files.items():
+    path.write_text(content)
+PYEOF
 
           git add "$MANIFEST_DIR"
 

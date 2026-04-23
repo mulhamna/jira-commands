@@ -64,8 +64,26 @@ jobs:
       - name: Publish skill
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
-          clawhub publish "$SKILL_PATH" \
-            --slug "$SKILL_SLUG" \
-            --name "$SKILL_NAME" \
-            --version "${{ github.event.inputs.version }}" \
-            --changelog "${{ github.event.inputs.changelog }}"
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            echo "Publish attempt $attempt/3"
+
+            if clawhub publish "$SKILL_PATH" \
+              --slug "$SKILL_SLUG" \
+              --name "$SKILL_NAME" \
+              --version "${{ github.event.inputs.version }}" \
+              --changelog "${{ github.event.inputs.changelog }}"; then
+              echo "Publish succeeded on attempt $attempt"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              backoff=$((attempt * 15))
+              echo "Publish failed, retrying in ${backoff}s..."
+              sleep "$backoff"
+            fi
+          done
+
+          echo "Publish failed after 3 attempts."
+          exit 1

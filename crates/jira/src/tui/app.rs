@@ -965,6 +965,138 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
 
 // ─── Suspended interactive actions ───────────────────────────────────────────
 
+#[derive(Clone)]
+struct PickerOption {
+    value: String,
+    label: String,
+}
+
+impl std::fmt::Display for PickerOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.label)
+    }
+}
+
+fn prompt_search_term(prompt: &str) -> Result<Option<String>> {
+    use inquire::Text;
+
+    Text::new(prompt).prompt_skippable().map(|input| {
+        input.and_then(|s| {
+            let trimmed = s.trim().to_string();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        })
+    })
+}
+
+async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<Option<String>> {
+    use inquire::Select;
+
+    let query = match prompt_search_term(prompt)? {
+        Some(query) => query,
+        None => return Ok(None),
+    };
+
+    let users = client.search_users(&query).await?;
+    let mut options = vec![PickerOption {
+        value: "me".to_string(),
+        label: "Assign to me".to_string(),
+    }];
+
+    for user in users {
+        let display = user
+            .get("displayName")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown user")
+            .trim();
+        let email = user
+            .get("emailAddress")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        let account_id = user
+            .get("accountId")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+
+        if account_id.is_empty() {
+            continue;
+        }
+
+        let label = if email.is_empty() {
+            display.to_string()
+        } else {
+            format!("{display} <{email}>")
+        };
+
+        if !options.iter().any(|option| option.value == account_id) {
+            options.push(PickerOption {
+                value: account_id.to_string(),
+                label,
+            });
+        }
+    }
+
+    if options.len() == 1 {
+        println!("  No matching users found.");
+        return Ok(None);
+    }
+
+    let selected = Select::new("Pick assignee:", options).prompt_skippable()?;
+    Ok(selected.map(|option| option.value))
+}
+
+async fn prompt_project_components(
+    client: &JiraClient,
+    project_key: &str,
+    prompt: &str,
+) -> Result<Option<Vec<String>>> {
+    use inquire::MultiSelect;
+
+    let query = match prompt_search_term(prompt)? {
+        Some(query) => query.to_lowercase(),
+        None => return Ok(None),
+    };
+
+    let raw_components = client.get_project_components(project_key).await?;
+    let mut options: Vec<PickerOption> = raw_components
+        .into_iter()
+        .filter_map(|component| {
+            let name = component.get("name").and_then(|v| v.as_str())?.trim();
+            if name.is_empty() {
+                return None;
+            }
+            Some(PickerOption {
+                value: name.to_string(),
+                label: name.to_string(),
+            })
+        })
+        .filter(|option| option.label.to_lowercase().contains(&query))
+        .collect();
+
+    options.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    options.dedup_by(|a, b| a.value == b.value);
+
+    if options.is_empty() {
+        println!("  No matching components found for project {project_key}.");
+        return Ok(None);
+    }
+
+    let selected = MultiSelect::new("Pick components (space to toggle, enter to confirm):", options)
+        .prompt_skippable()?;
+
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+
+    let values = selected.into_iter().map(|option| option.value).collect::<Vec<_>>();
+    Ok(Some(values))
+}
+
 /// Create a new issue interactively. Returns the created issue key, or None if cancelled.
 async fn tui_create_issue(
     client: &JiraClient,
@@ -999,7 +1131,6 @@ async fn tui_create_issue(
         _ => return Ok(None),
     };
 
-    // Fetch issue types for the project
     let issue_type = if let Ok(types) = client.get_issue_types(&project).await {
         let names: Vec<String> = types.iter().map(|t| t.name.clone()).collect();
         if names.is_empty() {
@@ -1013,15 +1144,10 @@ async fn tui_create_issue(
         "Task".to_string()
     };
 
-    let assignee = Text::new("Assignee (email or 'me', blank to skip):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
+    let assignee = prompt_assignee_selection(
+        client,
+        "Search assignee (name/email, blank to skip):",
+    )?;
 
     let priority = Text::new("Priority (blank to skip):")
         .prompt_skippable()?
@@ -1071,15 +1197,10 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
             }
         });
 
-    let assignee = Text::new("New assignee — email or 'me' (blank to skip):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
+    let assignee = prompt_assignee_selection(
+        client,
+        "Search new assignee (name/email, blank to skip):",
+    )?;
 
     let priority = Text::new("New priority (blank to skip):")
         .prompt_skippable()?
@@ -1110,49 +1231,13 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
 
 /// Assign an issue to a specific user.
 async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::{Select, Text};
-
     println!("\n── Assign {key} ─────────────────────────────────────");
 
-    let query =
-        match Text::new("Search assignee (name/email, blank to cancel):").prompt_skippable()? {
-            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-            _ => return Ok(false),
-        };
-
-    let users = client.search_users(&query).await?;
-    let mut options = vec!["me".to_string()];
-    for user in users {
-        let display = user
-            .get("displayName")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown user");
-        let email = user
-            .get("emailAddress")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let account_id = user.get("accountId").and_then(|v| v.as_str()).unwrap_or("");
-        let label = if email.is_empty() {
-            format!("{display} [{account_id}]")
-        } else {
-            format!("{display} <{email}> [{account_id}]")
-        };
-        if !options.contains(&label) {
-            options.push(label);
-        }
-    }
-
-    let selected = Select::new("Pick assignee:", options).prompt_skippable()?;
-    let Some(choice) = selected else {
+    let Some(assignee) = prompt_assignee_selection(
+        client,
+        "Search assignee (name/email, blank to cancel):",
+    )? else {
         return Ok(false);
-    };
-
-    let assignee = if choice == "me" {
-        "me".to_string()
-    } else if let Some(start) = choice.rfind('[') {
-        choice[start + 1..].trim_end_matches(']').to_string()
-    } else {
-        query
     };
 
     let req = UpdateIssueRequest {
@@ -1275,25 +1360,25 @@ async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bool> {
 
 /// Set components on an issue (replaces existing).
 async fn tui_edit_components(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::Text;
-
     println!("\n── Edit Components on {key} ──────────────────────────");
-    println!("  Enter comma-separated component names. Blank to cancel.\n");
 
-    let input = match Text::new("Components (comma-separated):").prompt_skippable()? {
-        Some(s) => s,
-        None => return Ok(false),
-    };
+    let issue = client.get_issue(key).await?;
+    let project_key = issue
+        .key
+        .split_once('-')
+        .map(|(project, _)| project.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Could not determine project for {key}"))?;
 
-    if input.trim().is_empty() {
+    println!("  Components are limited to project {project_key}.");
+
+    let Some(components) = prompt_project_components(
+        client,
+        &project_key,
+        "Search components (blank to cancel):",
+    )?
+    else {
         return Ok(false);
-    }
-
-    let components: Vec<String> = input
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
+    };
 
     let req = UpdateIssueRequest {
         components: Some(components),

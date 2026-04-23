@@ -612,6 +612,19 @@ impl JiraClient {
         Ok(users)
     }
 
+    /// List components available within a project.
+    pub async fn get_project_components(&self, project_key: &str) -> Result<Vec<Value>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/project/{project_key}/components"));
+
+        let http = &self.http;
+        let components: Vec<Value> = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(components)
+    }
+
     /// Upload a file as an attachment to an issue.
     pub async fn upload_attachment(
         &self,

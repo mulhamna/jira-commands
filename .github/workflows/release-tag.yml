@@ -369,13 +369,14 @@ jobs:
         id: vars
         run: |
           set -euo pipefail
+          RELEASE_TAG="${GITHUB_REF_NAME}"
           VERSION="${GITHUB_REF_NAME#v}"
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
-            VERSION="${{ inputs.release_tag }}"
-            VERSION="${VERSION#v}"
+            RELEASE_TAG="${{ inputs.release_tag }}"
+            VERSION="${RELEASE_TAG#v}"
           fi
           RELEASE_DATE=$(date -u +%F)
-          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${GITHUB_REF_NAME}/checksums.txt" -o checksums.txt
+          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/checksums.txt" -o checksums.txt
           echo "=== checksums.txt ==="
           cat checksums.txt
 

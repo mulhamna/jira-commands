@@ -232,6 +232,7 @@ enum AppAction {
     EditComponents(String),
     UploadAttachment(String),
     SaveColumnPreferences,
+    ResetColumnPreferences,
 }
 
 // ─── App impl ────────────────────────────────────────────────────────────────
@@ -651,6 +652,8 @@ impl App {
                     if self.visible_columns.contains(&column) {
                         if self.visible_columns.len() > 1 {
                             self.visible_columns.retain(|c| *c != column);
+                        } else {
+                            self.set_status("Keep at least one visible column", true);
                         }
                     } else {
                         self.visible_columns.push(column);
@@ -658,13 +661,18 @@ impl App {
                 }
                 AppAction::None
             }
-            KeyCode::Enter => {
+            KeyCode::Enter | KeyCode::Char('s') => {
                 self.mode = Mode::List;
                 AppAction::SaveColumnPreferences
             }
             KeyCode::Char('a') => {
                 self.visible_columns = AVAILABLE_COLUMNS.to_vec();
+                self.set_status("Selected all available columns", false);
                 AppAction::None
+            }
+            KeyCode::Char('r') => {
+                self.visible_columns = TuiPreferences::default().visible_columns;
+                AppAction::ResetColumnPreferences
             }
             _ => AppAction::None,
         }
@@ -945,11 +953,27 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 prefs.normalize();
                 app.visible_columns = prefs.visible_columns.clone();
                 match prefs.save() {
-                    Ok(()) => app.set_status("✓ Saved column preferences", false),
+                    Ok(()) => app.set_status(
+                        format!(
+                            "✓ Saved column preferences ({})",
+                            format_column_summary(&app.visible_columns)
+                        ),
+                        false,
+                    ),
                     Err(e) => {
                         app.set_status(format!("Failed to save column preferences: {e}"), true)
                     }
                 }
+            }
+
+            AppAction::ResetColumnPreferences => {
+                app.set_status(
+                    format!(
+                        "Reset to default columns ({})",
+                        format_column_summary(&app.visible_columns)
+                    ),
+                    false,
+                );
             }
 
             AppAction::None => {}
@@ -1687,7 +1711,16 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
-    let popup_area = centered_rect(40, 65, area);
+    let popup_area = centered_rect(54, 72, area);
+    let [summary_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(4),
+        ])
+        .areas(popup_area);
+
     let items: Vec<ListItem> = AVAILABLE_COLUMNS
         .iter()
         .map(|column| {
@@ -1700,11 +1733,30 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
 
+    let selected_summary = Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("Selected: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format_column_summary(&app.visible_columns),
+                Style::default().fg(Color::Cyan),
+            ),
+        ]),
+        Line::from(Span::styled(
+            "Tip: press Space to toggle columns, then S or Enter to save.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .title(" Column Settings ")
+            .style(Style::default().bg(Color::Black)),
+    );
+
     let list = List::new(items)
         .block(
             Block::default()
-                .borders(Borders::ALL)
-                .title(" Columns ")
+                .borders(Borders::LEFT | Borders::RIGHT)
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
@@ -1714,8 +1766,21 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_symbol("> ");
 
+    let hints = Paragraph::new(vec![
+        Line::from("↑/↓ move   Space toggle   a select all   r reset defaults"),
+        Line::from("s or Enter save   Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(Color::DarkGray));
+
     f.render_widget(Clear, popup_area);
-    f.render_stateful_widget(list, popup_area, &mut app.column_picker_state);
+    f.render_widget(selected_summary, summary_area);
+    f.render_stateful_widget(list, list_area, &mut app.column_picker_state);
+    f.render_widget(hints, hint_area);
 }
 
 fn render_help_popup(f: &mut Frame, area: Rect) {
@@ -1735,7 +1800,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     View issue detail"),
         Line::from("  t         Transition issue (in-TUI picker)"),
-        Line::from("  C         Pick visible table columns and save preference"),
+        Line::from("  C         Open column settings popup"),
         Line::from("  c         Create new issue"),
         Line::from("  e         Edit selected issue (summary/assignee/priority)"),
         Line::from("  a         Assign selected issue"),
@@ -1768,7 +1833,8 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ↓/j       Move down"),
         Line::from("  Space     Toggle selected column"),
         Line::from("  a         Select all available columns"),
-        Line::from("  Enter     Save preferences"),
+        Line::from("  r         Reset to default columns"),
+        Line::from("  s / Enter Save preferences"),
         Line::from("  Esc       Cancel without saving"),
         Line::from(""),
         Line::from(Span::styled("Search:", Style::default().fg(Color::Yellow))),
@@ -1828,6 +1894,14 @@ fn field_line<'a>(label: &'a str, value: &'a str) -> Line<'a> {
         ),
         Span::raw(value),
     ])
+}
+
+fn format_column_summary(columns: &[ColumnKind]) -> String {
+    columns
+        .iter()
+        .map(|column| column.label())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn status_color(status: &str) -> Color {

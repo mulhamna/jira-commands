@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -219,7 +220,7 @@ jobs:
     name: Rust check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: changes
-    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -251,7 +252,7 @@ jobs:
     name: Core regression & unit tests
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.rust_core == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.rust_core == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -271,7 +272,7 @@ jobs:
     name: CLI regression & unit tests
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.rust_cli == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.rust_cli == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -291,7 +292,7 @@ jobs:
     name: MCP regression & unit tests
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.rust_mcp == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.rust_mcp == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -311,7 +312,7 @@ jobs:
     name: Plugin structure check
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -334,7 +335,7 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.release == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.release == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

@@ -11,6 +11,8 @@ A fast, feature-rich Jira CLI built in Rust.
 
 It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes an interactive TUI, an [MCP server](#mcp-server) for editor/agent integrations, a [Claude Code plugin](#claude-code-plugin), and a separate ClawHub skill lane under `clawhub/jirac/`.
 
+The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/jirac>
+
 ## Preview
 
 ![jirac TUI preview](assets/readme/sample_tui.jpeg)
@@ -281,6 +283,14 @@ jirac-mcp serve --transport streamable-http --host 127.0.0.1 --port 8787 --path 
 | Advanced | `jira_plan_list`, `jira_api_request` |
 
 Destructive tools (delete, archive, bulk operations) require `confirm: true`. The `jira_api_request` tool provides raw access to any Jira REST endpoint.
+
+## ClawHub skill
+
+`jirac` is also available as an OpenClaw skill on ClawHub:
+
+- <https://clawhub.ai/mulhamna/jirac>
+
+The ClawHub lane is intentionally separate from the Claude Code plugin lane. It documents the OpenClaw-facing skill surface and points users to supported `jirac` installation options before use.
 
 ## Claude Code plugin
 

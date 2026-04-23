@@ -1,21 +1,23 @@
 # Install jirac
 
-Choose the installer that fits your environment.
+Choose the installer that fits your environment. Prefer package managers or verified release archives before using installer scripts.
 
-## Homebrew (macOS / Linux)
+## Recommended options
+
+### Homebrew (macOS / Linux)
 
 ```bash
 brew tap mulhamna/tap
 brew install jira-commands
 ```
 
-## Cargo
+### Cargo
 
 ```bash
 cargo install jira-commands
 ```
 
-## GitHub Releases
+### GitHub Releases
 
 Download a prebuilt archive or binary from:
 
@@ -33,16 +35,24 @@ Common release artifacts include:
 
 After extracting, place `jirac` on your `PATH`.
 
-## Windows install script
+## Installer scripts (optional)
+
+Use these only if you prefer the project-provided installer flow. Review the script before running it.
+
+### Windows PowerShell installer
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"
+Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1' -OutFile install.ps1
+Get-Content ./install.ps1
+powershell -ExecutionPolicy Bypass -File ./install.ps1
 ```
 
-## macOS / Linux install script
+### macOS / Linux installer
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
+curl -fsSLo install.sh https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh
+cat ./install.sh
+bash ./install.sh
 ```
 
 ## Verify install

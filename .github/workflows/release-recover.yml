@@ -346,10 +346,10 @@ jobs:
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: chore(winget): refresh manifests for v${{ steps.vars.outputs.version }}
+          commit-message: "chore(winget): refresh manifests for v${{ steps.vars.outputs.version }}"
           branch: chore/winget-manifests-v${{ steps.vars.outputs.version }}
           delete-branch: true
-          title: chore(winget): refresh manifests for v${{ steps.vars.outputs.version }}
+          title: "chore(winget): refresh manifests for v${{ steps.vars.outputs.version }}"
           body: |
             ## Summary
 

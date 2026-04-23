@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.2](https://github.com/mulhamna/jira-commands/compare/v0.15.1...v0.15.2) (2026-04-23)
+
+
+### Bug Fixes
+
+* add standalone release recovery workflow ([#63](https://github.com/mulhamna/jira-commands/issues/63)) ([eb7a194](https://github.com/mulhamna/jira-commands/commit/eb7a194a93b5294f1566a9d88f1e002408cdc0fd))
+* **release:** complete recovery packaging follow-through ([#65](https://github.com/mulhamna/jira-commands/issues/65)) ([b793822](https://github.com/mulhamna/jira-commands/commit/b7938226cd67643c2ba2eb9eae0e7922565f5e45))
+
 ## [0.15.1](https://github.com/mulhamna/jira-commands/compare/v0.15.0...v0.15.1) (2026-04-23)
 
 

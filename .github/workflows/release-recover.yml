@@ -2,6 +2,11 @@ name: Release Recover
 
 "on":
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to recover manually, for example v0.15.3.'
+        required: true
+        type: string
 
 permissions: {}
 

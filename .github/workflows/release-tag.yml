@@ -11,6 +11,11 @@ name: Release
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release manually, for example v0.15.3. Leave empty on tag-push runs.'
+        required: false
+        type: string
 
 # No global permissions — each job declares only what it needs.
 permissions: {}

@@ -21,31 +21,9 @@ concurrency:
   cancel-in-progress: false  # never cancel a release mid-flight
 
 jobs:
-  guard-tag-event:
-    name: Guard release trigger
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ensure release workflow only runs for tags or manual dispatch
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            echo "Manual release dispatch allowed."
-            exit 0
-          fi
-
-          case "${GITHUB_REF}" in
-            refs/tags/v*)
-              echo "Tag-triggered release run allowed."
-              ;;
-            *)
-              echo "This workflow is release-only and should not run on branch pushes."
-              exit 1
-              ;;
-          esac
-
   # ── 0. Validate tag matches Cargo.toml version ────────────────────────────
   validate-tag:
     name: Validate tag vs Cargo.toml
-    needs: guard-tag-event
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

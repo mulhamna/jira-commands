@@ -3,10 +3,10 @@ members = ["crates/jira-core", "crates/jira", "crates/jira-mcp"]
 resolver = "2"
 
 [workspace.package]
-version = "0.14.0" # x-release-please-version
+version = "0.15.0" # x-release-please-version
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-jira-core = { path = "crates/jira-core", version = "0.14.0" } # x-release-please-version
+jira-core = { path = "crates/jira-core", version = "0.15.0" } # x-release-please-version
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

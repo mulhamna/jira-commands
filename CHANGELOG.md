@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.0](https://github.com/mulhamna/jira-commands/compare/v0.14.0...v0.15.0) (2026-04-23)
+
+
+### Features
+
+* improve TUI pickers and split plugin release lanes ([#59](https://github.com/mulhamna/jira-commands/issues/59)) ([edc8c27](https://github.com/mulhamna/jira-commands/commit/edc8c2706b151b6b0fae26bfd9f49914f270916f))
+
 ## [0.14.0](https://github.com/mulhamna/jira-commands/compare/v0.13.0...v0.14.0) (2026-04-21)
 
 

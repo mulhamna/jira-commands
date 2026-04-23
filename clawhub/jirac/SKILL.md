@@ -1,17 +1,24 @@
 ---
 name: jirac
-description: Jira issue management skill for OpenClaw using the jirac CLI. Use when listing, viewing, creating, updating, transitioning, commenting on, attaching files to, or logging work against Jira issues from agent workflows.
+description: Jira issue management skill for OpenClaw using the jirac CLI. Requires the `jirac` binary to be installed and authenticated before use. Use when listing, viewing, creating, updating, transitioning, commenting on, attaching files to, or logging work against Jira issues from agent workflows.
 ---
 
 Use `jirac` as the Jira execution surface.
 
+## Requirements
+
+- Require the `jirac` binary from a trusted installation source.
+- Require Jira authentication to be configured before use, typically via `jirac auth login` in the target environment.
+- Treat Jira credentials, local config, and attachment paths as sensitive.
+
 ## Workflow
 
 1. Verify `jirac` is installed by running `jirac --version`.
-2. Prefer direct `jirac` commands over raw Jira API calls when the CLI already supports the action.
-3. Use `jirac issue fields` when required fields or custom fields are unclear.
-4. Use `jirac issue transition <KEY>` without `--to` when the target status is not known yet.
-5. Be explicit before destructive or high-impact operations.
+2. Verify authentication is already configured before issue operations, for example with `jirac auth status` or a known-good prior login.
+3. Prefer direct `jirac` commands over raw Jira API calls when the CLI already supports the action.
+4. Use `jirac issue fields` when required fields or custom fields are unclear.
+5. Use `jirac issue transition <KEY>` without `--to` when the target status is not known yet.
+6. Confirm intent before destructive or high-impact operations such as delete, bulk edits, transitions, and file attachments.
 
 ## Common commands
 
@@ -31,5 +38,6 @@ jirac issue attach PROJ-123 ./screenshot.png
 ## Guidance
 
 - Prefer interactive or metadata-assisted flows when field requirements are unclear.
-- Confirm intent before operations that may change workflow state, bulk-edit, or overwrite issue content.
+- Confirm intent before operations that may change workflow state, bulk-edit, delete, or overwrite issue content.
+- Confirm that local files selected for attachment are intended and safe to upload.
 - Keep Jira project keys, issue keys, and status names exact.

@@ -19,6 +19,10 @@ This directory stores the source manifests for publishing `jirac` to the Windows
 
 These files are source manifests kept in this repository for repeatable release operations. GitHub Actions now refreshes them after each published release, but submission to the community repository is still a manual follow-up.
 
+## Automation note
+
+A future workflow can optionally submit these manifests through the maintainer fork, but the release workflows should remain parse-safe and low-risk first.
+
 ## Notes
 
 - The supported Windows binary is `jirac.exe`.

@@ -1,0 +1,77 @@
+name: Winget Submit
+
+on:
+  workflow_run:
+    workflows: ["Release", "Release Recovery"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to submit, for example v0.15.5
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winget-submit-${{ github.event.workflow_run.head_branch || github.event.inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  submit-winget:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        (github.event.workflow_run.name == 'Release' || github.event.workflow_run.name == 'Release Recovery')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+    steps:
+      - name: Require Winget token
+        run: test -n "${GH_TOKEN}"
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve release tag
+        id: vars
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RELEASE_TAG="${{ inputs.release_tag }}"
+          else
+            RELEASE_TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName,targetCommitish,isDraft,isPrerelease,publishedAt --jq '.[] | select(.isDraft==false and .isPrerelease==false and .targetCommitish=="${{ github.event.workflow_run.head_sha }}") | .tagName' | head -n1)
+          fi
+
+          test -n "$RELEASE_TAG"
+          VERSION="${RELEASE_TAG#v}"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download checksums from release
+        id: checksums
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${{ steps.vars.outputs.release_tag }}"
+          RELEASE_DATE=$(date -u +%F)
+          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/checksums.txt" -o checksums.txt
+          SHA_WINDOWS_X86=$(grep "jirac-windows-x86_64" checksums.txt | awk '{print $1}')
+          test -n "$SHA_WINDOWS_X86"
+          echo "sha_windows_x86=$SHA_WINDOWS_X86" >> "$GITHUB_OUTPUT"
+          echo "release_date=$RELEASE_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Submit Winget PR
+        run: python3 .github/scripts/submit-winget-pr.py
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          SHA_WINDOWS_X86: ${{ steps.checksums.outputs.sha_windows_x86 }}
+          RELEASE_DATE: ${{ steps.checksums.outputs.release_date }}

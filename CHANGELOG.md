@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.1](https://github.com/mulhamna/jira-commands/compare/v0.15.0...v0.15.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* **release:** add manual tag recovery path ([#61](https://github.com/mulhamna/jira-commands/issues/61)) ([802a5ab](https://github.com/mulhamna/jira-commands/commit/802a5abaafaefb3cc08be6e6c50a5fff0188753a))
+
 ## [0.15.0](https://github.com/mulhamna/jira-commands/compare/v0.14.0...v0.15.0) (2026-04-23)
 
 

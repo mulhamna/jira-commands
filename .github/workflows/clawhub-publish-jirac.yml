@@ -1,23 +1,10 @@
 name: ClawHub Publish jirac
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Semver version to publish
-        required: true
-        default: 0.1.0
-        type: string
-      changelog:
-        description: Changelog text for this publish
-        required: true
-        default: Initial ClawHub release
-        type: string
-      dry_run:
-        description: Run dry-run only
-        required: true
-        default: true
-        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - 'clawhub/jirac/**'
 
 concurrency:
   group: clawhub-publish-jirac
@@ -35,9 +22,13 @@ jobs:
       SKILL_PATH: clawhub/jirac
       SKILL_SLUG: jirac
       SKILL_NAME: jirac
+      SKILL_VERSION_FILE: clawhub/jirac/VERSION
+      DEFAULT_CHANGELOG: Update ClawHub jirac skill metadata and docs
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -57,12 +48,44 @@ jobs:
         run: |
           test -d "$SKILL_PATH"
           test -f "$SKILL_PATH/SKILL.md"
+          test -f "$SKILL_VERSION_FILE"
 
       - name: Dry-run sync
         run: clawhub sync --dry-run --all --root "$SKILL_PATH/.."
 
+      - name: Resolve publish metadata
+        id: publish_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RANGE="HEAD~1..HEAD"
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            CHANGELOG=$(git log --format=%s ${RANGE} -- "$SKILL_PATH" | sed '/^$/d')
+          else
+            CHANGELOG=""
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="$DEFAULT_CHANGELOG"
+          fi
+
+          VERSION=$(tr -d '[:space:]' < "$SKILL_VERSION_FILE")
+          echo "Publish version: $VERSION"
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version in $SKILL_VERSION_FILE: $VERSION"
+            exit 1
+          fi
+
+          {
+            echo "changelog<<'EOF'"
+            echo "$CHANGELOG"
+            echo "EOF"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish skill
-        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
 
@@ -72,8 +95,8 @@ jobs:
             if clawhub publish "$SKILL_PATH" \
               --slug "$SKILL_SLUG" \
               --name "$SKILL_NAME" \
-              --version "${{ github.event.inputs.version }}" \
-              --changelog "${{ github.event.inputs.changelog }}"; then
+              --version "${{ steps.publish_meta.outputs.version }}" \
+              --changelog "${{ steps.publish_meta.outputs.changelog }}"; then
               echo "Publish succeeded on attempt $attempt"
               exit 0
             fi

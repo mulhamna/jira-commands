@@ -79,7 +79,7 @@ jobs:
           fi
 
           {
-            echo "changelog<<'EOF'"
+            echo "changelog<<EOF"
             echo "$CHANGELOG"
             echo "EOF"
             echo "version=$VERSION"

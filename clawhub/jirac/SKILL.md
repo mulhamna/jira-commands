@@ -42,6 +42,7 @@ jirac issue attach PROJ-123 ./screenshot.png
 - Confirm intent before operations that may change workflow state, bulk-edit, delete, or overwrite issue content.
 - Confirm that local files selected for attachment are intended and safe to upload.
 - Keep Jira project keys, issue keys, and status names exact.
+- Prefer explicit project scoping in commands when working across multiple Jira projects.
 
 ## References
 

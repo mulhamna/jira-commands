@@ -6,7 +6,7 @@ name: Release
 #   npx pin-github-action@latest .github/workflows/release.yml
 # ─────────────────────────────────────────────────────────────────────────────
 
-on:
+"on":
   push:
     tags:
       - 'v*'

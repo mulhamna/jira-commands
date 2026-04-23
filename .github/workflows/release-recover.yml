@@ -1,6 +1,6 @@
 name: Release Recover
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       release_tag:

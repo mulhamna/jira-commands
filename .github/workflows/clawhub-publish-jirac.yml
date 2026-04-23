@@ -1,0 +1,71 @@
+name: ClawHub Publish jirac
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semver version to publish
+        required: true
+        default: 0.1.0
+        type: string
+      changelog:
+        description: Changelog text for this publish
+        required: true
+        default: Initial ClawHub release
+        type: string
+      dry_run:
+        description: Run dry-run only
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: clawhub-publish-jirac
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Validate and publish ClawHub skill
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SKILL_PATH: clawhub/jirac
+      SKILL_SLUG: jirac
+      SKILL_NAME: jirac
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@0d5404e32756923281b081b103c8834d5f05282d # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install ClawHub CLI
+        run: npm install -g clawhub
+
+      - name: Validate auth
+        run: |
+          test -n "${{ secrets.CLAWHUB_TOKEN }}"
+          clawhub login --token "${{ secrets.CLAWHUB_TOKEN }}" --no-browser
+          clawhub whoami
+
+      - name: Validate skill path
+        run: |
+          test -d "$SKILL_PATH"
+          test -f "$SKILL_PATH/SKILL.md"
+
+      - name: Dry-run sync
+        run: clawhub sync --dry-run --all --root "$SKILL_PATH/.."
+
+      - name: Publish skill
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          clawhub publish "$SKILL_PATH" \
+            --slug "$SKILL_SLUG" \
+            --name "$SKILL_NAME" \
+            --version "${{ github.event.inputs.version }}" \
+            --changelog "${{ github.event.inputs.changelog }}"

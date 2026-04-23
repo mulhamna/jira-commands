@@ -29,8 +29,7 @@ jobs:
       rust_mcp: ${{ steps.filter.outputs.rust_mcp }}
       plugin: ${{ steps.filter.outputs.plugin }}
       plugin_release: ${{ steps.filter.outputs.plugin_release }}
-      openclaw: ${{ steps.filter.outputs.openclaw }}
-      openclaw_release: ${{ steps.filter.outputs.openclaw_release }}
+      clawhub: ${{ steps.filter.outputs.clawhub }}
       docs: ${{ steps.filter.outputs.docs }}
       release: ${{ steps.filter.outputs.release }}
       workspace_meta: ${{ steps.filter.outputs.workspace_meta }}
@@ -69,12 +68,8 @@ jobs:
               - 'plugin/CHANGELOG.md'
               - 'plugin/.claude-plugin/plugin.json'
               - '.claude-plugin/marketplace.json'
-            openclaw:
-              - 'openclaw/**'
-            openclaw_release:
-              - 'openclaw/VERSION'
-              - 'openclaw/CHANGELOG.md'
-              - 'openclaw/SKILL.md'
+            clawhub:
+              - 'clawhub/**'
             docs:
               - 'README.md'
               - 'docs/**'
@@ -169,41 +164,27 @@ jobs:
             echo "WARNING: plugin/CHANGELOG.md may be missing an entry for ${PLUGIN_VER}."
           fi
 
-      - name: Check OpenClaw release lane files
-        if: needs.changes.outputs.openclaw == 'true' || needs.changes.outputs.openclaw_release == 'true' || needs.changes.outputs.workflows == 'true'
+      - name: Check ClawHub jirac skill files
+        if: needs.changes.outputs.clawhub == 'true' || needs.changes.outputs.workflows == 'true'
         run: |
-          test -f openclaw/VERSION
-          test -f openclaw/CHANGELOG.md
-          test -f openclaw/SKILL.md
-          test -f openclaw/README.md
-          grep -q '^---' openclaw/SKILL.md
-          grep -q '^name:' openclaw/SKILL.md
-          grep -q '^description:' openclaw/SKILL.md
-          grep -q '^metadata:' openclaw/SKILL.md
-          OPENCLAW_VER=$(cat openclaw/VERSION | tr -d '[:space:]')
-          if ! grep -qF "[${OPENCLAW_VER}]" openclaw/CHANGELOG.md; then
-            echo "WARNING: openclaw/CHANGELOG.md may be missing an entry for ${OPENCLAW_VER}."
-          fi
-          grep -qF 'name: jirac' openclaw/SKILL.md
-          grep -qF 'ClawHub' openclaw/README.md
-          grep -qF 'OpenClaw' openclaw/README.md
+          test -f clawhub/jirac/SKILL.md
+          grep -q '^---' clawhub/jirac/SKILL.md
+          grep -q '^name: jirac' clawhub/jirac/SKILL.md
+          grep -q '^description:' clawhub/jirac/SKILL.md
 
-      - name: Package OpenClaw lane artifact
-        if: needs.changes.outputs.openclaw == 'true' || needs.changes.outputs.openclaw_release == 'true' || needs.changes.outputs.workflows == 'true'
+      - name: Package ClawHub jirac skill artifact
+        if: needs.changes.outputs.clawhub == 'true' || needs.changes.outputs.workflows == 'true'
         run: |
-          mkdir -p dist/openclaw/jirac
-          cp openclaw/SKILL.md dist/openclaw/jirac/
-          cp openclaw/VERSION dist/openclaw/jirac/
-          cp openclaw/CHANGELOG.md dist/openclaw/jirac/
-          cp openclaw/README.md dist/openclaw/jirac/
-          tar -czf openclaw-jirac-skill.tar.gz -C dist/openclaw jirac
+          mkdir -p dist/clawhub/jirac
+          cp clawhub/jirac/SKILL.md dist/clawhub/jirac/
+          tar -czf clawhub-jirac-skill.tar.gz -C dist/clawhub jirac
 
-      - name: Upload OpenClaw lane artifact
-        if: needs.changes.outputs.openclaw == 'true' || needs.changes.outputs.openclaw_release == 'true' || needs.changes.outputs.workflows == 'true'
+      - name: Upload ClawHub jirac skill artifact
+        if: needs.changes.outputs.clawhub == 'true' || needs.changes.outputs.workflows == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: openclaw-jirac-skill
-          path: openclaw-jirac-skill.tar.gz
+          name: clawhub-jirac-skill
+          path: clawhub-jirac-skill.tar.gz
           if-no-files-found: error
 
       - name: Check README examples and install docs are up to date

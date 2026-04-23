@@ -9,7 +9,7 @@ A fast, feature-rich Jira CLI built in Rust.
 
 `jirac` is an opinionated Jira terminal client that fills the gaps left by existing CLIs: **full custom field support** via runtime introspection, **native attachment uploads**, **cursor-based pagination**, and full compatibility with **Jira REST API v3**.
 
-It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes an interactive TUI, an [MCP server](#mcp-server) for editor/agent integrations, a [Claude Code plugin](#claude-code-plugin), and a separate OpenClaw / ClawHub integration lane under `openclaw/`.
+It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes an interactive TUI, an [MCP server](#mcp-server) for editor/agent integrations, a [Claude Code plugin](#claude-code-plugin), and a separate ClawHub skill lane under `clawhub/jirac/`.
 
 ## Preview
 
@@ -286,7 +286,7 @@ Destructive tools (delete, archive, bulk operations) require `confirm: true`. Th
 
 The plugin namespace remains `/jira:*`, but the binary it invokes is `jirac`.
 
-The Claude Code plugin now has its own release lane under `plugin/`, with dedicated `plugin/VERSION` and `plugin/CHANGELOG.md` files. OpenClaw / ClawHub is being split into its own lane under `openclaw/` rather than sharing the Claude plugin packaging.
+The Claude Code plugin now has its own release lane under `plugin/`, with dedicated `plugin/VERSION` and `plugin/CHANGELOG.md` files. ClawHub publishing uses the dedicated skill lane under `clawhub/jirac/` rather than sharing the Claude plugin packaging.
 
 ```bash
 # 1. Install the CLI that the plugin calls

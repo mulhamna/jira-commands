@@ -286,7 +286,7 @@ Destructive tools (delete, archive, bulk operations) require `confirm: true`. Th
 
 The plugin namespace remains `/jira:*`, but the binary it invokes is `jirac`.
 
-ClawHub and the Claude Code marketplace are the discovery surfaces for the plugin/package. The `jirac` CLI itself should still be installed through Homebrew, Winget, install scripts, GitHub Releases, or Cargo.
+The Claude Code plugin now has its own release lane under `plugin/`, with dedicated `plugin/VERSION` and `plugin/CHANGELOG.md` files. OpenClaw / ClawHub should be treated as a separate integration surface rather than sharing the Claude plugin packaging.
 
 ```bash
 # 1. Install the CLI that the plugin calls

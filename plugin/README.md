@@ -2,6 +2,8 @@
 
 Manage Jira issues directly from Claude Code. Create, list, view, transition, comment, log time, and run bulk operations without leaving your editor.
 
+This plugin is versioned and released independently from the main CLI/MCP workspace. See `plugin/VERSION` and `plugin/CHANGELOG.md` for the Claude-specific release lane.
+
 > **jirac** is an independent Claude Code plugin for the Jira ecosystem. Not affiliated with or endorsed by Atlassian.
 
 > **Requires** the `jirac` CLI to be installed: `cargo install jira-commands`
@@ -12,7 +14,7 @@ Manage Jira issues directly from Claude Code. Create, list, view, transition, co
 
 > **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` with `cargo install jira-mcp`.
 >
-> **ClawHub positioning:** publish the Claude Code plugin/package as the discovery surface on ClawHub, while keeping the `jirac` CLI itself distributed through Homebrew, Winget, install scripts, GitHub Releases, and Cargo.
+> **Positioning note:** this directory is the Claude Code surface only. OpenClaw / ClawHub should be modeled as a separate integration surface with its own packaging, docs, and release flow.
 
 ---
 

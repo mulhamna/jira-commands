@@ -1,0 +1,251 @@
+name: Release Recover
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release (for manual recovery runs, e.g. v0.15.0)'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-recover-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate-tag:
+    name: Validate tag vs Cargo.toml
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Verify tag matches VERSION file
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          VER=$(cat VERSION | tr -d '[:space:]')
+          EXPECTED_TAG="v${VER}"
+
+          echo "Manual tag:      $TAG"
+          echo "VERSION file:    $VER  (expected tag: $EXPECTED_TAG)"
+
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo ""
+            echo "ERROR: Tag '${TAG}' does not match VERSION file '${VER}'."
+            exit 1
+          fi
+
+      - name: Verify workspace crate versions match
+        run: |
+          VER=$(cat VERSION | tr -d '[:space:]')
+          CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          WS_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+
+          if [ "$VER" != "$CORE_VER" ] || [ "$VER" != "$MCP_VER" ] || [ "$VER" != "$BIN_VER" ] || [ "$VER" != "$WS_VER" ]; then
+            echo "ERROR: Workspace version mismatch before release!"
+            exit 1
+          fi
+
+  build-binaries:
+    name: Build (${{ matrix.target }})
+    needs: validate-tag
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: jirac-linux-x86_64
+            mcp_artifact: jirac-mcp-linux-x86_64
+            archive_artifact: jirac-linux-x86_64.tar.gz
+            mcp_archive_artifact: jirac-mcp-linux-x86_64.tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: jirac-linux-aarch64
+            mcp_artifact: jirac-mcp-linux-aarch64
+            archive_artifact: jirac-linux-aarch64.tar.gz
+            mcp_archive_artifact: jirac-mcp-linux-aarch64.tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: jirac-macos-x86_64
+            mcp_artifact: jirac-mcp-macos-x86_64
+            archive_artifact: jirac-macos-x86_64.tar.gz
+            mcp_archive_artifact: jirac-mcp-macos-x86_64.tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: jirac-macos-aarch64
+            mcp_artifact: jirac-mcp-macos-aarch64
+            archive_artifact: jirac-macos-aarch64.tar.gz
+            mcp_archive_artifact: jirac-mcp-macos-aarch64.tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: jirac-windows-x86_64.exe
+            mcp_artifact: jirac-mcp-windows-x86_64.exe
+            archive_artifact: jirac-windows-x86_64.zip
+            mcp_archive_artifact: jirac-mcp-windows-x86_64.zip
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.release_tag }}
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Install Zig + cargo-zigbuild (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          pip3 install ziglang==0.14.0 --break-system-packages
+          cargo install cargo-zigbuild --locked
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: Build (zigbuild — Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+      - name: Build (native)
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        run: cargo build --release --target ${{ matrix.target }} -p jira-commands -p jira-mcp
+      - name: Copy binaries (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.mcp_artifact }}
+      - name: Copy binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
+          Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.mcp_artifact }}
+      - name: Package archives (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p dist/jirac dist/jirac-mcp
+          cp ${{ matrix.artifact }} dist/jirac/
+          cp ${{ matrix.mcp_artifact }} dist/jirac-mcp/
+          cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac/
+          cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
+          tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
+          tar -czf ${{ matrix.mcp_archive_artifact }} -C dist/jirac-mcp .
+      - name: Package archives (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp | Out-Null
+          Copy-Item ${{ matrix.artifact }} dist/jirac/
+          Copy-Item ${{ matrix.mcp_artifact }} dist/jirac-mcp/
+          Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac/
+          Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
+          Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
+          Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.mcp_archive_artifact }}
+      - name: Upload artifact (jirac)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.archive_artifact }}
+          if-no-files-found: error
+      - name: Upload artifact (jirac-mcp)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.mcp_artifact }}
+          path: |
+            ${{ matrix.mcp_artifact }}
+            ${{ matrix.mcp_archive_artifact }}
+          if-no-files-found: error
+
+  publish-crates:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.release_tag }}
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+      - name: Publish jira-core (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-core v${VERSION} already on crates.io — skipping publish"
+          else
+            cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
+      - name: Wait for jira-core in crates.io sparse index
+        run: |
+          VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          for i in $(seq 1 30); do
+            if curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${VERSION}\""; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+      - name: Publish jira-mcp (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-mcp" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-mcp v${VERSION} already on crates.io — skipping publish"
+          else
+            cargo publish -p jira-mcp --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
+      - name: Publish jira-commands (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-commands" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-commands v${VERSION} already on crates.io — skipping publish"
+          else
+            cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
+
+  create-release:
+    name: Upload release assets
+    runs-on: ubuntu-latest
+    needs: [build-binaries, publish-crates]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.release_tag }}
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts/
+      - name: Generate SHA-256 checksums
+        run: |
+          cd artifacts
+          for dir in */; do
+            file="${dir%/}"
+            sha256sum "$file/$file" >> ../checksums.txt 2>/dev/null || \
+            sha256sum "$file/$file.exe" >> ../checksums.txt 2>/dev/null || true
+          done
+      - name: Upload assets to existing release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          append_body: true
+          files: |
+            artifacts/**/*
+            checksums.txt

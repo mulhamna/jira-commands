@@ -11,6 +11,8 @@ Manage Jira issues directly from Claude Code. Create, list, view, transition, co
 > **Compatibility note:** the next release requires `jirac`. If you still have old scripts or aliases that call `jira`, update them before upgrading.
 
 > **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` with `cargo install jira-mcp`.
+>
+> **ClawHub positioning:** publish the Claude Code plugin/package as the discovery surface on ClawHub, while keeping the `jirac` CLI itself distributed through Homebrew, Winget, install scripts, GitHub Releases, and Cargo.
 
 ---
 

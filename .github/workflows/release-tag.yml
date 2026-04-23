@@ -472,6 +472,7 @@ jobs:
           VERSION: ${{ steps.vars.outputs.version }}
           SHA_WINDOWS_X86: ${{ steps.vars.outputs.sha_windows_x86 }}
           RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
+          MANIFEST_DIR: manifests/m/mulhamna/jirac/${{ steps.vars.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -484,43 +485,47 @@ jobs:
           git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/mulhamna/winget-pkgs.git "$workdir/winget-pkgs"
           cd "$workdir/winget-pkgs"
 
-          branch=chore/jirac-winget-v${VERSION}
+          branch="chore/jirac-winget-v${VERSION}"
           git switch -C "$branch"
 
-          manifest_dir=manifests/m/mulhamna/jirac/${VERSION}
-          mkdir -p "$manifest_dir"
+          mkdir -p "$MANIFEST_DIR"
 
-          cat > "$manifest_dir/mulhamna.jirac.yaml" <<EOF
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
+          python3 - <<'PYEOF'
+          from pathlib import Path
+          import os
+
+          manifest_dir = Path(os.environ['MANIFEST_DIR'])
+          version = os.environ['VERSION']
+          release_date = os.environ['RELEASE_DATE']
+          sha_windows = os.environ['SHA_WINDOWS_X86']
+
+          files = {
+              manifest_dir / 'mulhamna.jirac.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
-PackageVersion: ${VERSION}
+PackageVersion: {version}
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.9.0
-EOF
-
-          cat > "$manifest_dir/mulhamna.jirac.installer.yaml" <<EOF
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+""",
+              manifest_dir / 'mulhamna.jirac.installer.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
-PackageVersion: ${VERSION}
+PackageVersion: {version}
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
   - RelativeFilePath: jirac.exe
     PortableCommandAlias: jirac
-ReleaseDate: ${RELEASE_DATE}
+ReleaseDate: {release_date}
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v${VERSION}/jirac-windows-x86_64.zip
-    InstallerSha256: ${SHA_WINDOWS_X86}
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v{version}/jirac-windows-x86_64.zip
+    InstallerSha256: {sha_windows}
 ManifestType: installer
 ManifestVersion: 1.9.0
-EOF
-
-          cat > "$manifest_dir/mulhamna.jirac.locale.en-US.yaml" <<EOF
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+""",
+              manifest_dir / 'mulhamna.jirac.locale.en-US.yaml': f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
-PackageVersion: ${VERSION}
+PackageVersion: {version}
 PackageLocale: en-US
 Publisher: mulhamna
 PublisherUrl: https://github.com/mulhamna
@@ -541,9 +546,14 @@ Tags:
   - mcp
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0
-EOF
+""",
+          }
 
-          git add "$manifest_dir"
+          for path, content in files.items():
+              path.write_text(content)
+          PYEOF
+
+          git add "$MANIFEST_DIR"
 
           if git diff --cached --quiet; then
             echo "No Winget manifest changes to submit for ${VERSION}."

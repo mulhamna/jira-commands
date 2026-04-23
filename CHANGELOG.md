@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.15.5](https://github.com/mulhamna/jira-commands/compare/v0.15.4...v0.15.5) (2026-04-23)
+
+
+### Bug Fixes
+
+* **clawhub:** correct github output delimiter ([#82](https://github.com/mulhamna/jira-commands/issues/82)) ([b1aeced](https://github.com/mulhamna/jira-commands/commit/b1aecedf644afc5ffee0080e148702c683fd6833))
+
 ## [0.15.4](https://github.com/mulhamna/jira-commands/compare/v0.15.3...v0.15.4) (2026-04-23)
 
 

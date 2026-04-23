@@ -28,6 +28,7 @@ jobs:
       rust_cli: ${{ steps.filter.outputs.rust_cli }}
       rust_mcp: ${{ steps.filter.outputs.rust_mcp }}
       plugin: ${{ steps.filter.outputs.plugin }}
+      plugin_release: ${{ steps.filter.outputs.plugin_release }}
       docs: ${{ steps.filter.outputs.docs }}
       release: ${{ steps.filter.outputs.release }}
       workspace_meta: ${{ steps.filter.outputs.workspace_meta }}
@@ -60,6 +61,12 @@ jobs:
               - 'crates/jira-mcp/**'
             plugin:
               - 'plugin/**'
+              - '.claude-plugin/**'
+            plugin_release:
+              - 'plugin/VERSION'
+              - 'plugin/CHANGELOG.md'
+              - 'plugin/.claude-plugin/plugin.json'
+              - '.claude-plugin/marketplace.json'
             docs:
               - 'README.md'
               - 'docs/**'
@@ -103,33 +110,55 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Check version consistency (jira-core == jira-mcp == jira-commands == plugin)
+      - name: Check workspace crate version consistency
         run: |
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
-          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
           echo "jira-core:     $CORE_VER"
           echo "jira-mcp:      $MCP_VER"
           echo "jira-commands: $BIN_VER"
-          echo "plugin:        $PLUGIN_VER"
 
-          if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ] || [ "$CORE_VER" != "$PLUGIN_VER" ]; then
+          if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ]; then
             echo ""
-            echo "ERROR: Version mismatch! All four must be equal."
+            echo "ERROR: Version mismatch! Workspace crates must stay aligned."
             exit 1
           fi
 
-      - name: Check CHANGELOG entry exists for current version
+      - name: Check workspace CHANGELOG entry exists for current version
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
             || grep -qF "[${VERSION}]" crates/jira-core/CHANGELOG.md 2>/dev/null \
             || grep -qF "[${VERSION}]" crates/jira/CHANGELOG.md 2>/dev/null; then
-            echo "✓ CHANGELOG entry found for v${VERSION}"
+            echo "✓ CHANGELOG entry found for workspace v${VERSION}"
           else
-            echo "WARNING: No CHANGELOG entry found for v${VERSION} in any location."
+            echo "WARNING: No CHANGELOG entry found for workspace v${VERSION} in any location."
+          fi
+
+      - name: Check Claude plugin release lane files
+        if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.plugin_release == 'true' || needs.changes.outputs.workflows == 'true'
+        run: |
+          test -f plugin/VERSION
+          test -f plugin/CHANGELOG.md
+          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
+          PLUGIN_LANE_VER=$(cat plugin/VERSION | tr -d '[:space:]')
+          MARKETPLACE_VER=$(jq -r '.metadata.version' .claude-plugin/marketplace.json)
+          MARKETPLACE_PLUGIN_VER=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+
+          echo "plugin manifest:   $PLUGIN_VER"
+          echo "plugin lane:       $PLUGIN_LANE_VER"
+          echo "marketplace meta:  $MARKETPLACE_VER"
+          echo "marketplace item:  $MARKETPLACE_PLUGIN_VER"
+
+          if [ "$PLUGIN_VER" != "$PLUGIN_LANE_VER" ] || [ "$PLUGIN_VER" != "$MARKETPLACE_VER" ] || [ "$PLUGIN_VER" != "$MARKETPLACE_PLUGIN_VER" ]; then
+            echo "ERROR: Claude plugin release lane files are out of sync."
+            exit 1
+          fi
+
+          if ! grep -qF "[${PLUGIN_VER}]" plugin/CHANGELOG.md; then
+            echo "WARNING: plugin/CHANGELOG.md may be missing an entry for ${PLUGIN_VER}."
           fi
 
       - name: Check README examples and install docs are up to date

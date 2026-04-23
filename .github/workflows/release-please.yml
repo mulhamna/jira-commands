@@ -4,8 +4,8 @@ name: Release Please
 # 1. Every push to main is analyzed for Conventional Commits.
 # 2. release-please creates/updates a "Release PR" that:
 #      - Bumps the Rust workspace version across all member crates
-#      - Updates plugin/.claude-plugin/plugin.json
 #      - Updates the root CHANGELOG.md
+#      - Leaves Claude plugin versioning to its separate release lane under plugin/
 # 3. When you (the owner) merge the Release PR:
 #      - release-please pushes a git tag (e.g. v0.5.0)
 #      - That tag triggers release.yml → builds binaries, publishes to crates.io

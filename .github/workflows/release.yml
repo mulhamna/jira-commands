@@ -47,23 +47,21 @@ jobs:
             exit 1
           fi
 
-      - name: Verify all versions match
+      - name: Verify workspace crate versions match
         run: |
           VER=$(cat VERSION | tr -d '[:space:]')
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           WS_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
-          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
 
-          if [ "$VER" != "$CORE_VER" ] || [ "$VER" != "$MCP_VER" ] || [ "$VER" != "$BIN_VER" ] || [ "$VER" != "$WS_VER" ] || [ "$VER" != "$PLUGIN_VER" ]; then
-            echo "ERROR: Version mismatch before release!"
+          if [ "$VER" != "$CORE_VER" ] || [ "$VER" != "$MCP_VER" ] || [ "$VER" != "$BIN_VER" ] || [ "$VER" != "$WS_VER" ]; then
+            echo "ERROR: Workspace version mismatch before release!"
             echo "  VERSION:        $VER"
             echo "  workspace:      $WS_VER"
             echo "  jira-core:      $CORE_VER"
             echo "  jira-mcp:       $MCP_VER"
             echo "  jira-commands:  $BIN_VER"
-            echo "  plugin:         $PLUGIN_VER"
             exit 1
           fi
 

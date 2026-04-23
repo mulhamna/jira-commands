@@ -577,6 +577,7 @@ PYEOF
             --title "Add version: mulhamna.jirac version ${VERSION}" \
             --body "Automated submission for jirac ${VERSION} generated from the published GitHub release assets."
 
+
   # ── 5. Update Homebrew tap ────────────────────────────────────────────────
   update-homebrew:
     name: Update Homebrew formula

@@ -1101,7 +1101,7 @@ async fn prompt_project_components(
         .filter(|option| option.label.to_lowercase().contains(&query))
         .collect();
 
-    options.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    options.sort_by_key(|a| a.label.to_lowercase());
     options.dedup_by(|a, b| a.value == b.value);
 
     if options.is_empty() {

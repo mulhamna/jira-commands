@@ -35,6 +35,8 @@ enum Mode {
     Transition,
     Help,
     ColumnPicker,
+    AssigneePicker,
+    ComponentPicker,
 }
 
 const AVAILABLE_COLUMNS: [ColumnKind; 8] = [
@@ -211,6 +213,18 @@ pub struct App {
     transition_issue_key: String,
     visible_columns: Vec<ColumnKind>,
     column_picker_state: ListState,
+    assignee_query: String,
+    assignee_cursor: usize,
+    assignee_options: Vec<PickerOption>,
+    assignee_state: ListState,
+    assignee_issue_key: String,
+    component_query: String,
+    component_cursor: usize,
+    component_options: Vec<PickerOption>,
+    component_selected: HashSet<String>,
+    component_state: ListState,
+    component_issue_key: String,
+    component_project_key: String,
 }
 
 // ─── Actions returned from key handling ──────────────────────────────────────
@@ -226,10 +240,14 @@ enum AppAction {
     CreateIssue,
     EditIssue(String),
     AssignIssue(String),
+    OpenAssigneePicker(String),
+    RefreshAssigneeOptions,
     AddComment(String),
     AddWorklog(String),
     EditLabels(String),
     EditComponents(String),
+    OpenComponentPicker(String),
+    RefreshComponentOptions,
     UploadAttachment(String),
     SaveColumnPreferences,
     ResetColumnPreferences,
@@ -258,6 +276,18 @@ impl App {
             transition_issue_key: String::new(),
             visible_columns: prefs.visible_columns,
             column_picker_state,
+            assignee_query: String::new(),
+            assignee_cursor: 0,
+            assignee_options: Vec::new(),
+            assignee_state: ListState::default(),
+            assignee_issue_key: String::new(),
+            component_query: String::new(),
+            component_cursor: 0,
+            component_options: Vec::new(),
+            component_selected: HashSet::new(),
+            component_state: ListState::default(),
+            component_issue_key: String::new(),
+            component_project_key: String::new(),
         }
     }
 
@@ -342,6 +372,8 @@ impl App {
             Mode::Search => self.handle_search_key(code),
             Mode::Transition => self.handle_transition_key(code),
             Mode::ColumnPicker => self.handle_column_picker_key(code),
+            Mode::AssigneePicker => self.handle_assignee_picker_key(code),
+            Mode::ComponentPicker => self.handle_component_picker_key(code),
             Mode::Help => {
                 self.mode = Mode::List;
                 AppAction::None
@@ -395,7 +427,7 @@ impl App {
             }
             KeyCode::Char('a') => {
                 if let Some(key) = self.selected_issue_key() {
-                    AppAction::AssignIssue(key)
+                    AppAction::OpenAssigneePicker(key)
                 } else {
                     AppAction::None
                 }
@@ -423,7 +455,7 @@ impl App {
             }
             KeyCode::Char('m') => {
                 if let Some(key) = self.selected_issue_key() {
-                    AppAction::EditComponents(key)
+                    AppAction::OpenComponentPicker(key)
                 } else {
                     AppAction::None
                 }
@@ -460,7 +492,7 @@ impl App {
             }
             KeyCode::Char('a') => {
                 if let Some(key) = self.selected_issue_key() {
-                    AppAction::AssignIssue(key)
+                    AppAction::OpenAssigneePicker(key)
                 } else {
                     AppAction::None
                 }
@@ -488,7 +520,7 @@ impl App {
             }
             KeyCode::Char('m') => {
                 if let Some(key) = self.selected_issue_key() {
-                    AppAction::EditComponents(key)
+                    AppAction::OpenComponentPicker(key)
                 } else {
                     AppAction::None
                 }
@@ -677,6 +709,172 @@ impl App {
             _ => AppAction::None,
         }
     }
+
+    fn handle_assignee_picker_key(&mut self, code: KeyCode) -> AppAction {
+        match code {
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.mode = Mode::List;
+                AppAction::None
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                let i = self
+                    .assignee_state
+                    .selected()
+                    .map(|i| (i + 1).min(self.assignee_options.len().saturating_sub(1)))
+                    .unwrap_or(0);
+                self.assignee_state.select(Some(i));
+                AppAction::None
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                let i = self
+                    .assignee_state
+                    .selected()
+                    .map(|i| i.saturating_sub(1))
+                    .unwrap_or(0);
+                self.assignee_state.select(Some(i));
+                AppAction::None
+            }
+            KeyCode::Left => {
+                if self.assignee_cursor > 0 {
+                    self.assignee_cursor -= 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Right => {
+                if self.assignee_cursor < self.assignee_query.chars().count() {
+                    self.assignee_cursor += 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Backspace => {
+                if self.assignee_cursor > 0 {
+                    self.assignee_cursor -= 1;
+                    let byte_pos = self
+                        .assignee_query
+                        .char_indices()
+                        .nth(self.assignee_cursor)
+                        .map(|(i, _)| i)
+                        .unwrap_or(self.assignee_query.len());
+                    let char_len = self.assignee_query[byte_pos..]
+                        .chars()
+                        .next()
+                        .map(|c| c.len_utf8())
+                        .unwrap_or(0);
+                    self.assignee_query.drain(byte_pos..byte_pos + char_len);
+                    return AppAction::RefreshAssigneeOptions;
+                }
+                AppAction::None
+            }
+            KeyCode::Char(c) => {
+                let byte_pos = self
+                    .assignee_query
+                    .char_indices()
+                    .nth(self.assignee_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.assignee_query.len());
+                self.assignee_query.insert(byte_pos, c);
+                self.assignee_cursor += 1;
+                AppAction::RefreshAssigneeOptions
+            }
+            KeyCode::Enter => {
+                if let Some(idx) = self.assignee_state.selected() {
+                    if let Some(option) = self.assignee_options.get(idx) {
+                        self.mode = Mode::List;
+                        self.assignee_issue_key = option.value.clone();
+                        return AppAction::AssignIssue(option.value.clone());
+                    }
+                }
+                AppAction::None
+            }
+            _ => AppAction::None,
+        }
+    }
+
+    fn handle_component_picker_key(&mut self, code: KeyCode) -> AppAction {
+        match code {
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.mode = Mode::List;
+                AppAction::None
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                let i = self
+                    .component_state
+                    .selected()
+                    .map(|i| (i + 1).min(self.component_options.len().saturating_sub(1)))
+                    .unwrap_or(0);
+                self.component_state.select(Some(i));
+                AppAction::None
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                let i = self
+                    .component_state
+                    .selected()
+                    .map(|i| i.saturating_sub(1))
+                    .unwrap_or(0);
+                self.component_state.select(Some(i));
+                AppAction::None
+            }
+            KeyCode::Left => {
+                if self.component_cursor > 0 {
+                    self.component_cursor -= 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Right => {
+                if self.component_cursor < self.component_query.chars().count() {
+                    self.component_cursor += 1;
+                }
+                AppAction::None
+            }
+            KeyCode::Backspace => {
+                if self.component_cursor > 0 {
+                    self.component_cursor -= 1;
+                    let byte_pos = self
+                        .component_query
+                        .char_indices()
+                        .nth(self.component_cursor)
+                        .map(|(i, _)| i)
+                        .unwrap_or(self.component_query.len());
+                    let char_len = self.component_query[byte_pos..]
+                        .chars()
+                        .next()
+                        .map(|c| c.len_utf8())
+                        .unwrap_or(0);
+                    self.component_query.drain(byte_pos..byte_pos + char_len);
+                    return AppAction::RefreshComponentOptions;
+                }
+                AppAction::None
+            }
+            KeyCode::Char(' ') => {
+                if let Some(idx) = self.component_state.selected() {
+                    if let Some(option) = self.component_options.get(idx) {
+                        if self.component_selected.contains(&option.value) {
+                            self.component_selected.remove(&option.value);
+                        } else {
+                            self.component_selected.insert(option.value.clone());
+                        }
+                    }
+                }
+                AppAction::None
+            }
+            KeyCode::Char(c) => {
+                let byte_pos = self
+                    .component_query
+                    .char_indices()
+                    .nth(self.component_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(self.component_query.len());
+                self.component_query.insert(byte_pos, c);
+                self.component_cursor += 1;
+                AppAction::RefreshComponentOptions
+            }
+            KeyCode::Enter => {
+                self.mode = Mode::List;
+                AppAction::EditComponents(self.component_issue_key.clone())
+            }
+            _ => AppAction::None,
+        }
+    }
 }
 
 // ─── Suspend / resume helpers ─────────────────────────────────────────────────
@@ -827,6 +1025,180 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 }
             }
 
+            AppAction::OpenAssigneePicker(key) => {
+                app.assignee_issue_key = key;
+                app.assignee_query.clear();
+                app.assignee_cursor = 0;
+                app.assignee_options = vec![PickerOption {
+                    value: "me".to_string(),
+                    label: "Assign to me".to_string(),
+                }];
+                app.assignee_state = ListState::default();
+                app.assignee_state.select(Some(0));
+                app.mode = Mode::AssigneePicker;
+                app.set_status("Loading assignees...", false);
+                match client.search_users("").await {
+                    Ok(users) => {
+                        for user in users {
+                            let display = user
+                                .get("displayName")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown user")
+                                .trim();
+                            let email = user
+                                .get("emailAddress")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .trim();
+                            let account_id = user
+                                .get("accountId")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .trim();
+                            if account_id.is_empty() {
+                                continue;
+                            }
+                            let mut parts = vec![display.to_string()];
+                            if !email.is_empty() {
+                                parts.push(format!("<{email}>"));
+                            }
+                            parts.push(format!("accountId: {account_id}"));
+                            let label = parts.join("  •  ");
+                            if !app
+                                .assignee_options
+                                .iter()
+                                .any(|option| option.value == account_id)
+                            {
+                                app.assignee_options.push(PickerOption {
+                                    value: account_id.to_string(),
+                                    label,
+                                });
+                            }
+                        }
+                        app.clear_status();
+                    }
+                    Err(e) => app.set_status(format!("Assignee lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshAssigneeOptions => {
+                let query = app.assignee_query.clone();
+                app.set_status("Searching assignees...", false);
+                match client.search_users(&query).await {
+                    Ok(users) => {
+                        app.assignee_options = vec![PickerOption {
+                            value: "me".to_string(),
+                            label: "Assign to me".to_string(),
+                        }];
+                        for user in users {
+                            let display = user
+                                .get("displayName")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown user")
+                                .trim();
+                            let email = user
+                                .get("emailAddress")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .trim();
+                            let account_id = user
+                                .get("accountId")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .trim();
+                            if account_id.is_empty() {
+                                continue;
+                            }
+                            let mut parts = vec![display.to_string()];
+                            if !email.is_empty() {
+                                parts.push(format!("<{email}>"));
+                            }
+                            parts.push(format!("accountId: {account_id}"));
+                            app.assignee_options.push(PickerOption {
+                                value: account_id.to_string(),
+                                label: parts.join("  •  "),
+                            });
+                        }
+                        app.assignee_state.select(Some(0));
+                        app.clear_status();
+                    }
+                    Err(e) => app.set_status(format!("Assignee lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::OpenComponentPicker(key) => {
+                app.component_issue_key = key.clone();
+                app.component_query.clear();
+                app.component_cursor = 0;
+                app.component_selected.clear();
+                app.component_options.clear();
+                app.component_state = ListState::default();
+                match client.get_issue(&key).await {
+                    Ok(issue) => {
+                        let project_key = issue
+                            .key
+                            .split_once('-')
+                            .map(|(project, _)| project.to_string())
+                            .unwrap_or(issue.project_key.clone());
+                        app.component_project_key = project_key.clone();
+                        app.mode = Mode::ComponentPicker;
+                        app.set_status(format!("Loading components for {project_key}..."), false);
+                        match client.get_project_components(&project_key).await {
+                            Ok(components) => {
+                                app.component_options = components
+                                    .into_iter()
+                                    .filter_map(|component| {
+                                        let name =
+                                            component.get("name").and_then(|v| v.as_str())?.trim();
+                                        if name.is_empty() {
+                                            return None;
+                                        }
+                                        Some(PickerOption {
+                                            value: name.to_string(),
+                                            label: name.to_string(),
+                                        })
+                                    })
+                                    .collect();
+                                app.component_options
+                                    .sort_by_key(|option| option.label.to_lowercase());
+                                app.component_state.select(Some(0));
+                                app.clear_status();
+                            }
+                            Err(e) => app.set_status(format!("Component lookup failed: {e}"), true),
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Issue lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshComponentOptions => {
+                let query = app.component_query.to_lowercase();
+                if let Ok(components) = client
+                    .get_project_components(&app.component_project_key)
+                    .await
+                {
+                    app.component_options = components
+                        .into_iter()
+                        .filter_map(|component| {
+                            let name = component.get("name").and_then(|v| v.as_str())?.trim();
+                            if name.is_empty() {
+                                return None;
+                            }
+                            if !query.is_empty() && !name.to_lowercase().contains(&query) {
+                                return None;
+                            }
+                            Some(PickerOption {
+                                value: name.to_string(),
+                                label: name.to_string(),
+                            })
+                        })
+                        .collect();
+                    app.component_options
+                        .sort_by_key(|option| option.label.to_lowercase());
+                    app.component_state.select(Some(0));
+                }
+            }
+
             // ── Edit actions (suspend TUI → prompt → resume TUI) ──────────
             AppAction::CreateIssue => {
                 suspend_tui(&mut terminal)?;
@@ -862,19 +1234,20 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 }
             }
 
-            AppAction::AssignIssue(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_assign_issue(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
+            AppAction::AssignIssue(assignee) => {
+                let key = app.assignee_issue_key.clone();
+                let req = UpdateIssueRequest {
+                    assignee: Some(assignee),
+                    ..Default::default()
+                };
+                match client.update_issue(&key, req).await {
+                    Ok(()) => {
                         let jql = app.jql.clone();
                         if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Assigned {key}"), false);
                     }
-                    Ok(false) => app.set_status("Assign cancelled", false),
                     Err(e) => app.set_status(format!("Assign failed: {e}"), true),
                 }
             }
@@ -919,18 +1292,19 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::EditComponents(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_edit_components(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
+                let components = app.component_selected.iter().cloned().collect::<Vec<_>>();
+                let req = UpdateIssueRequest {
+                    components: Some(components),
+                    ..Default::default()
+                };
+                match client.update_issue(&key, req).await {
+                    Ok(()) => {
                         let jql = app.jql.clone();
                         if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Components updated on {key}"), false);
                     }
-                    Ok(false) => app.set_status("Component edit cancelled", false),
                     Err(e) => app.set_status(format!("Component edit failed: {e}"), true),
                 }
             }
@@ -1078,61 +1452,6 @@ fn pick_single_option(prompt: &str, options: Vec<PickerOption>) -> Result<Option
     }
 }
 
-fn pick_multi_options(
-    prompt: &str,
-    options: Vec<PickerOption>,
-) -> Result<Option<Vec<PickerOption>>> {
-    use inquire::{MultiSelect, Text};
-
-    let mut filtered = options.clone();
-    if filtered.is_empty() {
-        return Ok(None);
-    }
-
-    loop {
-        let selected = MultiSelect::new(prompt, filtered.clone())
-            .with_help_message(
-                "Space toggles, Enter confirms, Esc cancels. Choose 'Search again' to refine.",
-            )
-            .prompt_skippable()?;
-
-        let Some(selected) = selected else {
-            return Ok(None);
-        };
-
-        if !selected
-            .iter()
-            .any(|option| option.value == "__search_again__")
-        {
-            return Ok(Some(selected));
-        }
-
-        let Some(query) = Text::new("Refine component search:").prompt_skippable()? else {
-            return Ok(None);
-        };
-        let query = normalize_picker_query(&query);
-        if query.is_empty() {
-            continue;
-        }
-
-        filtered = options
-            .iter()
-            .filter(|option| {
-                option.value == "__search_again__" || picker_option_matches(option, &query)
-            })
-            .cloned()
-            .collect();
-
-        if filtered
-            .iter()
-            .all(|option| option.value == "__search_again__")
-        {
-            println!("  No components matched '{query}'. Try another search.");
-            filtered = options.clone();
-        }
-    }
-}
-
 async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<Option<String>> {
     let query = match prompt_search_term(prompt)? {
         Some(query) => query,
@@ -1194,65 +1513,6 @@ async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<
 
     let selected = pick_single_option("Pick assignee:", options)?;
     Ok(selected.map(|option| option.value))
-}
-
-async fn prompt_project_components(
-    client: &JiraClient,
-    project_key: &str,
-    prompt: &str,
-) -> Result<Option<Vec<String>>> {
-    let query = match prompt_search_term(prompt)? {
-        Some(query) => normalize_picker_query(&query),
-        None => return Ok(None),
-    };
-
-    let raw_components = client.get_project_components(project_key).await?;
-    let mut options: Vec<PickerOption> = raw_components
-        .into_iter()
-        .filter_map(|component| {
-            let name = component.get("name").and_then(|v| v.as_str())?.trim();
-            if name.is_empty() {
-                return None;
-            }
-            Some(PickerOption {
-                value: name.to_string(),
-                label: name.to_string(),
-            })
-        })
-        .filter(|option| picker_option_matches(option, &query))
-        .collect();
-
-    options.sort_by_key(|a| a.label.to_lowercase());
-    options.dedup_by(|a, b| a.value == b.value);
-    options.insert(
-        0,
-        PickerOption {
-            value: "__search_again__".to_string(),
-            label: "Search again...".to_string(),
-        },
-    );
-
-    if options.len() == 1 {
-        println!("  No matching components found for project {project_key}.");
-        return Ok(None);
-    }
-
-    let selected = pick_multi_options(
-        "Pick components (space to toggle, enter to confirm):",
-        options,
-    )?;
-
-    let Some(selected) = selected else {
-        return Ok(None);
-    };
-
-    let values = selected
-        .into_iter()
-        .filter(|option| option.value != "__search_again__")
-        .map(|option| option.value)
-        .collect::<Vec<_>>();
-
-    Ok(Some(values))
 }
 
 /// Create a new issue interactively. Returns the created issue key, or None if cancelled.
@@ -1384,26 +1644,6 @@ async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
     Ok(true)
 }
 
-/// Assign an issue to a specific user.
-async fn tui_assign_issue(client: &JiraClient, key: &str) -> Result<bool> {
-    println!("\n── Assign {key} ─────────────────────────────────────");
-
-    let Some(assignee) =
-        prompt_assignee_selection(client, "Search assignee (name/email, blank to cancel):").await?
-    else {
-        return Ok(false);
-    };
-
-    let req = UpdateIssueRequest {
-        assignee: Some(assignee),
-        ..Default::default()
-    };
-
-    client.update_issue(key, req).await?;
-    println!("✓ Assigned {key}");
-    Ok(true)
-}
-
 /// Add a comment to an issue.
 async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bool> {
     use inquire::Text;
@@ -1512,36 +1752,6 @@ async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bool> {
     Ok(true)
 }
 
-/// Set components on an issue (replaces existing).
-async fn tui_edit_components(client: &JiraClient, key: &str) -> Result<bool> {
-    println!("\n── Edit Components on {key} ──────────────────────────");
-
-    let issue = client.get_issue(key).await?;
-    let project_key = issue
-        .key
-        .split_once('-')
-        .map(|(project, _)| project.to_string())
-        .ok_or_else(|| anyhow::anyhow!("Could not determine project for {key}"))?;
-
-    println!("  Components are limited to project {project_key}.");
-
-    let Some(components) =
-        prompt_project_components(client, &project_key, "Search components (blank to cancel):")
-            .await?
-    else {
-        return Ok(false);
-    };
-
-    let req = UpdateIssueRequest {
-        components: Some(components),
-        ..Default::default()
-    };
-
-    client.update_issue(key, req).await?;
-    println!("✓ Components updated on {key}");
-    Ok(true)
-}
-
 /// Upload a file attachment to an issue.
 async fn tui_upload_attachment(client: &JiraClient, key: &str) -> Result<bool> {
     use inquire::Text;
@@ -1588,6 +1798,8 @@ fn ui(f: &mut Frame, app: &mut App) {
         Mode::Transition => " Jira CLI — Select Transition ".to_string(),
         Mode::Help => " Jira CLI — Help ".to_string(),
         Mode::ColumnPicker => " Jira CLI — Columns ".to_string(),
+        Mode::AssigneePicker => " Jira CLI — Assignee Picker ".to_string(),
+        Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
     };
     let header = Paragraph::new(title).style(
         Style::default()
@@ -1620,6 +1832,14 @@ fn ui(f: &mut Frame, app: &mut App) {
             render_list(f, app, chunks[1]);
             render_column_picker_popup(f, app, size);
         }
+        Mode::AssigneePicker => {
+            render_list(f, app, chunks[1]);
+            render_assignee_picker_popup(f, app, size);
+        }
+        Mode::ComponentPicker => {
+            render_list(f, app, chunks[1]);
+            render_component_picker_popup(f, app, size);
+        }
     }
 }
 
@@ -1637,6 +1857,8 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::Transition => " j/k:move  Enter:execute  Esc:cancel".to_string(),
         Mode::Help => " Any key: close".to_string(),
         Mode::ColumnPicker => " j/k:move  Space:toggle  a:all  Enter:save  Esc:cancel".to_string(),
+        Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
+        Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
     };
 
     let (fg, bg) = if let Some((_, true)) = &app.status {
@@ -1911,6 +2133,149 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(hints, hint_area);
 }
 
+fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
+    let popup_area = centered_rect(70, 70, area);
+    let [input_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(3),
+        ])
+        .areas(popup_area);
+
+    let input = Paragraph::new(app.assignee_query.as_str())
+        .block(
+            Block::default()
+                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .title(format!(" Assignee: {} ", app.assignee_issue_key))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(Color::White));
+
+    let items: Vec<ListItem> = app
+        .assignee_options
+        .iter()
+        .map(|option| ListItem::new(option.label.clone()))
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT)
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let hints = Paragraph::new(vec![
+        Line::from("Type to search assignees"),
+        Line::from("↑/↓ move   Enter assign   Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(Color::DarkGray));
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(input, input_area);
+    f.render_stateful_widget(list, list_area, &mut app.assignee_state);
+    f.render_widget(hints, hint_area);
+
+    let before_cursor: String = app
+        .assignee_query
+        .chars()
+        .take(app.assignee_cursor)
+        .collect();
+    f.set_cursor_position((
+        input_area.x + 1 + before_cursor.len() as u16,
+        input_area.y + 1,
+    ));
+}
+
+fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
+    let popup_area = centered_rect(70, 75, area);
+    let [input_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(4),
+        ])
+        .areas(popup_area);
+
+    let input = Paragraph::new(app.component_query.as_str())
+        .block(
+            Block::default()
+                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .title(format!(
+                    " Components: {} ({}) ",
+                    app.component_issue_key, app.component_project_key
+                ))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(Color::White));
+
+    let items: Vec<ListItem> = app
+        .component_options
+        .iter()
+        .map(|option| {
+            let checked = if app.component_selected.contains(&option.value) {
+                "[x]"
+            } else {
+                "[ ]"
+            };
+            ListItem::new(format!("{checked} {}", option.label))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT)
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let hints = Paragraph::new(vec![
+        Line::from("Type to filter project components"),
+        Line::from("↑/↓ move   Space toggle   Enter save"),
+        Line::from("Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(Color::DarkGray));
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(input, input_area);
+    f.render_stateful_widget(list, list_area, &mut app.component_state);
+    f.render_widget(hints, hint_area);
+
+    let before_cursor: String = app
+        .component_query
+        .chars()
+        .take(app.component_cursor)
+        .collect();
+    f.set_cursor_position((
+        input_area.x + 1 + before_cursor.len() as u16,
+        input_area.y + 1,
+    ));
+}
+
 fn render_help_popup(f: &mut Frame, area: Rect) {
     let popup_area = centered_rect(70, 95, area);
 
@@ -1928,14 +2293,14 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     View issue detail"),
         Line::from("  t         Transition issue (in-TUI picker)"),
-        Line::from("  C         Open column settings popup"),
+        Line::from("  C         Open native column settings popup"),
         Line::from("  c         Create new issue"),
         Line::from("  e         Edit selected issue (summary/assignee/priority)"),
-        Line::from("  a         Assign selected issue"),
+        Line::from("  a         Open native assignee popup and assign selected issue"),
         Line::from("  ;         Add comment to selected issue"),
         Line::from("  w         Add worklog to selected issue"),
         Line::from("  l         Set labels on selected issue"),
-        Line::from("  m         Set components on selected issue"),
+        Line::from("  m         Open native component popup and set issue components"),
         Line::from("  u         Upload attachment to selected issue"),
         Line::from("  o         Open issue in browser"),
         Line::from("  r         Refresh list"),

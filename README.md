@@ -24,21 +24,35 @@ The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/ji
 
 ## Installation
 
-Choose the installer that fits your environment:
+Choose the installer that fits your environment. For detailed step-by-step instructions, see [INSTALL.md](INSTALL.md).
 
-### Homebrew (macOS / Linux)
+### Installation matrix
+
+| Method | macOS | Linux | Windows | Notes |
+| --- | --- | --- | --- | --- |
+| Homebrew | Yes | Yes | No | `jirac` formula via `mulhamna/tap` |
+| Install script | Yes | Yes | No | Downloads latest release asset |
+| PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
+| Cargo | Yes | Yes | Yes | Best for Rust users |
+| GitHub Releases | Yes | Yes | Yes | Manual archive/binary download |
+| Winget | No | No | Yes | Windows package manager |
+| Chocolatey | No | No | Yes | Windows package manager |
+
+### Quick install commands
+
+#### Homebrew (macOS / Linux)
 
 ```bash
 brew tap mulhamna/tap && brew install jira-commands
 ```
 
-### Install script (macOS / Linux)
+#### Install script (macOS / Linux)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
 ```
 
-### PowerShell installer (Windows)
+#### PowerShell installer (Windows)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"
@@ -46,13 +60,25 @@ powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-We
 
 Installs `jirac.exe` to `%LOCALAPPDATA%\Programs\jirac\bin` and adds that directory to your user `PATH`.
 
-### Cargo
+#### Cargo
 
 ```bash
 cargo install jira-commands
 ```
 
-### GitHub Releases
+#### Winget (Windows)
+
+```powershell
+winget install mulhamna.jirac
+```
+
+#### Chocolatey (Windows)
+
+```powershell
+choco install jirac
+```
+
+#### GitHub Releases
 
 Download pre-built archives from [GitHub Releases](https://github.com/mulhamna/jira-commands/releases).
 
@@ -69,18 +95,6 @@ Supported release artifacts:
 | Windows (x86_64)      | `jirac-windows-x86_64.exe` | `jirac-windows-x86_64.zip`   |
 
 Releases publish `jirac` and `jirac-mcp`. The legacy `jira` binary is no longer shipped in release artifacts.
-
-### Winget (Windows)
-
-```powershell
-winget install mulhamna.jirac
-```
-
-### Chocolatey (Windows)
-
-```powershell
-choco install jirac
-```
 
 ## Why jirac
 
@@ -217,11 +231,11 @@ Common shortcuts:
 | `C`         | Open column settings popup                                          |
 | `c`         | Create issue                                                        |
 | `e`         | Edit issue                                                          |
-| `a`         | Search and assign issue with a picker                               |
+| `a`         | Open native assignee popup and assign issue                         |
 | `t`         | Transition issue                                                    |
 | `w`         | Add worklog                                                         |
 | `l`         | Manage labels                                                       |
-| `m`         | Search and set project-scoped components with a multi-select picker |
+| `m`         | Open native component popup and set project-scoped components       |
 | `u`         | Upload attachment                                                   |
 | `o`         | Open in browser                                                     |
 | `r`         | Refresh issue list                                                  |
@@ -238,6 +252,25 @@ Inside column settings:
 | `r`           | Reset to default columns     |
 | `s` / `Enter` | Save preferences             |
 | `Esc`         | Cancel without saving        |
+
+Inside assignee popup:
+
+| Key         | Action |
+| ----------- | ------ |
+| Type        | Filter assignee list from Jira |
+| `j` / `k`   | Move selection |
+| `Enter`     | Assign selected assignee |
+| `Esc`       | Cancel |
+
+Inside component popup:
+
+| Key         | Action |
+| ----------- | ------ |
+| Type        | Filter project components |
+| `j` / `k`   | Move selection |
+| `Space`     | Toggle selected component |
+| `Enter`     | Save selected components |
+| `Esc`       | Cancel |
 
 ## Configuration
 

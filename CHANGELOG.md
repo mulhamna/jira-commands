@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.17.1](https://github.com/mulhamna/jira-commands/compare/v0.17.0...v0.17.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **chocolatey:** remove duplicate tools file mappings ([#108](https://github.com/mulhamna/jira-commands/issues/108)) ([8a81b79](https://github.com/mulhamna/jira-commands/commit/8a81b79f9ce8aab9a01b1b5f12263b433a8332a9))
+
 ## [0.17.0](https://github.com/mulhamna/jira-commands/compare/v0.16.5...v0.17.0) (2026-04-24)
 
 

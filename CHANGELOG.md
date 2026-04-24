@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.16.2](https://github.com/mulhamna/jira-commands/compare/v0.16.1...v0.16.2) (2026-04-24)
+
+
+### Bug Fixes
+
+* **actions:** fall back when winget upstream PR is blocked ([#92](https://github.com/mulhamna/jira-commands/issues/92)) ([27929f3](https://github.com/mulhamna/jira-commands/commit/27929f310bb084042553176258e2ef0707540c4d))
+
 ## [0.16.1](https://github.com/mulhamna/jira-commands/compare/v0.16.0...v0.16.1) (2026-04-24)
 
 

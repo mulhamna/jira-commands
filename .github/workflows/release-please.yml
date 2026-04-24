@@ -32,9 +32,7 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write       # push version-bump commits + tags
-  pull-requests: write  # create/update the Release PR
+permissions: {}
 
 concurrency:
   group: release-please
@@ -45,6 +43,9 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write       # push version-bump commits + tags
+      pull-requests: write  # create/update the Release PR
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}

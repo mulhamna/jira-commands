@@ -11,7 +11,7 @@ This directory stores the source manifests for publishing `jirac` to the Windows
 ## Update flow
 
 1. Publish a GitHub release with the Windows archive asset.
-2. Release CI refreshes the in-repo manifests under `packaging/winget/` using the published release version, URL, SHA256, and release date.
+2. Release CI refreshes the in-repo manifests under `packaging/winget/` using the published release version, URL, ZIP asset SHA256, and release date.
 3. Validate the manifest set with `winget validate` or the Windows Package Manager validation tooling.
 4. Submit the updated manifests to the Windows Package Manager community repository.
 

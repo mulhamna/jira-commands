@@ -56,14 +56,15 @@ jobs:
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Download checksums from release
+      - name: Download Windows ZIP and compute Winget SHA
         id: checksums
         run: |
           set -euo pipefail
           RELEASE_TAG="${{ steps.vars.outputs.release_tag }}"
           RELEASE_DATE=$(date -u +%F)
-          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/checksums.txt" -o checksums.txt
-          SHA_WINDOWS_X86=$(grep "jirac-windows-x86_64" checksums.txt | awk '{print $1}')
+          ASSET_URL="https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/jirac-windows-x86_64.zip"
+          curl -fsSL "$ASSET_URL" -o jirac-windows-x86_64.zip
+          SHA_WINDOWS_X86=$(sha256sum jirac-windows-x86_64.zip | awk '{print $1}')
           test -n "$SHA_WINDOWS_X86"
           echo "sha_windows_x86=$SHA_WINDOWS_X86" >> "$GITHUB_OUTPUT"
           echo "release_date=$RELEASE_DATE" >> "$GITHUB_OUTPUT"

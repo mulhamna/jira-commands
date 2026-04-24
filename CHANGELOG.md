@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.16.4](https://github.com/mulhamna/jira-commands/compare/v0.16.3...v0.16.4) (2026-04-24)
+
+
+### Bug Fixes
+
+* **winget:** use actual Windows archive executable path ([#98](https://github.com/mulhamna/jira-commands/issues/98)) ([f95a935](https://github.com/mulhamna/jira-commands/commit/f95a9357c4b9c3a616a5419e3c2b75be4e6616ed))
+
 ## [0.16.3](https://github.com/mulhamna/jira-commands/compare/v0.16.2...v0.16.3) (2026-04-24)
 
 

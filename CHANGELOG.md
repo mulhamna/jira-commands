@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.16.5](https://github.com/mulhamna/jira-commands/compare/v0.16.4...v0.16.5) (2026-04-24)
+
+
+### Bug Fixes
+
+* trigger release-please after squash merge ([#102](https://github.com/mulhamna/jira-commands/issues/102)) ([ab6da06](https://github.com/mulhamna/jira-commands/commit/ab6da068aa82d7ffc7091a07106246cc580286bd))
+
 ## [0.16.4](https://github.com/mulhamna/jira-commands/compare/v0.16.3...v0.16.4) (2026-04-24)
 
 

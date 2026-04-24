@@ -20,9 +20,5 @@
   </metadata>
   <files>
     <file src="tools\**" target="tools" />
-    <file src="LICENSE" target="tools" />
-    <file src="LICENSE-MIT" target="tools" />
-    <file src="LICENSE-APACHE" target="tools" />
-    <file src="README.md" target="tools" />
   </files>
 </package>

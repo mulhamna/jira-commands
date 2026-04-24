@@ -13,10 +13,12 @@ UPSTREAM_REPO = os.environ.get('WINGET_UPSTREAM_REPO', 'microsoft/winget-pkgs')
 BRANCH = f'chore/jirac-winget-v{VERSION}'
 TITLE = f'Add version: mulhamna.jirac version {VERSION}'
 BODY = f'Automated submission for jirac {VERSION} generated from the published GitHub release assets.'
+FORK_BRANCH_URL = f'https://github.com/{FORK_REPO}/tree/{BRANCH}'
+COMPARE_URL = f'https://github.com/{UPSTREAM_REPO}/compare/master...{FORK_REPO.split("/")[0]}:{BRANCH}?expand=1'
 
 
-def run(cmd, cwd=None, check=True):
-    return subprocess.run(cmd, cwd=cwd, check=check, text=True)
+def run(cmd, cwd=None, check=True, capture_output=False):
+    return subprocess.run(cmd, cwd=cwd, check=check, text=True, capture_output=capture_output)
 
 with tempfile.TemporaryDirectory() as tmp:
     repo_dir = Path(tmp) / 'winget-pkgs'
@@ -91,18 +93,32 @@ ManifestVersion: 1.9.0
     run(['git', 'commit', '-m', TITLE], cwd=repo_dir)
     run(['git', 'push', '--force-with-lease', 'origin', BRANCH], cwd=repo_dir)
 
-    existing = subprocess.run([
+    existing = run([
         'gh', 'pr', 'list', '--repo', UPSTREAM_REPO, '--head', f'mulhamna:{BRANCH}', '--state', 'open', '--json', 'number', '--jq', '.[0].number // empty'
-    ], cwd=repo_dir, check=True, capture_output=True, text=True).stdout.strip()
+    ], cwd=repo_dir, capture_output=True).stdout.strip()
     if existing:
         print(f'Upstream PR already open: #{existing}')
         raise SystemExit(0)
 
-    run([
+    created = subprocess.run([
         'gh', 'pr', 'create',
         '--repo', UPSTREAM_REPO,
         '--head', f'mulhamna:{BRANCH}',
         '--base', 'master',
         '--title', TITLE,
         '--body', BODY,
-    ], cwd=repo_dir)
+    ], cwd=repo_dir, text=True, capture_output=True)
+
+    if created.returncode == 0:
+        print(created.stdout.strip())
+        raise SystemExit(0)
+
+    stderr = (created.stderr or '').strip()
+    if 'Resource not accessible by personal access token' in stderr:
+        print('Upstream PR creation was blocked by token permissions, but the fork branch was pushed successfully.')
+        print(f'Fork branch: {FORK_BRANCH_URL}')
+        print(f'Open PR manually: {COMPARE_URL}')
+        raise SystemExit(0)
+
+    print(stderr)
+    raise SystemExit(created.returncode)

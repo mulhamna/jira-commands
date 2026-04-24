@@ -21,7 +21,7 @@ These files are source manifests kept in this repository for repeatable release 
 
 ## Automation note
 
-A future workflow can optionally submit these manifests through the maintainer fork, but the release workflows should remain parse-safe and low-risk first.
+The separate Winget submission workflow can push the generated branch to the maintainer fork automatically. If the token cannot create the upstream PR directly, the workflow should still leave the fork branch ready and surface a manual compare link.
 
 ## Notes
 

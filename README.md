@@ -24,79 +24,12 @@ The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/ji
 
 ## Installation
 
-Choose the installer that fits your environment. For detailed step-by-step instructions, see [INSTALL.md](INSTALL.md).
+See [INSTALL.md](INSTALL.md) for install matrix and detailed steps.
 
-### Installation matrix
+### Quick pointers
 
-| Method | macOS | Linux | Windows | Notes |
-| --- | --- | --- | --- | --- |
-| Homebrew | Yes | Yes | No | `jirac` formula via `mulhamna/tap` |
-| Install script | Yes | Yes | No | Downloads latest release asset |
-| PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
-| Cargo | Yes | Yes | Yes | Best for Rust users |
-| GitHub Releases | Yes | Yes | Yes | Manual archive/binary download |
-| Winget | No | No | Yes | Windows package manager |
-| Chocolatey | No | No | Yes | Windows package manager |
-
-### Quick install commands
-
-#### Homebrew (macOS / Linux)
-
-```bash
-brew tap mulhamna/tap && brew install jira-commands
-```
-
-#### Install script (macOS / Linux)
-
-```bash
-curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash
-```
-
-#### PowerShell installer (Windows)
-
-```powershell
-powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"
-```
-
-Installs `jirac.exe` to `%LOCALAPPDATA%\Programs\jirac\bin` and adds that directory to your user `PATH`.
-
-#### Cargo
-
-```bash
-cargo install jira-commands
-```
-
-#### Winget (Windows)
-
-```powershell
-winget install mulhamna.jirac
-```
-
-#### Chocolatey (Windows)
-
-```powershell
-choco install jirac
-```
-
-Chocolatey packages are published automatically from official GitHub releases.
-
-#### GitHub Releases
-
-Download pre-built archives from [GitHub Releases](https://github.com/mulhamna/jira-commands/releases).
-
-Prefer the packaged archives over raw binaries. They include the executable, licenses, and README.
-
-Supported release artifacts:
-
-| Platform              | Raw binary                 | Preferred archive            |
-| --------------------- | -------------------------- | ---------------------------- |
-| macOS (Apple Silicon) | `jirac-macos-aarch64`      | `jirac-macos-aarch64.tar.gz` |
-| macOS (Intel)         | `jirac-macos-x86_64`       | `jirac-macos-x86_64.tar.gz`  |
-| Linux (x86_64)        | `jirac-linux-x86_64`       | `jirac-linux-x86_64.tar.gz`  |
-| Linux (ARM64)         | `jirac-linux-aarch64`      | `jirac-linux-aarch64.tar.gz` |
-| Windows (x86_64)      | `jirac-windows-x86_64.exe` | `jirac-windows-x86_64.zip`   |
-
-Releases publish `jirac` and `jirac-mcp`. The legacy `jira` binary is no longer shipped in release artifacts.
+- Homebrew, install script, PowerShell, Cargo, Winget, Chocolatey, and GitHub Releases are all documented in `INSTALL.md`.
+- `jirac` and `jirac-mcp` are both released as binaries; release archives remain on GitHub Releases.
 
 ## Why jirac
 

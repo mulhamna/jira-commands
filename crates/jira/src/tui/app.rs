@@ -1252,10 +1252,6 @@ async fn prompt_project_components(
         .map(|option| option.value)
         .collect::<Vec<_>>();
 
-    if values.is_empty() {
-        return Ok(None);
-    }
-
     Ok(Some(values))
 }
 

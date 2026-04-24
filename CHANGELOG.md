@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.16.3](https://github.com/mulhamna/jira-commands/compare/v0.16.2...v0.16.3) (2026-04-24)
+
+
+### Bug Fixes
+
+* **actions:** hash the Windows zip for winget ([#95](https://github.com/mulhamna/jira-commands/issues/95)) ([b489c04](https://github.com/mulhamna/jira-commands/commit/b489c04c0eeb9dd864e3cbbc45b10f11f07585f5))
+
 ## [0.16.2](https://github.com/mulhamna/jira-commands/compare/v0.16.1...v0.16.2) (2026-04-24)
 
 

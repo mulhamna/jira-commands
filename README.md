@@ -412,3 +412,4 @@ Licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
 ---
 
 <sub>**jirac** is an independent, community-built tool. It is not affiliated with, endorsed by, or sponsored by Atlassian. "Jira" is a trademark of Atlassian.</sub>
+

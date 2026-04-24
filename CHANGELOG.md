@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.17.0](https://github.com/mulhamna/jira-commands/compare/v0.16.5...v0.17.0) (2026-04-24)
+
+
+### Features
+
+* add Chocolatey release lane and native TUI pickers ([#105](https://github.com/mulhamna/jira-commands/issues/105)) ([0f1c654](https://github.com/mulhamna/jira-commands/commit/0f1c654ab51acf89a3d3e02c31397c259eff2d92))
+
 ## [0.16.5](https://github.com/mulhamna/jira-commands/compare/v0.16.4...v0.16.5) (2026-04-24)
 
 

@@ -45,7 +45,7 @@ PackageVersion: {VERSION}
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
-  - RelativeFilePath: jirac.exe
+  - RelativeFilePath: jirac-windows-x86_64.exe
     PortableCommandAlias: jirac
 ReleaseDate: {RELEASE_DATE}
 Installers:

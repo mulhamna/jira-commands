@@ -24,12 +24,19 @@ The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/ji
 
 ## Installation
 
-See [INSTALL.md](INSTALL.md) for install matrix and detailed steps.
+See [INSTALL.md](INSTALL.md) for detailed steps.
 
-### Quick pointers
+### Installation matrix
 
-- Homebrew, install script, PowerShell, Cargo, Winget, Chocolatey, and GitHub Releases are all documented in `INSTALL.md`.
-- `jirac` and `jirac-mcp` are both released as binaries; release archives remain on GitHub Releases.
+| Method | macOS | Linux | Windows | Notes |
+| --- | --- | --- | --- | --- |
+| Homebrew | Yes | Yes | No | `jirac` formula via `mulhamna/tap` |
+| Install script | Yes | Yes | No | Downloads latest release asset |
+| PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
+| Cargo | Yes | Yes | Yes | Best for Rust users |
+| GitHub Releases | Yes | Yes | Yes | Manual archive/binary download |
+| Winget | No | No | Yes | Windows package manager |
+| Chocolatey | No | No | Yes | Windows package manager |
 
 ## Why jirac
 

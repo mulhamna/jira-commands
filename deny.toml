@@ -29,11 +29,9 @@ allow = [
   "ISC",
   "BSD-2-Clause",
   "BSD-3-Clause",
-  "Unicode-DFS-2016",
   "Unicode-3.0",
   "Zlib",
   "CC0-1.0",
-  "OpenSSL",
   "MPL-2.0",
   # CDLA-Permissive-2.0 is used by webpki-roots to ship Mozilla's CA cert
   # bundle. It is OSI-friendly and comparable to MIT/Apache in permissiveness.

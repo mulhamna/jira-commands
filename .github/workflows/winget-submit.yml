@@ -48,7 +48,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RELEASE_TAG="${{ inputs.release_tag }}"
           else
-            RELEASE_TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName,targetCommitish,isDraft,isPrerelease,publishedAt --jq '.[] | select(.isDraft==false and .isPrerelease==false and .targetCommitish=="${{ github.event.workflow_run.head_sha }}") | .tagName' | head -n1)
+            RELEASE_TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
           fi
 
           test -n "$RELEASE_TAG"

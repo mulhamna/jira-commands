@@ -20,6 +20,7 @@ The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/ji
 ## Preview
 
 ![jirac TUI preview](assets/readme/sample_tui.jpeg)
+![jirac TUI preview JQL builder](assets/readme/sample-jql.jpeg)
 
 ## Installation
 
@@ -71,21 +72,39 @@ Releases publish `jirac` and `jirac-mcp`. The legacy `jira` binary is no longer 
 
 ### Winget (Windows)
 
-Winget manifests are maintained in `packaging/winget/` in this repository. After each GitHub release, update the manifest version, archive URL, and SHA256, validate the manifest set, then submit it to the Windows Package Manager community repository.
-
-Once published there, installation will be:
-
 ```powershell
 winget install mulhamna.jirac
 ```
 
+### Chocolatey (Windows)
+
+```powershell
+choco install jirac
+```
+
 ## Why jirac
 
-- Fast CLI and interactive TUI in one tool
-- Better support for custom Jira fields than most lightweight CLIs
-- Built for practical issue management, not only read-only queries
-- Cross-platform release artifacts for macOS, Linux, and Windows
-- Extra integration lanes for MCP, Claude Code, and ClawHub
+| Feature                           |      **jirac**       | [jira-cli](https://github.com/ankitpokhrel/jira-cli) | [jira-cmd](https://github.com/palashkulsh/jira-cmd) |
+| --------------------------------- | :------------------: | :--------------------------------------------------: | :-------------------------------------------------: |
+| Language / runtime                | Rust (single binary) |                  Go (single binary)                  |                    Node.js (npm)                    |
+| Interactive TUI                   |         Yes          |                         Yes                          |                         No                          |
+| Jira REST API version             |          v3          |                       v2 / v3                        |                         v2                          |
+| Custom fields (runtime discovery) |         Yes          |                Partial (config-based)                |                 Partial (field IDs)                 |
+| Attachment upload                 |         Yes          |                          No                          |                         No                          |
+| Worklogs (add / list / delete)    |         Yes          |                          No                          |                   Add / list only                   |
+| Bulk transition                   |         Yes          |                          No                          |                         No                          |
+| Bulk update                       |         Yes          |                          No                          |                         No                          |
+| Issue archive                     |         Yes          |                          No                          |                         No                          |
+| JQL builder (interactive)         |         Yes          |                          No                          |                         No                          |
+| Raw API passthrough               |         Yes          |                          No                          |                         No                          |
+| Cursor-based pagination           |         Yes          |                     No (offset)                      |                     No (offset)                     |
+| MCP server                        |  Yes (`jirac-mcp`)   |                          No                          |                         No                          |
+| Claude Code plugin                |   Yes (12 skills)    |                          No                          |                         No                          |
+| Homebrew                          |         Yes          |                         Yes                          |                         No                          |
+| Winget                            |         Yes          |                          No                          |                         No                          |
+| Chocolatey                        |         Yes          |                          No                          |                         No                          |
+| macOS / Linux / Windows           |   Yes / Yes / Yes    |                 Yes / Yes / Partial                  |                   Yes / Yes / Yes                   |
+| Jira Server (on-prem)             |      Cloud only      |                    Cloud + Server                    |                   Cloud + Server                    |
 
 ## Quick start
 
@@ -157,6 +176,8 @@ jirac issue archive -p PROJ -q 'status = Done AND updated < -90d'
 jirac issue jql                                     # interactive
 ```
 
+![jirac JQL builder](assets/readme/sample-jql.jpeg)
+
 ### Raw API passthrough
 
 ```bash
@@ -189,34 +210,34 @@ jirac tui -p PROJ
 
 Common shortcuts:
 
-| Key         | Action |
-| ----------- | ------ |
-| `j` / `k`   | Navigate up / down |
-| `Enter`     | View issue |
-| `C`         | Open column settings popup |
-| `c`         | Create issue |
-| `e`         | Edit issue |
-| `a`         | Search and assign issue with a picker |
-| `t`         | Transition issue |
-| `w`         | Add worklog |
-| `l`         | Manage labels |
+| Key         | Action                                                              |
+| ----------- | ------------------------------------------------------------------- |
+| `j` / `k`   | Navigate up / down                                                  |
+| `Enter`     | View issue                                                          |
+| `C`         | Open column settings popup                                          |
+| `c`         | Create issue                                                        |
+| `e`         | Edit issue                                                          |
+| `a`         | Search and assign issue with a picker                               |
+| `t`         | Transition issue                                                    |
+| `w`         | Add worklog                                                         |
+| `l`         | Manage labels                                                       |
 | `m`         | Search and set project-scoped components with a multi-select picker |
-| `u`         | Upload attachment |
-| `o`         | Open in browser |
-| `r`         | Refresh issue list |
-| `/`         | JQL search |
-| `?`         | Show in-app help |
-| `q` / `Esc` | Quit or go back, depending on context |
+| `u`         | Upload attachment                                                   |
+| `o`         | Open in browser                                                     |
+| `r`         | Refresh issue list                                                  |
+| `/`         | JQL search                                                          |
+| `?`         | Show in-app help                                                    |
+| `q` / `Esc` | Quit or go back, depending on context                               |
 
 Inside column settings:
 
-| Key | Action |
-| --- | ------ |
-| `Space` | Toggle selected column |
-| `a` | Select all available columns |
-| `r` | Reset to default columns |
-| `s` / `Enter` | Save preferences |
-| `Esc` | Cancel without saving |
+| Key           | Action                       |
+| ------------- | ---------------------------- |
+| `Space`       | Toggle selected column       |
+| `a`           | Select all available columns |
+| `r`           | Reset to default columns     |
+| `s` / `Enter` | Save preferences             |
+| `Esc`         | Cancel without saving        |
 
 ## Configuration
 
@@ -285,14 +306,14 @@ jirac-mcp serve --transport streamable-http --host 127.0.0.1 --port 8787 --path 
 
 ### Available tools
 
-| Category | Tools |
-|---|---|
-| Auth | `jira_auth_status`, `jira_auth_set_credentials`, `jira_auth_logout` |
-| Issues | `jira_issue_list`, `jira_issue_view`, `jira_issue_create`, `jira_issue_update`, `jira_issue_delete` |
-| Metadata | `jira_issue_types_list`, `jira_issue_fields`, `jira_issue_transitions_list` |
+| Category | Tools                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------ |
+| Auth     | `jira_auth_status`, `jira_auth_set_credentials`, `jira_auth_logout`                                          |
+| Issues   | `jira_issue_list`, `jira_issue_view`, `jira_issue_create`, `jira_issue_update`, `jira_issue_delete`          |
+| Metadata | `jira_issue_types_list`, `jira_issue_fields`, `jira_issue_transitions_list`                                  |
 | Workflow | `jira_issue_transition`, `jira_issue_attach`, `jira_worklog_list`, `jira_worklog_add`, `jira_worklog_delete` |
-| Bulk | `jira_issue_bulk_transition`, `jira_issue_bulk_update`, `jira_issue_archive` |
-| Advanced | `jira_plan_list`, `jira_api_request` |
+| Bulk     | `jira_issue_bulk_transition`, `jira_issue_bulk_update`, `jira_issue_archive`                                 |
+| Advanced | `jira_plan_list`, `jira_api_request`                                                                         |
 
 Destructive tools (delete, archive, bulk operations) require `confirm: true`. The `jira_api_request` tool provides raw access to any Jira REST endpoint.
 
@@ -322,20 +343,20 @@ jirac auth login
 /plugin install jira@jira-commands
 ```
 
-| Skill                   | Description                         |
-| ----------------------- | ----------------------------------- |
-| `/jira:list-issues`     | List issues by project or JQL       |
-| `/jira:view-issue`      | View full issue detail              |
-| `/jira:create-issue`    | Create a new issue                  |
-| `/jira:update-issue`    | Update an existing issue            |
-| `/jira:transition`      | Transition an issue                 |
+| Skill                   | Description                             |
+| ----------------------- | --------------------------------------- |
+| `/jira:list-issues`     | List issues by project or JQL           |
+| `/jira:view-issue`      | View full issue detail                  |
+| `/jira:create-issue`    | Create a new issue                      |
+| `/jira:update-issue`    | Update an existing issue                |
+| `/jira:transition`      | Transition an issue                     |
 | `/jira:comment`         | List comments or add a Markdown comment |
-| `/jira:worklog`         | List, add, or delete worklogs       |
-| `/jira:fields`          | Inspect available field metadata    |
-| `/jira:bulk-transition` | Bulk transition issues via JQL      |
-| `/jira:attach`          | Upload a file to an issue           |
-| `/jira:jql`             | Build and run a JQL query           |
-| `/jira:api`             | Raw REST API passthrough            |
+| `/jira:worklog`         | List, add, or delete worklogs           |
+| `/jira:fields`          | Inspect available field metadata        |
+| `/jira:bulk-transition` | Bulk transition issues via JQL          |
+| `/jira:attach`          | Upload a file to an issue               |
+| `/jira:jql`             | Build and run a JQL query               |
+| `/jira:api`             | Raw REST API passthrough                |
 
 ## Using jira-core as a library
 
@@ -383,7 +404,7 @@ crates/
 ├── jira/          # CLI binary (jirac) — clap commands + ratatui TUI
 └── jira-mcp/      # MCP server binary (jirac-mcp) — rmcp-based
 plugin/
-└── .claude-plugin/  # Claude Code plugin (9 skills)
+└── .claude-plugin/  # Claude Code plugin (12 skills)
 ```
 
 Releases are automated via [release-please](https://github.com/googleapis/release-please). See [CHANGELOG.md](CHANGELOG.md) for version history.
@@ -407,6 +428,7 @@ Licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
 
 - `install.ps1` is the direct Windows installer entrypoint
 - Winget manifest sources are maintained in `packaging/winget/`
+- Chocolatey package coming soon
 - GitHub Releases remain the source for release archives and checksums
 
 ---

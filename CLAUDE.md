@@ -30,16 +30,17 @@ Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynam
 ```
 crates/
 ├── jira-core/    # PUBLIC LIBRARY: API client, auth, model, ADF parser (crates.io: "jira-core")
-├── jira/         # BINARY: clap CLI + TUI (crates.io: "jira-commands", binary: jirac; legacy jira shim no longer shipped in release artifacts)
+├── jira/         # BINARY: clap CLI + TUI (crates.io: "jira-commands", binary: jirac)
 └── jira-mcp/     # MCP SERVER: typed Jira tools via rmcp (crates.io: "jira-mcp", binary: jirac-mcp)
 plugin/
-└── .claude-plugin/  # Claude Code plugin (9 skills)
+├── .claude-plugin/  # Claude Code plugin metadata (plugin.json)
+└── skills/          # 12 skills: api, attach, bulk-transition, comment, create-issue, fields, jql, list-issues, transition, update-issue, view-issue, worklog
 ```
 
 ### Crate responsibilities
 
 - **`jira-core`** — public API: `JiraClient`, model types, ADF parser, auth, error types. Can be used as a library dependency.
-- **`jira/`** — clap commands, TUI (ratatui + crossterm), interactive prompts (inquire). Binary `jirac` (primary) + `jira` (legacy shim with deprecation warning).
+- **`jira/`** — clap commands, TUI (ratatui + crossterm), interactive prompts (inquire). Binary: `jirac`.
 - **`jira-mcp/`** — MCP server via `rmcp`, exposes `jira-core` as MCP tools for LLM clients.
 
 ---
@@ -110,9 +111,16 @@ See `.github/workflows/` for details — actual files are source of truth.
 - **ci.yml**: fmt + clippy + test + build (matrix: ubuntu/macos/windows)
 - **security.yml**: `cargo audit`
 - **release-please.yml**: auto version bump + CHANGELOG + tag
-- **release.yml**: build binaries for 5 platforms + publish to crates.io (trigger: tag `v*`)
+- **release-tag.yml**: build binaries + publish to crates.io (trigger: tag `v*`)
+- **release-recover.yml**: recovery workflow for failed releases
+- **clawhub-publish-jirac.yml**: publish to ClawHub plugin marketplace
+- **pr-automerge.yml**: auto-merge release-please PRs
+- **winget-submit.yml**: submit to Windows Package Manager
+
+### Release strategy
+
+Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files updated via `generic` updater in `release-please-config.json`. Plugin version in `plugin/.claude-plugin/plugin.json` is separate and NOT auto-bumped by release-please.
 
 ### Plugin marketplace
 
-Version in `plugin/.claude-plugin/plugin.json` is bumped automatically by release-please.
 When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.

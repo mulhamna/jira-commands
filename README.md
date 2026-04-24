@@ -1,15 +1,19 @@
 # jirac
 
-A fast, feature-rich Jira CLI built in Rust.
+A fast, polished Jira CLI and TUI built in Rust.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
 [![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
 [![License: MIT%20OR%20Apache--2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-`jirac` is an opinionated Jira terminal client that fills the gaps left by existing CLIs: **full custom field support** via runtime introspection, **native attachment uploads**, **cursor-based pagination**, and full compatibility with **Jira REST API v3**.
+`jirac` is an opinionated Jira terminal client for people who want terminal speed without giving up modern Jira workflows. It supports **custom fields discovered at runtime**, **native attachment uploads**, **cursor-based pagination**, and broad **Jira REST API v3** coverage.
 
-It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes an interactive TUI, an [MCP server](#mcp-server) for editor/agent integrations, a [Claude Code plugin](#claude-code-plugin), and a separate ClawHub skill lane under `clawhub/jirac/`.
+It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes:
+- an interactive terminal UI for browsing and updating issues,
+- an [MCP server](#mcp-server) for editor and agent integrations,
+- a [Claude Code plugin](#claude-code-plugin), and
+- a separate ClawHub skill lane under `clawhub/jirac/`.
 
 The OpenClaw skill is also published on ClawHub: <https://clawhub.ai/mulhamna/jirac>
 
@@ -74,6 +78,14 @@ Once published there, installation will be:
 ```powershell
 winget install mulhamna.jirac
 ```
+
+## Why jirac
+
+- Fast CLI and interactive TUI in one tool
+- Better support for custom Jira fields than most lightweight CLIs
+- Built for practical issue management, not only read-only queries
+- Cross-platform release artifacts for macOS, Linux, and Windows
+- Extra integration lanes for MCP, Claude Code, and ClawHub
 
 ## Quick start
 
@@ -184,11 +196,11 @@ Common shortcuts:
 | `C`         | Open column settings popup |
 | `c`         | Create issue |
 | `e`         | Edit issue |
-| `a`         | Search and assign issue |
+| `a`         | Search and assign issue with a picker |
 | `t`         | Transition issue |
 | `w`         | Add worklog |
 | `l`         | Manage labels |
-| `m`         | Search and set project-scoped components |
+| `m`         | Search and set project-scoped components with a multi-select picker |
 | `u`         | Upload attachment |
 | `o`         | Open in browser |
 | `r`         | Refresh issue list |

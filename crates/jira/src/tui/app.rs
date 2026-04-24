@@ -1001,6 +1001,10 @@ impl std::fmt::Display for PickerOption {
     }
 }
 
+fn normalize_picker_query(input: &str) -> String {
+    input.trim().to_lowercase()
+}
+
 fn prompt_search_term(prompt: &str) -> Result<Option<String>> {
     use inquire::Text;
 
@@ -1015,19 +1019,137 @@ fn prompt_search_term(prompt: &str) -> Result<Option<String>> {
     }))
 }
 
-async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<Option<String>> {
-    use inquire::Select;
+fn picker_option_matches(option: &PickerOption, query: &str) -> bool {
+    let query = normalize_picker_query(query);
+    if query.is_empty() {
+        return true;
+    }
 
+    let haystack = normalize_picker_query(&format!("{} {}", option.label, option.value));
+    haystack.contains(&query)
+}
+
+fn pick_single_option(prompt: &str, options: Vec<PickerOption>) -> Result<Option<PickerOption>> {
+    use inquire::{Select, Text};
+
+    let mut filtered = options.clone();
+    if filtered.is_empty() {
+        return Ok(None);
+    }
+
+    loop {
+        let selected = Select::new(prompt, filtered.clone())
+            .with_help_message("Enter to choose, Esc to cancel, or pick 'Search again' to refine")
+            .prompt_skippable()?;
+
+        let Some(selected) = selected else {
+            return Ok(None);
+        };
+
+        if selected.value != "__search_again__" {
+            return Ok(Some(selected));
+        }
+
+        let Some(query) = Text::new("Refine search:").prompt_skippable()? else {
+            return Ok(None);
+        };
+        let query = normalize_picker_query(&query);
+        if query.is_empty() {
+            continue;
+        }
+
+        filtered = options
+            .iter()
+            .filter(|option| {
+                option.value == "__search_again__"
+                    || option.value == "me"
+                    || picker_option_matches(option, &query)
+            })
+            .cloned()
+            .collect();
+
+        if filtered
+            .iter()
+            .all(|option| option.value == "__search_again__")
+        {
+            println!("  No matches for '{query}'. Try another search.");
+            filtered = options.clone();
+        }
+    }
+}
+
+fn pick_multi_options(
+    prompt: &str,
+    options: Vec<PickerOption>,
+) -> Result<Option<Vec<PickerOption>>> {
+    use inquire::{MultiSelect, Text};
+
+    let mut filtered = options.clone();
+    if filtered.is_empty() {
+        return Ok(None);
+    }
+
+    loop {
+        let selected = MultiSelect::new(prompt, filtered.clone())
+            .with_help_message(
+                "Space toggles, Enter confirms, Esc cancels. Choose 'Search again' to refine.",
+            )
+            .prompt_skippable()?;
+
+        let Some(selected) = selected else {
+            return Ok(None);
+        };
+
+        if !selected
+            .iter()
+            .any(|option| option.value == "__search_again__")
+        {
+            return Ok(Some(selected));
+        }
+
+        let Some(query) = Text::new("Refine component search:").prompt_skippable()? else {
+            return Ok(None);
+        };
+        let query = normalize_picker_query(&query);
+        if query.is_empty() {
+            continue;
+        }
+
+        filtered = options
+            .iter()
+            .filter(|option| {
+                option.value == "__search_again__" || picker_option_matches(option, &query)
+            })
+            .cloned()
+            .collect();
+
+        if filtered
+            .iter()
+            .all(|option| option.value == "__search_again__")
+        {
+            println!("  No components matched '{query}'. Try another search.");
+            filtered = options.clone();
+        }
+    }
+}
+
+async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<Option<String>> {
     let query = match prompt_search_term(prompt)? {
         Some(query) => query,
         None => return Ok(None),
     };
 
     let users = client.search_users(&query).await?;
-    let mut options = vec![PickerOption {
-        value: "me".to_string(),
-        label: "Assign to me".to_string(),
-    }];
+    let mut options = vec![
+        PickerOption {
+            value: "me".to_string(),
+            label: "Assign to me".to_string(),
+        },
+        PickerOption {
+            value: "__search_again__".to_string(),
+            label: "Search again...".to_string(),
+        },
+    ];
 
     for user in users {
         let display = user
@@ -1050,11 +1172,12 @@ async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<
             continue;
         }
 
-        let label = if email.is_empty() {
-            display.to_string()
-        } else {
-            format!("{display} <{email}>")
-        };
+        let mut parts = vec![display.to_string()];
+        if !email.is_empty() {
+            parts.push(format!("<{email}>"));
+        }
+        parts.push(format!("accountId: {account_id}"));
+        let label = parts.join("  •  ");
 
         if !options.iter().any(|option| option.value == account_id) {
             options.push(PickerOption {
@@ -1064,12 +1187,12 @@ async fn prompt_assignee_selection(client: &JiraClient, prompt: &str) -> Result<
         }
     }
 
-    if options.len() == 1 {
+    if options.len() <= 2 {
         println!("  No matching users found.");
         return Ok(None);
     }
 
-    let selected = Select::new("Pick assignee:", options).prompt_skippable()?;
+    let selected = pick_single_option("Pick assignee:", options)?;
     Ok(selected.map(|option| option.value))
 }
 
@@ -1078,10 +1201,8 @@ async fn prompt_project_components(
     project_key: &str,
     prompt: &str,
 ) -> Result<Option<Vec<String>>> {
-    use inquire::MultiSelect;
-
     let query = match prompt_search_term(prompt)? {
-        Some(query) => query.to_lowercase(),
+        Some(query) => normalize_picker_query(&query),
         None => return Ok(None),
     };
 
@@ -1098,22 +1219,28 @@ async fn prompt_project_components(
                 label: name.to_string(),
             })
         })
-        .filter(|option| option.label.to_lowercase().contains(&query))
+        .filter(|option| picker_option_matches(option, &query))
         .collect();
 
     options.sort_by_key(|a| a.label.to_lowercase());
     options.dedup_by(|a, b| a.value == b.value);
+    options.insert(
+        0,
+        PickerOption {
+            value: "__search_again__".to_string(),
+            label: "Search again...".to_string(),
+        },
+    );
 
-    if options.is_empty() {
+    if options.len() == 1 {
         println!("  No matching components found for project {project_key}.");
         return Ok(None);
     }
 
-    let selected = MultiSelect::new(
+    let selected = pick_multi_options(
         "Pick components (space to toggle, enter to confirm):",
         options,
-    )
-    .prompt_skippable()?;
+    )?;
 
     let Some(selected) = selected else {
         return Ok(None);
@@ -1121,8 +1248,14 @@ async fn prompt_project_components(
 
     let values = selected
         .into_iter()
+        .filter(|option| option.value != "__search_again__")
         .map(|option| option.value)
         .collect::<Vec<_>>();
+
+    if values.is_empty() {
+        return Ok(None);
+    }
+
     Ok(Some(values))
 }
 

@@ -31,12 +31,12 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@8c91899e31d0e68ef6c1c3b39a0e27f2f111052f # v4.0.4
         with:
           node-version: 22
 
       - name: Install ClawHub CLI
-        run: npm install -g clawhub
+        run: npm install -g clawhub@latest
 
       - name: Validate auth
         run: |

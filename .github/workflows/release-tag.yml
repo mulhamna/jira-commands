@@ -606,8 +606,8 @@ jobs:
             Set-Content $nuspec
 
           (Get-Content $installScript -Raw) `
-            -replace "\$url64 = '.*'", "`$url64 = 'https://github.com/mulhamna/jira-commands/releases/download/v$env:VERSION/jirac-windows-x86_64.zip'" `
-            -replace "\$checksum64 = '.*'", "`$checksum64 = '$env:SHA_WINDOWS_X86'" |
+            -replace '(?m)^\$url64 = ''.*''$', "`$url64 = 'https://github.com/mulhamna/jira-commands/releases/download/v$env:VERSION/jirac-windows-x86_64.zip'" `
+            -replace '(?m)^\$checksum64 = ''.*''$', "`$checksum64 = '$env:SHA_WINDOWS_X86'" |
             Set-Content $installScript
 
       - name: Stage Chocolatey package files

@@ -29,26 +29,28 @@ jirac-mcp serve --transport streamable-http --host 127.0.0.1 --port 8787 --path 
 
 The server reuses the same credentials/config as `jirac`:
 - `~/.config/jira/config.toml`
+- `JIRA_PROFILE`
 - `JIRA_URL`
 - `JIRA_EMAIL`
 - `JIRA_TOKEN`
 
-You can also initialize credentials with:
+You can initialize and switch credentials with:
 
 ```bash
 jirac auth login
+jirac auth profiles
+jirac auth use work-cloud
 ```
 
 ## Tool coverage
 
 The MCP server includes tools for:
 - auth status and credential updates
-- issue list, view, create, update, delete
+- issue list, view, create, update, delete, and clone
 - field and transition discovery
 - attachment upload
 - worklog operations
-- bulk transition and bulk update
-- archive
+- bulk transition, bulk update, batch, and archive flows
 - plans
 - raw Jira REST API requests
 

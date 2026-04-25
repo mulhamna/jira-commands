@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 
 use crate::{
     adf::markdown_to_adf,
-    config::JiraConfig,
+    config::{JiraAuthType, JiraConfig},
     error::{JiraError, Result},
     model::{
         attachment::Attachment,
@@ -23,7 +23,6 @@ use crate::{
     },
 };
 
-const PLATFORM_BASE: &str = "/rest/api/3";
 const AGILE_BASE: &str = "/rest/agile/1.0";
 const MAX_RETRIES: u32 = 3;
 
@@ -49,9 +48,9 @@ impl JiraClient {
 
     fn platform_url(&self, path: &str) -> String {
         format!(
-            "{}{}{}",
+            "{}/rest/api/{}{}",
             self.config.base_url.trim_end_matches('/'),
-            PLATFORM_BASE,
+            self.config.api_version,
             path
         )
     }
@@ -71,8 +70,13 @@ impl JiraClient {
             JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
 
-        let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
-        let auth_value = format!("Basic {credentials}");
+        let auth_value = match self.config.auth_type {
+            JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic => {
+                let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
+                format!("Basic {credentials}")
+            }
+            JiraAuthType::DataCenterPat => format!("Bearer {token}"),
+        };
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -91,8 +95,13 @@ impl JiraClient {
             JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
 
-        let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
-        let auth_value = format!("Basic {credentials}");
+        let auth_value = match self.config.auth_type {
+            JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic => {
+                let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
+                format!("Basic {credentials}")
+            }
+            JiraAuthType::DataCenterPat => format!("Bearer {token}"),
+        };
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -1156,4 +1165,75 @@ fn base64_encode(input: &str) -> String {
         i += 3;
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{JiraAuthType, JiraDeployment};
+    use wiremock::{
+        matchers::{header, method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    #[tokio::test]
+    async fn data_center_pat_uses_bearer_and_api_v2() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/serverInfo"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "deploymentType": "Data Center",
+                "version": "10.0.0"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("dc-main".into()),
+            base_url: server.uri(),
+            email: String::new(),
+            token: Some("dc-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+        });
+
+        let info = client.get_server_info().await.expect("server info");
+        assert_eq!(info["deploymentType"], Value::String("Data Center".into()));
+    }
+
+    #[tokio::test]
+    async fn cloud_auth_uses_basic_and_api_v3() {
+        let server = MockServer::start().await;
+        let expected = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/serverInfo"))
+            .and(header("authorization", expected.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "deploymentType": "Cloud",
+                "version": "1001.0.0"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        });
+
+        let info = client.get_server_info().await.expect("server info");
+        assert_eq!(info["deploymentType"], Value::String("Cloud".into()));
+    }
 }

@@ -11,11 +11,14 @@ pub struct ToolResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AuthSetCredentialsArgs {
+    pub profile: Option<String>,
     pub url: Option<String>,
     pub email: Option<String>,
     pub token: Option<String>,
     pub project: Option<String>,
     pub timeout_secs: Option<u64>,
+    pub deployment: Option<String>,
+    pub auth_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

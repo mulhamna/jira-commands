@@ -126,13 +126,13 @@ fn build_client() -> Result<JiraClient> {
         );
     }
 
-    if config.email.is_empty() {
+    if config.requires_user_identity() && config.email.trim().is_empty() {
         anyhow::bail!(
-            "Email not configured. Run `jirac auth login` or set JIRA_EMAIL environment variable."
+            "User identity not configured. Run `jirac auth login` or set JIRA_EMAIL environment variable."
         );
     }
 
-    if config.token.is_none() {
+    if !config.token_present() {
         anyhow::bail!(
             "API token not found. Run `jirac auth login` or set JIRA_TOKEN environment variable."
         );

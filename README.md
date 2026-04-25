@@ -36,8 +36,9 @@ Jira on the command line.
 | Raw API passthrough               |          ✅          |                             ❌                             |                              ❌                             |
 | Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
 | MCP server                        |  ✅ (`jirac-mcp`)    |                             ❌                             |                              ❌                             |
+| Multi login / saved profiles      |          ✅          |                             ❌                             |                              ❌                             |
 | macOS / Linux / Windows           |   ✅ / ✅ / ✅       |                    ✅ / ✅ / Partial                       |                      ✅ / ✅ / ✅                           |
-| Jira Data Center / self-managed   |    Cloud + Data Center    |                  Cloud + self-managed                      |                     Cloud + self-managed                    |
+| Jira Data Center / self-managed   |   Cloud + Data Center   |                  Cloud + self-managed                      |                     Cloud + self-managed                    |
 - **JQL builder** — interactive prompt that helps you construct queries
 - **Raw API passthrough** — call any Jira REST endpoint directly
 - **MCP server** — expose Jira as typed tools for editors and AI agents ([docs](crates/jira-mcp/README.md))

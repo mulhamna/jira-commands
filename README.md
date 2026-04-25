@@ -248,8 +248,10 @@ See [jira-core on crates.io](https://crates.io/crates/jira-core) for full API do
 ```bash
 git clone https://github.com/mulhamna/jira-commands
 cd jira-commands
-cargo build --all
-cargo test --all
+make build       # or: cargo build --all
+make test        # or: cargo test --all
+make smoke       # fmt-check + clippy + test + build (CI gate)
+make help        # list all targets
 ```
 
 ### Workspace layout

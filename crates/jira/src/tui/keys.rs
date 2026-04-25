@@ -3,25 +3,42 @@ use crossterm::event::KeyCode;
 use super::app::{App, AppAction};
 use super::column::AVAILABLE_COLUMNS;
 use super::mode::Mode;
+use super::panel::Focus;
 use super::prefs::TuiPreferences;
 
 pub(super) fn handle_key(app: &mut App, code: KeyCode) -> AppAction {
     match &app.mode {
-        Mode::List => handle_list_key(app, code),
-        Mode::View => handle_view_key(app, code),
+        Mode::Browse => {
+            if app.focus == Focus::Detail {
+                handle_view_key(app, code)
+            } else {
+                handle_browse_key(app, code)
+            }
+        }
         Mode::Search => handle_search_key(app, code),
         Mode::Transition => handle_transition_key(app, code),
         Mode::ColumnPicker => handle_column_picker_key(app, code),
         Mode::AssigneePicker => handle_assignee_picker_key(app, code),
         Mode::ComponentPicker => handle_component_picker_key(app, code),
         Mode::Help => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        Mode::SavedJqlPicker
+        | Mode::ServerInfo
+        | Mode::ConfigView
+        | Mode::ThemePicker
+        | Mode::CommentCompose
+        | Mode::LinkUrlInput => {
+            if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
+                app.mode = Mode::Browse;
+            }
             AppAction::None
         }
     }
 }
 
-fn handle_list_key(app: &mut App, code: KeyCode) -> AppAction {
+fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Char('q') | KeyCode::Esc => AppAction::Quit,
         KeyCode::Down | KeyCode::Char('j') => {
@@ -34,7 +51,7 @@ fn handle_list_key(app: &mut App, code: KeyCode) -> AppAction {
         }
         KeyCode::Enter => {
             if app.selected_issue().is_some() {
-                app.mode = Mode::View;
+                app.open_detail();
                 app.clear_status();
             }
             AppAction::None
@@ -92,7 +109,15 @@ fn handle_list_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Char('q') | KeyCode::Esc | KeyCode::Backspace => {
-            app.mode = Mode::List;
+            app.close_detail();
+            AppAction::None
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            app.active_tab = app.active_tab.prev();
+            AppAction::None
+        }
+        KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
+            app.active_tab = app.active_tab.next();
             AppAction::None
         }
         KeyCode::Char('t') => AppAction::FetchTransitions,
@@ -117,14 +142,6 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::AddWorklog)
             .unwrap_or(AppAction::None),
-        KeyCode::Char('l') => app
-            .selected_issue_key()
-            .map(AppAction::EditLabels)
-            .unwrap_or(AppAction::None),
-        KeyCode::Char('m') => app
-            .selected_issue_key()
-            .map(AppAction::OpenComponentPicker)
-            .unwrap_or(AppAction::None),
         KeyCode::Char('u') => app
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
@@ -136,12 +153,12 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Esc => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::None
         }
         KeyCode::Enter => {
             let jql = app.search_input.trim().to_string();
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             if jql.is_empty() {
                 AppAction::None
             } else {
@@ -222,7 +239,7 @@ fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_transition_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             app.transitions.clear();
             AppAction::None
         }
@@ -239,7 +256,7 @@ fn handle_transition_key(app: &mut App, code: KeyCode) -> AppAction {
                 if let Some((id, _)) = app.transitions.get(idx) {
                     let action =
                         AppAction::ExecuteTransition(app.transition_issue_key.clone(), id.clone());
-                    app.mode = Mode::List;
+                    app.mode = Mode::Browse;
                     return action;
                 }
             }
@@ -252,7 +269,7 @@ fn handle_transition_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_column_picker_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::None
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -289,7 +306,7 @@ fn handle_column_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Enter | KeyCode::Char('s') => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::SaveColumnPreferences
         }
         KeyCode::Char('a') => {
@@ -308,7 +325,7 @@ fn handle_column_picker_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::None
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -374,8 +391,7 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Enter => {
             if let Some(idx) = app.assignee_state.selected() {
                 if let Some(option) = app.assignee_options.get(idx) {
-                    app.mode = Mode::List;
-                    app.assignee_issue_key = option.value.clone();
+                    app.mode = Mode::Browse;
                     return AppAction::AssignIssue(option.value.clone());
                 }
             }
@@ -388,7 +404,7 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
 fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
         KeyCode::Esc | KeyCode::Char('q') => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::None
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -464,7 +480,7 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::RefreshComponentOptions
         }
         KeyCode::Enter => {
-            app.mode = Mode::List;
+            app.mode = Mode::Browse;
             AppAction::EditComponents(app.component_issue_key.clone())
         }
         _ => AppAction::None,

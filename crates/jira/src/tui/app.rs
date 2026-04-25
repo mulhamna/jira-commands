@@ -10,6 +10,8 @@ use jira_core::{
     model::{Issue, UpdateIssueRequest},
     JiraClient,
 };
+
+use super::panel::{DetailData, DetailTab, Focus};
 use ratatui::{
     backend::CrosstermBackend,
     widgets::{ListState, TableState},
@@ -31,6 +33,9 @@ pub(super) struct App {
     pub(super) issues: Vec<Issue>,
     pub(super) table_state: TableState,
     pub(super) mode: Mode,
+    pub(super) focus: Focus,
+    pub(super) active_tab: DetailTab,
+    pub(super) detail: DetailData,
     pub(super) base_url: String,
     pub(super) jql: String,
     pub(super) default_project: Option<String>,
@@ -54,6 +59,7 @@ pub(super) struct App {
     pub(super) component_state: ListState,
     pub(super) component_issue_key: String,
     pub(super) component_project_key: String,
+    pub(super) prefs: TuiPreferences,
 }
 
 pub(super) enum AppAction {
@@ -89,7 +95,10 @@ impl App {
         Self {
             issues: Vec::new(),
             table_state: TableState::default(),
-            mode: Mode::List,
+            mode: Mode::Browse,
+            focus: Focus::List,
+            active_tab: DetailTab::Summary,
+            detail: DetailData::default(),
             base_url,
             jql,
             default_project,
@@ -99,7 +108,7 @@ impl App {
             transitions: Vec::new(),
             transition_list_state: ListState::default(),
             transition_issue_key: String::new(),
-            visible_columns: prefs.visible_columns,
+            visible_columns: prefs.visible_columns.clone(),
             column_picker_state,
             assignee_query: String::new(),
             assignee_cursor: 0,
@@ -113,16 +122,25 @@ impl App {
             component_state: ListState::default(),
             component_issue_key: String::new(),
             component_project_key: String::new(),
+            prefs,
         }
     }
 
     pub(super) fn set_issues(&mut self, issues: Vec<Issue>) {
+        let prev_key = self.selected_issue_key();
         self.issues = issues;
         if self.issues.is_empty() {
             self.table_state.select(None);
-        } else {
-            self.table_state.select(Some(0));
+            self.focus = Focus::List;
+            return;
         }
+
+        let selected = prev_key
+            .as_ref()
+            .and_then(|key| self.issues.iter().position(|issue| &issue.key == key))
+            .unwrap_or(0);
+        self.table_state.select(Some(selected));
+        self.ensure_detail_context();
     }
 
     pub(super) fn selected_issue(&self) -> Option<&Issue> {
@@ -187,6 +205,21 @@ impl App {
 
     pub(super) fn clear_status(&mut self) {
         self.status = None;
+    }
+
+    pub(super) fn ensure_detail_context(&mut self) {
+        if let Some(key) = self.selected_issue_key() {
+            self.detail.reset_for(&key);
+        }
+    }
+
+    pub(super) fn open_detail(&mut self) {
+        self.focus = Focus::Detail;
+        self.ensure_detail_context();
+    }
+
+    pub(super) fn close_detail(&mut self) {
+        self.focus = Focus::List;
     }
 }
 
@@ -285,6 +318,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                 app.transition_list_state.select(Some(0));
                                 app.transition_issue_key = key;
                                 app.mode = Mode::Transition;
+                                app.focus = Focus::List;
                                 app.clear_status();
                             }
                         }
@@ -319,6 +353,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
 
             AppAction::OpenAssigneePicker(key) => {
                 app.assignee_issue_key = key;
+                app.focus = Focus::List;
                 app.assignee_query.clear();
                 app.assignee_cursor = 0;
                 app.assignee_options = vec![PickerOption {
@@ -434,6 +469,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             .unwrap_or(issue.project_key.clone());
                         app.component_project_key = project_key.clone();
                         app.mode = Mode::ComponentPicker;
+                        app.focus = Focus::List;
                         app.set_status(format!("Loading components for {project_key}..."), false);
                         match client.get_project_components(&project_key).await {
                             Ok(components) => {
@@ -612,12 +648,10 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::SaveColumnPreferences => {
-                let mut prefs = TuiPreferences {
-                    visible_columns: app.visible_columns.clone(),
-                };
-                prefs.normalize();
-                app.visible_columns = prefs.visible_columns.clone();
-                match prefs.save() {
+                app.prefs.visible_columns = app.visible_columns.clone();
+                app.prefs.normalize();
+                app.visible_columns = app.prefs.visible_columns.clone();
+                match app.prefs.save() {
                     Ok(()) => app.set_status(
                         format!(
                             "✓ Saved column preferences ({})",

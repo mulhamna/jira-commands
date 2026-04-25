@@ -6,14 +6,6 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
-## Unreleased
-
-### Features
-
-* **auth:** add multi-profile login for Jira Cloud and Jira Data Center
-* **auth:** add active profile switching and profile-aware status/logout flows
-* **datacenter:** support bearer PAT auth, basic auth, and automatic REST API v2 selection
-
 ## [0.17.1](https://github.com/mulhamna/jira-commands/compare/v0.17.0...v0.17.1) (2026-04-24)
 
 

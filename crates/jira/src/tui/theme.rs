@@ -1,18 +1,13 @@
 use ratatui::style::Color;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub(super) enum ThemeName {
+    #[default]
     Default,
     Dracula,
     Nord,
     Solarized,
     Gruvbox,
-}
-
-impl Default for ThemeName {
-    fn default() -> Self {
-        ThemeName::Default
-    }
 }
 
 #[derive(Debug, Clone, Copy)]

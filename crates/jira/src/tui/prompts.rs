@@ -105,7 +105,6 @@ pub(super) async fn tui_create_issue(
     };
 
     let issue = client.create_issue_v2(req).await?;
-    println!("✓ Created {}", issue.key);
     Ok(Some(issue.key))
 }
 
@@ -140,7 +139,6 @@ pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<boo
         });
 
     if summary.is_none() && assignee.is_none() && priority.is_none() {
-        println!("  Nothing to update.");
         return Ok(false);
     }
 
@@ -152,7 +150,6 @@ pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<boo
     };
 
     client.update_issue(key, req).await?;
-    println!("✓ Updated {key}");
     Ok(true)
 }
 
@@ -167,7 +164,6 @@ pub(super) async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bo
     };
 
     client.add_comment(key, &body).await?;
-    println!("✓ Comment added to {key}");
     Ok(true)
 }
 
@@ -226,7 +222,6 @@ pub(super) async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bo
     client
         .add_worklog(key, &time, comment.as_deref(), started.as_deref())
         .await?;
-    println!("✓ Worklog added to {key}");
     Ok(true)
 }
 
@@ -257,7 +252,6 @@ pub(super) async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bo
     };
 
     client.update_issue(key, req).await?;
-    println!("✓ Labels updated on {key}");
     Ok(true)
 }
 
@@ -277,9 +271,5 @@ pub(super) async fn tui_upload_attachment(client: &JiraClient, key: &str) -> Res
     }
 
     client.upload_attachment(key, &path).await?;
-    println!(
-        "✓ Uploaded {} to {key}",
-        path.file_name().unwrap_or_default().to_string_lossy()
-    );
     Ok(true)
 }

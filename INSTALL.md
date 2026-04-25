@@ -90,12 +90,22 @@ choco install jirac
 Authenticate first:
 
 ```bash
+# Simple login (Cloud or Data Center)
 jirac auth login
+
+# Save separate accounts
+jirac auth login --profile work-cloud
+jirac auth login --profile client-dc
+
+# Switch active account later
+jirac auth use client-dc
 ```
 
 Then verify:
 
 ```bash
+jirac auth status
+jirac auth profiles
 jirac --help
 jirac tui --help
 ```

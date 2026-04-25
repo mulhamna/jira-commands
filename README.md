@@ -7,7 +7,7 @@ Jira on the command line.
 [![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-`jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It talks directly to the Jira REST API v3 and discovers custom fields at runtime, so there is nothing to configure beyond your credentials.
+`jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
 ![jirac TUI preview](assets/readme/sample_tui.jpeg)
 
@@ -25,7 +25,7 @@ Jira on the command line.
 | --------------------------------- | :------------------: | :--------------------------------------------------------: | :---------------------------------------------------------: |
 | Single binary, no runtime deps    |          ✅          |                             ✅                             |                          ❌ (npm)                           |
 | Interactive TUI                   |          ✅          |                             ✅                             |                              ❌                             |
-| Jira REST API version             |          v3          |                          v2 / v3                           |                             v2                              |
+| Jira REST API version             |        v2 / v3       |                          v2 / v3                           |                             v2                              |
 | Custom fields (runtime discovery) |          ✅          |                    Partial (config-based)                  |                     Partial (field IDs)                     |
 | Attachment upload                 |          ✅          |                             ❌                             |                              ❌                             |
 | Worklogs (add / list / delete)    |          ✅          |                             ❌                             |                       Add / list only                       |
@@ -37,7 +37,7 @@ Jira on the command line.
 | Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
 | MCP server                        |  ✅ (`jirac-mcp`)    |                             ❌                             |                              ❌                             |
 | macOS / Linux / Windows           |   ✅ / ✅ / ✅       |                    ✅ / ✅ / Partial                       |                      ✅ / ✅ / ✅                           |
-| Jira Server (on-prem)             |      Cloud only      |                       Cloud + Server                       |                        Cloud + Server                       |
+| Jira Data Center / self-managed   |    Cloud + Data Center    |                  Cloud + self-managed                      |                     Cloud + self-managed                    |
 - **JQL builder** — interactive prompt that helps you construct queries
 - **Raw API passthrough** — call any Jira REST endpoint directly
 - **MCP server** — expose Jira as typed tools for editors and AI agents ([docs](crates/jira-mcp/README.md))
@@ -144,9 +144,24 @@ jirac plan list
 
 ```bash
 jirac auth login
+jirac auth profiles
+jirac auth use work-cloud
 jirac auth status
-jirac auth update --token NEW_TOKEN
-jirac auth logout
+jirac auth update --profile client-dc --token NEW_SECRET
+jirac auth logout --profile client-dc
+```
+
+### Multi-profile examples
+
+```bash
+# Jira Cloud
+jirac auth login --profile work-cloud
+
+# Jira Data Center with PAT
+jirac auth login --profile client-dc
+
+# Switch active account
+jirac auth use client-dc
 ```
 
 ## Interactive TUI
@@ -164,16 +179,33 @@ Full keybinding reference: [TUI.md](TUI.md)
 Config file: `~/.config/jira/config.toml`
 
 ```toml
+current_profile = "work-cloud"
+
+[profiles.work-cloud]
 base_url = "https://yourcompany.atlassian.net"
 email = "you@example.com"
 token = "your_api_token"
-project = "PROJ"           # optional default project
+project = "PROJ"
 timeout_secs = 30
+deployment = "cloud"
+auth_type = "cloud_api_token"
+api_version = 3
+
+[profiles.client-dc]
+base_url = "https://jira.company.internal"
+email = "ops-user"
+token = "your_pat"
+project = "OPS"
+timeout_secs = 30
+deployment = "data_center"
+auth_type = "datacenter_pat"
+api_version = 2
 ```
 
-Environment variables override the config file:
+Environment variables override the active profile:
 
 ```bash
+export JIRA_PROFILE=work-cloud
 export JIRA_URL=https://yourcompany.atlassian.net
 export JIRA_EMAIL=you@example.com
 export JIRA_TOKEN=your_api_token

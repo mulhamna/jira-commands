@@ -832,11 +832,16 @@ fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: 
 
 fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, palette: Palette) {
     let popup_area = centered_rect(72, 85, area);
-    let content = if lines.is_empty() {
+    let mut content = if lines.is_empty() {
         vec![Line::from("No data")]
     } else {
-        lines.iter().cloned().map(Line::from).collect()
+        lines.iter().cloned().map(Line::from).collect::<Vec<_>>()
     };
+    content.push(Line::from(""));
+    content.push(Line::from(Span::styled(
+        "Esc or q to close",
+        Style::default().fg(palette.muted),
+    )));
 
     let paragraph = Paragraph::new(content)
         .block(

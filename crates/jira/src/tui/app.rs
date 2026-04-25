@@ -6,7 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use jira_core::config::config_file_path;
+use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
 use jira_core::{
     model::{Issue, UpdateIssueRequest},
     JiraClient,
@@ -294,9 +294,119 @@ impl App {
 
     pub(super) fn load_config_lines(&mut self) {
         let path = config_file_path();
-        self.config_lines = std::fs::read_to_string(&path)
-            .map(|raw| raw.lines().take(80).map(|line| line.to_string()).collect())
-            .unwrap_or_else(|e| vec![format!("Failed to read {}: {e}", path.display())]);
+        let mut lines = vec![format!("Config file: {}", path.display()), String::new()];
+
+        match JiraProfilesFile::load() {
+            Ok(store) => {
+                let current = store
+                    .current_profile_name()
+                    .unwrap_or_else(|| "(none)".to_string());
+                lines.push(format!("Current profile: {current}"));
+                lines.push(format!("Profiles: {}", store.profiles.len()));
+                lines.push(String::new());
+
+                for (name, profile) in &store.profiles {
+                    let marker = if Some(name.as_str()) == store.current_profile.as_deref() {
+                        "*"
+                    } else {
+                        " "
+                    };
+                    lines.push(format!("{marker} {name}"));
+                    lines.push(format!("  URL: {}", profile.base_url));
+                    lines.push(format!(
+                        "  User: {}",
+                        if profile.email.trim().is_empty() {
+                            "(empty)"
+                        } else {
+                            profile.email.as_str()
+                        }
+                    ));
+                    lines.push(format!(
+                        "  Project: {}",
+                        profile.project.as_deref().unwrap_or("(none)")
+                    ));
+                    lines.push(format!("  Timeout: {}s", profile.timeout_secs));
+                    lines.push(format!("  Deployment: {:?}", profile.deployment));
+                    lines.push(format!("  Auth: {:?}", profile.auth_type));
+                    lines.push(format!("  API: v{}", profile.api_version));
+                    lines.push(format!(
+                        "  Token: {}",
+                        if profile
+                            .token
+                            .as_deref()
+                            .map(|t| !t.trim().is_empty())
+                            .unwrap_or(false)
+                        {
+                            "present"
+                        } else {
+                            "missing"
+                        }
+                    ));
+                    lines.push(String::new());
+                }
+            }
+            Err(e) => {
+                lines.push(format!("Config parse failed: {e}"));
+                lines.push(String::new());
+                match std::fs::read_to_string(&path) {
+                    Ok(raw) => {
+                        lines.push("Raw file preview:".to_string());
+                        lines.extend(raw.lines().take(60).map(|line| line.to_string()));
+                    }
+                    Err(read_err) => {
+                        lines.push(format!("Failed to read raw file: {read_err}"));
+                    }
+                }
+            }
+        }
+
+        lines.push("Environment overrides (detected now):".to_string());
+        let active = JiraConfig::load();
+        match active {
+            Ok(cfg) => {
+                lines.push(format!(
+                    "  JIRA_PROFILE => {}",
+                    std::env::var("JIRA_PROFILE").unwrap_or_else(|_| "(unset)".to_string())
+                ));
+                lines.push(format!(
+                    "  JIRA_URL => {}",
+                    if std::env::var("JIRA_URL").is_ok() {
+                        "set"
+                    } else {
+                        "unset"
+                    }
+                ));
+                lines.push(format!(
+                    "  JIRA_EMAIL => {}",
+                    if std::env::var("JIRA_EMAIL").is_ok() {
+                        "set"
+                    } else {
+                        "unset"
+                    }
+                ));
+                lines.push(format!(
+                    "  JIRA_TOKEN => {}",
+                    if std::env::var("JIRA_TOKEN").is_ok() {
+                        "set"
+                    } else {
+                        "unset"
+                    }
+                ));
+                lines.push(format!(
+                    "  Effective profile: {}",
+                    cfg.profile_name.unwrap_or_else(|| "(unknown)".to_string())
+                ));
+                lines.push(format!("  Effective URL: {}", cfg.base_url));
+                lines.push(format!(
+                    "  Effective project: {}",
+                    cfg.project.unwrap_or_else(|| "(none)".to_string())
+                ));
+                lines.push(format!("  Effective timeout: {}s", cfg.timeout_secs));
+            }
+            Err(e) => lines.push(format!("  Failed to load effective config: {e}")),
+        }
+
+        self.config_lines = lines;
     }
 }
 
@@ -799,11 +909,49 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 terminal.draw(|f| ui(f, &mut app))?;
                 match client.get_server_info().await {
                     Ok(info) => {
-                        app.server_info_lines = serde_json::to_string_pretty(&info)
-                            .unwrap_or_else(|_| format!("{info:#?}"))
-                            .lines()
-                            .map(|line| line.to_string())
-                            .collect();
+                        let mut lines = Vec::new();
+                        let field = |key: &str| info.get(key).and_then(|v| v.as_str());
+
+                        lines.push("Server Summary".to_string());
+                        lines.push(String::new());
+                        lines.push(format!(
+                            "Base URL: {}",
+                            field("baseUrl").unwrap_or(&app.base_url)
+                        ));
+                        lines.push(format!(
+                            "Version: {}",
+                            field("version").unwrap_or("unknown")
+                        ));
+                        lines.push(format!(
+                            "Build number: {}",
+                            info.get("buildNumber")
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "unknown".to_string())
+                        ));
+                        lines.push(format!(
+                            "Deployment type: {}",
+                            field("deploymentType").unwrap_or("unknown")
+                        ));
+                        lines.push(format!(
+                            "Version numbers: {}",
+                            info.get("versionNumbers")
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "unknown".to_string())
+                        ));
+                        lines.push(format!(
+                            "Default locale: {}",
+                            field("defaultLocale").unwrap_or("unknown")
+                        ));
+                        lines.push(String::new());
+                        lines.push("Raw preview:".to_string());
+                        lines.extend(
+                            serde_json::to_string_pretty(&info)
+                                .unwrap_or_else(|_| format!("{info:#?}"))
+                                .lines()
+                                .take(40)
+                                .map(|line| line.to_string()),
+                        );
+                        app.server_info_lines = lines;
                         app.clear_status();
                     }
                     Err(e) => app.set_status(format!("Server info failed: {e}"), true),

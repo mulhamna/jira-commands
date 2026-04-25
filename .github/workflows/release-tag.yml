@@ -314,14 +314,22 @@ jobs:
 
       - name: Generate SHA-256 checksums
         run: |
-          cd artifacts
-          for dir in */; do
-            file="${dir%/}"
-            sha256sum "$file/$file" >> ../checksums.txt 2>/dev/null || \
-            sha256sum "$file/$file.exe" >> ../checksums.txt 2>/dev/null || true
+          set -euo pipefail
+          : > checksums.txt
+          find artifacts -type f \( \
+            -name 'jirac-*' -o \
+            -name 'jirac-*.exe' -o \
+            -name 'jirac-*.tar.gz' -o \
+            -name 'jirac-*.zip' -o \
+            -name 'jirac-mcp-*' -o \
+            -name 'jirac-mcp-*.exe' -o \
+            -name 'jirac-mcp-*.tar.gz' -o \
+            -name 'jirac-mcp-*.zip' \
+          \) -print0 | sort -z | while IFS= read -r -d '' file; do
+            sha256sum "$file" >> checksums.txt
           done
           echo "=== checksums.txt ==="
-          cat ../checksums.txt
+          cat checksums.txt
 
       - name: Build release notes footer
         run: |
@@ -381,11 +389,11 @@ jobs:
           echo "=== checksums.txt ==="
           cat checksums.txt
 
-          SHA_MACOS_ARM=$(grep "jirac-macos-aarch64" checksums.txt | awk '{print $1}')
-          SHA_MACOS_X86=$(grep "jirac-macos-x86_64"  checksums.txt | awk '{print $1}')
-          SHA_LINUX_ARM=$(grep "jirac-linux-aarch64"  checksums.txt | awk '{print $1}')
-          SHA_LINUX_X86=$(grep "jirac-linux-x86_64"   checksums.txt | awk '{print $1}')
-          SHA_WINDOWS_X86=$(grep "jirac-windows-x86_64" checksums.txt | awk '{print $1}')
+          SHA_MACOS_ARM=$(grep ' jirac-macos-aarch64.tar.gz$' checksums.txt | awk '{print $1}')
+          SHA_MACOS_X86=$(grep ' jirac-macos-x86_64.tar.gz$'  checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM=$(grep ' jirac-linux-aarch64.tar.gz$'  checksums.txt | awk '{print $1}')
+          SHA_LINUX_X86=$(grep ' jirac-linux-x86_64.tar.gz$'   checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_X86=$(grep ' jirac-windows-x86_64.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"

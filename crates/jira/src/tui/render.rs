@@ -27,7 +27,8 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             if app.focus == Focus::Detail {
                 format!(
                     " Jira CLI — {} — {} ",
-                    app.selected_issue_key().unwrap_or_else(|| "Issue Detail".into()),
+                    app.selected_issue_key()
+                        .unwrap_or_else(|| "Issue Detail".into()),
                     app.active_tab.label()
                 )
             } else {
@@ -229,11 +230,11 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect) {
 
     let body = match app.active_tab {
         DetailTab::Summary => build_summary_lines(issue),
-        DetailTab::Comments => build_placeholder_lines("Comments panel", "Read/write path exists in client, panel wiring next."),
-        DetailTab::Worklog => build_placeholder_lines("Worklog panel", "Worklog fetch exists, panel wiring next."),
+        DetailTab::Comments => build_comment_lines(app),
+        DetailTab::Worklog => build_worklog_lines(app),
         DetailTab::Attachments => build_attachment_lines(issue),
         DetailTab::Subtasks => build_subtask_lines(issue),
-        DetailTab::Links => build_placeholder_lines("Links panel", "Remote links client exists, panel wiring next."),
+        DetailTab::Links => build_link_lines(app),
     };
 
     let paragraph = Paragraph::new(body)
@@ -296,6 +297,108 @@ fn build_summary_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
     lines
 }
 
+fn build_comment_lines(app: &App) -> Vec<Line<'static>> {
+    match &app.detail.comments {
+        Some(comments) if comments.is_empty() => {
+            build_placeholder_lines("Comments", "No comments on this issue.")
+        }
+        Some(comments) => {
+            let mut lines = vec![
+                Line::from(format!("{} comment(s)", comments.len())),
+                Line::from(""),
+            ];
+            for comment in comments {
+                let author = comment.author.clone().unwrap_or_else(|| "Unknown".into());
+                let created = comment.created.get(..10).unwrap_or(&comment.created);
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        author,
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(format!("  {}", created)),
+                ]));
+                let body = comment.body.clone().unwrap_or_else(|| "(empty)".into());
+                for line in body.lines() {
+                    lines.push(Line::from(format!("  {line}")));
+                }
+                lines.push(Line::from(""));
+            }
+            lines
+        }
+        None => build_placeholder_lines("Comments", "Loading comments..."),
+    }
+}
+
+fn build_worklog_lines(app: &App) -> Vec<Line<'static>> {
+    match &app.detail.worklogs {
+        Some(worklogs) if worklogs.is_empty() => {
+            build_placeholder_lines("Worklog", "No worklogs on this issue.")
+        }
+        Some(worklogs) => {
+            let mut lines = vec![
+                Line::from(format!("{} worklog entr(y/ies)", worklogs.len())),
+                Line::from(""),
+            ];
+            for worklog in worklogs {
+                let author = worklog.author.clone().unwrap_or_else(|| "Unknown".into());
+                let started = worklog.started.get(..10).unwrap_or(&worklog.started);
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        author,
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(format!("  {}  {}", worklog.time_spent, started)),
+                ]));
+                if let Some(comment) = &worklog.comment {
+                    for line in comment.lines() {
+                        lines.push(Line::from(format!("  {line}")));
+                    }
+                }
+                lines.push(Line::from(""));
+            }
+            lines
+        }
+        None => build_placeholder_lines("Worklog", "Loading worklogs..."),
+    }
+}
+
+fn build_link_lines(app: &App) -> Vec<Line<'static>> {
+    match &app.detail.remote_links {
+        Some(links) if links.is_empty() => {
+            build_placeholder_lines("Links", "No remote links on this issue.")
+        }
+        Some(links) => {
+            let mut lines = vec![
+                Line::from(format!("{} link(s)", links.len())),
+                Line::from(""),
+            ];
+            for link in links {
+                let object = link.get("object");
+                let title = object
+                    .and_then(|o| o.get("title"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Untitled link");
+                let url = object
+                    .and_then(|o| o.get("url"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("-");
+                lines.push(Line::from(Span::styled(
+                    title.to_string(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                )));
+                lines.push(Line::from(format!("  {url}")));
+                lines.push(Line::from(""));
+            }
+            lines
+        }
+        None => build_placeholder_lines("Links", "Loading remote links..."),
+    }
+}
+
 fn build_attachment_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
     if issue.attachments.is_empty() {
         return build_placeholder_lines("Attachments", "No attachments on this issue.");
@@ -327,7 +430,10 @@ fn build_subtask_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
         return build_placeholder_lines("Subtasks", "No subtasks found.");
     }
 
-    let mut lines = vec![Line::from(format!("{} subtask(s)", subtasks.len())), Line::from("")];
+    let mut lines = vec![
+        Line::from(format!("{} subtask(s)", subtasks.len())),
+        Line::from(""),
+    ];
     for subtask in subtasks {
         let key = subtask.get("key").and_then(|v| v.as_str()).unwrap_or("?");
         let summary = subtask
@@ -531,7 +637,11 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, list_area, &mut app.assignee_state);
     f.render_widget(hints, hint_area);
 
-    let before_cursor: String = app.assignee_query.chars().take(app.assignee_cursor).collect();
+    let before_cursor: String = app
+        .assignee_query
+        .chars()
+        .take(app.assignee_cursor)
+        .collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,
@@ -604,7 +714,11 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, list_area, &mut app.component_state);
     f.render_widget(hints, hint_area);
 
-    let before_cursor: String = app.component_query.chars().take(app.component_cursor).collect();
+    let before_cursor: String = app
+        .component_query
+        .chars()
+        .take(app.component_cursor)
+        .collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,
@@ -620,7 +734,10 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled("Issue List:", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled(
+            "Issue List:",
+            Style::default().fg(Color::Yellow),
+        )),
         Line::from("  ↑/k       Move up"),
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
@@ -640,12 +757,18 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from("  ?         Show help"),
         Line::from("  q         Quit the TUI"),
         Line::from(""),
-        Line::from(Span::styled("Detail View:", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled(
+            "Detail View:",
+            Style::default().fg(Color::Yellow),
+        )),
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
         Line::from("  Summary / Comments / Worklog / Attachments / Subtasks / Links"),
         Line::from(""),
-        Line::from(Span::styled("Press any key to close", Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(
+            "Press any key to close",
+            Style::default().fg(Color::DarkGray),
+        )),
     ];
 
     f.render_widget(Clear, popup_area);

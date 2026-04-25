@@ -28,7 +28,9 @@ impl Default for TuiPreferences {
             saved_jqls: vec![
                 SavedJql {
                     name: "My open issues".into(),
-                    jql: "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC".into(),
+                    jql:
+                        "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC"
+                            .into(),
                 },
                 SavedJql {
                     name: "Updated this week".into(),

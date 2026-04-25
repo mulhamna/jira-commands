@@ -903,7 +903,8 @@ impl JiraClient {
         let url = self.platform_url(&format!("/issue/{issue_key}/remotelink"));
 
         let http = &self.http;
-        self.request(|| http.get(&url).headers(headers.clone())).await
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
     }
 
     /// Add a remote link to an issue.

@@ -87,6 +87,41 @@ pub(super) enum AppAction {
 }
 
 impl App {
+    async fn warm_active_tab(&mut self, client: &JiraClient) {
+        let Some(key) = self.selected_issue_key() else {
+            return;
+        };
+        self.detail.reset_for(&key);
+
+        match self.active_tab {
+            DetailTab::Comments => {
+                if self.detail.comments.is_none() {
+                    match client.get_comments(&key).await {
+                        Ok(comments) => self.detail.comments = Some(comments),
+                        Err(e) => self.set_status(format!("Comments load failed: {e}"), true),
+                    }
+                }
+            }
+            DetailTab::Worklog => {
+                if self.detail.worklogs.is_none() {
+                    match client.get_worklogs(&key).await {
+                        Ok(worklogs) => self.detail.worklogs = Some(worklogs),
+                        Err(e) => self.set_status(format!("Worklog load failed: {e}"), true),
+                    }
+                }
+            }
+            DetailTab::Links => {
+                if self.detail.remote_links.is_none() {
+                    match client.get_remote_links(&key).await {
+                        Ok(links) => self.detail.remote_links = Some(links),
+                        Err(e) => self.set_status(format!("Links load failed: {e}"), true),
+                    }
+                }
+            }
+            DetailTab::Attachments | DetailTab::Subtasks | DetailTab::Summary => {}
+        }
+    }
+
     fn new(jql: String, base_url: String, default_project: Option<String>) -> Self {
         let prefs = TuiPreferences::load();
         let mut column_picker_state = ListState::default();
@@ -274,6 +309,9 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match client.search_issues(&jql, None, Some(50)).await {
                     Ok(result) => {
                         app.set_issues(result.issues);
+                        if app.focus == Focus::Detail {
+                            app.warm_active_tab(&client).await;
+                        }
                         app.clear_status();
                     }
                     Err(e) => app.set_status(format!("Error: {e}"), true),
@@ -337,6 +375,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                         terminal.draw(|f| ui(f, &mut app))?;
                         if let Ok(result) = client.search_issues(&jql, None, Some(50)).await {
                             app.set_issues(result.issues);
+                            app.warm_active_tab(&client).await;
                         }
                     }
                     Err(e) => app.set_status(format!("Error: {e}"), true),
@@ -584,7 +623,11 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 let result = tui_add_comment(&client, &key).await;
                 resume_tui(&mut terminal)?;
                 match result {
-                    Ok(true) => app.set_status(format!("✓ Comment added to {key}"), false),
+                    Ok(true) => {
+                        app.detail.comments = None;
+                        app.warm_active_tab(&client).await;
+                        app.set_status(format!("✓ Comment added to {key}"), false)
+                    }
                     Ok(false) => app.set_status("Comment cancelled", false),
                     Err(e) => app.set_status(format!("Comment failed: {e}"), true),
                 }
@@ -595,7 +638,11 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 let result = tui_add_worklog(&client, &key).await;
                 resume_tui(&mut terminal)?;
                 match result {
-                    Ok(true) => app.set_status(format!("✓ Worklog added to {key}"), false),
+                    Ok(true) => {
+                        app.detail.worklogs = None;
+                        app.warm_active_tab(&client).await;
+                        app.set_status(format!("✓ Worklog added to {key}"), false)
+                    }
                     Ok(false) => app.set_status("Worklog cancelled", false),
                     Err(e) => app.set_status(format!("Worklog failed: {e}"), true),
                 }
@@ -641,7 +688,14 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 let result = tui_upload_attachment(&client, &key).await;
                 resume_tui(&mut terminal)?;
                 match result {
-                    Ok(true) => app.set_status(format!("✓ Attachment uploaded to {key}"), false),
+                    Ok(true) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                            app.warm_active_tab(&client).await;
+                        }
+                        app.set_status(format!("✓ Attachment uploaded to {key}"), false)
+                    }
                     Ok(false) => app.set_status("Upload cancelled", false),
                     Err(e) => app.set_status(format!("Upload failed: {e}"), true),
                 }

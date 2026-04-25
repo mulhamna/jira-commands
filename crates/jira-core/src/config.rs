@@ -117,7 +117,9 @@ impl From<JiraProfileConfig> for JiraConfig {
 impl JiraConfig {
     /// Load the active profile from ~/.config/jira/config.toml and env vars.
     pub fn load() -> Result<Self> {
-        let profile_override = env::var("JIRA_PROFILE").ok().filter(|s| !s.trim().is_empty());
+        let profile_override = env::var("JIRA_PROFILE")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
         let store = JiraProfilesFile::load()?;
 
         let mut config = if let Some(profile_name) = profile_override.clone() {
@@ -179,7 +181,10 @@ impl JiraConfig {
     }
 
     pub fn requires_user_identity(&self) -> bool {
-        matches!(self.auth_type, JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic)
+        matches!(
+            self.auth_type,
+            JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic
+        )
     }
 
     pub fn credential_label(&self) -> &'static str {
@@ -268,7 +273,8 @@ impl JiraProfilesFile {
             let mut store: JiraProfilesFile = toml::from_str(&content)
                 .map_err(|e| JiraError::Config(format!("Failed to parse config: {e}")))?;
             for profile in store.profiles.values_mut() {
-                profile.api_version = normalize_api_version(profile.api_version, &profile.deployment);
+                profile.api_version =
+                    normalize_api_version(profile.api_version, &profile.deployment);
             }
             return Ok(store);
         }
@@ -333,7 +339,9 @@ impl JiraProfilesFile {
 
     pub fn set_current_profile(&mut self, profile_name: &str) -> Result<()> {
         if !self.profiles.contains_key(profile_name) {
-            return Err(JiraError::Config(format!("Profile not found: {profile_name}")));
+            return Err(JiraError::Config(format!(
+                "Profile not found: {profile_name}"
+            )));
         }
         self.current_profile = Some(profile_name.to_string());
         Ok(())
@@ -341,7 +349,9 @@ impl JiraProfilesFile {
 
     pub fn remove_profile(&mut self, profile_name: &str) -> Result<()> {
         if self.profiles.remove(profile_name).is_none() {
-            return Err(JiraError::Config(format!("Profile not found: {profile_name}")));
+            return Err(JiraError::Config(format!(
+                "Profile not found: {profile_name}"
+            )));
         }
         if self.current_profile.as_deref() == Some(profile_name) {
             self.current_profile = self.profiles.keys().next().cloned();

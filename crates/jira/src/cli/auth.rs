@@ -258,7 +258,10 @@ async fn login(args: LoginArgs) -> Result<()> {
     config.profile_name = Some(profile_name.clone());
     config.save().context("Failed to save config")?;
 
-    println!("\n✓ Profile '{profile_name}' saved to {}", config_file_path().display());
+    println!(
+        "\n✓ Profile '{profile_name}' saved to {}",
+        config_file_path().display()
+    );
     println!("  Deployment: {}", deployment_label(&config.deployment));
     println!("  Auth:       {}", auth_type_label(&config.auth_type));
 
@@ -347,8 +350,10 @@ async fn update(args: UpdateArgs) -> Result<()> {
         {
             config.auth_type = JiraAuthType::DataCenterPat;
         }
-        if matches!(config.auth_type, JiraAuthType::DataCenterPat | JiraAuthType::DataCenterBasic)
-            && matches!(config.deployment, JiraDeployment::Cloud)
+        if matches!(
+            config.auth_type,
+            JiraAuthType::DataCenterPat | JiraAuthType::DataCenterBasic
+        ) && matches!(config.deployment, JiraDeployment::Cloud)
         {
             config.auth_type = JiraAuthType::CloudApiToken;
         }
@@ -399,7 +404,10 @@ async fn status(profile: Option<String>) -> Result<()> {
         println!("  User:           {}", config.email);
     }
     if config.token_present() {
-        println!("  Secret:         ✓ stored in {}", config_file_path().display());
+        println!(
+            "  Secret:         ✓ stored in {}",
+            config_file_path().display()
+        );
     } else {
         println!("  Secret:         ✗ not found — run `jirac auth login`");
     }
@@ -520,12 +528,10 @@ fn derive_profile_name(config: &JiraConfig) -> String {
     if config.email.trim().is_empty() {
         host
     } else {
-        let user = config
-            .email
-            .split('@')
-            .next()
-            .unwrap_or("user")
-            .replace(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-' && ch != '_', "-");
+        let user = config.email.split('@').next().unwrap_or("user").replace(
+            |ch: char| !ch.is_ascii_alphanumeric() && ch != '-' && ch != '_',
+            "-",
+        );
         format!("{host}-{user}")
     }
 }
@@ -572,4 +578,3 @@ impl From<AuthTypeArg> for JiraAuthType {
         }
     }
 }
-

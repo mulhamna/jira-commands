@@ -4,15 +4,15 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 
 ## Supported install paths
 
-| Method | macOS | Linux | Windows | Notes |
-| --- | --- | --- | --- | --- |
-| Homebrew | Yes | Yes | No | `jirac` formula via `mulhamna/tap` |
-| Install script | Yes | Yes | No | Downloads latest release asset |
-| PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
-| Cargo | Yes | Yes | Yes | Best for Rust users |
-| GitHub Releases | Yes | Yes | Yes | Manual download of archives/binaries |
-| Winget | No | No | Yes | Windows package manager |
-| Chocolatey | No | No | Yes | Windows package manager |
+| Method               | macOS | Linux | Windows | Notes                                  |
+| -------------------- | ----- | ----- | ------- | -------------------------------------- |
+| Homebrew             | ✅     | ✅     | No      | `jirac` formula via `mulhamna/tap`     |
+| Install script       | ✅     | ✅     | No      | Downloads latest release asset         |
+| PowerShell installer | ❌     | ❌     | ✅       | Installs `jirac.exe` to user-local bin |
+| Cargo                | ✅     | ✅     | ✅       | Best for Rust users                    |
+| GitHub Releases      | ✅     | ✅     | ✅       | Manual download of archives/binaries   |
+| Winget               | ❌     | ❌     | ✅       | Windows package manager                |
+| Chocolatey           | ❌     | ❌     | ✅       | Windows package manager                |
 
 ## Homebrew (macOS / Linux)
 
@@ -65,13 +65,13 @@ Download from:
 
 Preferred archives:
 
-| Platform | Archive |
-| --- | --- |
+| Platform            | Archive                      |
+| ------------------- | ---------------------------- |
 | macOS Apple Silicon | `jirac-macos-aarch64.tar.gz` |
-| macOS Intel | `jirac-macos-x86_64.tar.gz` |
-| Linux x86_64 | `jirac-linux-x86_64.tar.gz` |
-| Linux ARM64 | `jirac-linux-aarch64.tar.gz` |
-| Windows x86_64 | `jirac-windows-x86_64.zip` |
+| macOS Intel         | `jirac-macos-x86_64.tar.gz`  |
+| Linux x86_64        | `jirac-linux-x86_64.tar.gz`  |
+| Linux ARM64         | `jirac-linux-aarch64.tar.gz` |
+| Windows x86_64      | `jirac-windows-x86_64.zip`   |
 
 ## Winget (Windows)
 

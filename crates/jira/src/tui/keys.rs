@@ -24,12 +24,9 @@ pub(super) fn handle_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        Mode::SavedJqlPicker
-        | Mode::ServerInfo
-        | Mode::ConfigView
-        | Mode::ThemePicker
-        | Mode::CommentCompose
-        | Mode::LinkUrlInput => {
+        Mode::SavedJqlPicker => handle_saved_jql_key(app, code),
+        Mode::ThemePicker => handle_theme_picker_key(app, code),
+        Mode::ServerInfo | Mode::ConfigView => {
             if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
                 app.mode = Mode::Browse;
             }
@@ -72,6 +69,22 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('C') => {
             app.mode = Mode::ColumnPicker;
             AppAction::None
+        }
+        KeyCode::Char('p') => {
+            app.mode = Mode::SavedJqlPicker;
+            AppAction::None
+        }
+        KeyCode::Char('T') => {
+            app.mode = Mode::ThemePicker;
+            AppAction::None
+        }
+        KeyCode::Char('S') => {
+            app.mode = Mode::ServerInfo;
+            AppAction::LoadServerInfo
+        }
+        KeyCode::Char('g') => {
+            app.mode = Mode::ConfigView;
+            AppAction::LoadConfigView
         }
         KeyCode::Char('c') => AppAction::CreateIssue,
         KeyCode::Char('e') => app
@@ -396,6 +409,73 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
                 }
             }
             AppAction::None
+        }
+        _ => AppAction::None,
+    }
+}
+
+fn handle_saved_jql_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            let i = app
+                .saved_jql_state
+                .selected()
+                .map(|i| (i + 1).min(app.prefs.saved_jqls.len().saturating_sub(1)))
+                .unwrap_or(0);
+            app.saved_jql_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            let i = app
+                .saved_jql_state
+                .selected()
+                .map(|i| i.saturating_sub(1))
+                .unwrap_or(0);
+            app.saved_jql_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Enter => {
+            if let Some(jql) = app.selected_saved_jql().map(|saved| saved.jql.clone()) {
+                app.mode = Mode::Browse;
+                return AppAction::ApplySavedJql(jql);
+            }
+            AppAction::None
+        }
+        _ => AppAction::None,
+    }
+}
+
+fn handle_theme_picker_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            let i = app
+                .theme_state
+                .selected()
+                .map(|i| (i + 1).min(super::theme::ThemeName::ALL.len().saturating_sub(1)))
+                .unwrap_or(0);
+            app.theme_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            let i = app
+                .theme_state
+                .selected()
+                .map(|i| i.saturating_sub(1))
+                .unwrap_or(0);
+            app.theme_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Enter => {
+            app.mode = Mode::Browse;
+            AppAction::SaveTheme
         }
         _ => AppAction::None,
     }

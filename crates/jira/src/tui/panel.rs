@@ -32,10 +32,6 @@ impl DetailTab {
         }
     }
 
-    pub(super) fn from_index(idx: usize) -> Option<Self> {
-        Self::ALL.get(idx).copied()
-    }
-
     pub(super) fn index(self) -> usize {
         Self::ALL.iter().position(|t| *t == self).unwrap_or(0)
     }
@@ -57,11 +53,6 @@ pub(super) struct DetailData {
     pub(super) comments: Option<Vec<Comment>>,
     pub(super) worklogs: Option<Vec<Worklog>>,
     pub(super) remote_links: Option<Vec<Value>>,
-    pub(super) selected_comment: usize,
-    pub(super) selected_worklog: usize,
-    pub(super) selected_attachment: usize,
-    pub(super) selected_subtask: usize,
-    pub(super) selected_link: usize,
 }
 
 impl DetailData {

@@ -11,6 +11,4 @@ pub(super) enum Mode {
     ServerInfo,
     ConfigView,
     ThemePicker,
-    CommentCompose,
-    LinkUrlInput,
 }

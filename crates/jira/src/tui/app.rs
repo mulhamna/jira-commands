@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use jira_core::config::config_file_path;
 use jira_core::{
     model::{Issue, UpdateIssueRequest},
     JiraClient,
@@ -22,12 +23,13 @@ use super::column::{format_column_summary, ColumnKind};
 use super::keys;
 use super::mode::Mode;
 use super::picker::PickerOption;
-use super::prefs::TuiPreferences;
+use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
     resume_tui, suspend_tui, tui_add_comment, tui_add_worklog, tui_create_issue, tui_edit_issue,
     tui_edit_labels, tui_upload_attachment,
 };
 use super::render::ui;
+use super::theme::ThemeName;
 
 pub(super) struct App {
     pub(super) issues: Vec<Issue>,
@@ -60,6 +62,10 @@ pub(super) struct App {
     pub(super) component_issue_key: String,
     pub(super) component_project_key: String,
     pub(super) prefs: TuiPreferences,
+    pub(super) saved_jql_state: ListState,
+    pub(super) theme_state: ListState,
+    pub(super) server_info_lines: Vec<String>,
+    pub(super) config_lines: Vec<String>,
 }
 
 pub(super) enum AppAction {
@@ -84,6 +90,10 @@ pub(super) enum AppAction {
     UploadAttachment(String),
     SaveColumnPreferences,
     ResetColumnPreferences,
+    ApplySavedJql(String),
+    SaveTheme,
+    LoadServerInfo,
+    LoadConfigView,
 }
 
 impl App {
@@ -126,6 +136,14 @@ impl App {
         let prefs = TuiPreferences::load();
         let mut column_picker_state = ListState::default();
         column_picker_state.select(Some(0));
+        let mut saved_jql_state = ListState::default();
+        saved_jql_state.select(Some(0));
+        let mut theme_state = ListState::default();
+        let theme_idx = ThemeName::ALL
+            .iter()
+            .position(|theme| *theme == prefs.theme)
+            .unwrap_or(0);
+        theme_state.select(Some(theme_idx));
 
         Self {
             issues: Vec::new(),
@@ -158,6 +176,10 @@ impl App {
             component_issue_key: String::new(),
             component_project_key: String::new(),
             prefs,
+            saved_jql_state,
+            theme_state,
+            server_info_lines: Vec::new(),
+            config_lines: Vec::new(),
         }
     }
 
@@ -255,6 +277,26 @@ impl App {
 
     pub(super) fn close_detail(&mut self) {
         self.focus = Focus::List;
+    }
+
+    pub(super) fn selected_saved_jql(&self) -> Option<&SavedJql> {
+        self.saved_jql_state
+            .selected()
+            .and_then(|i| self.prefs.saved_jqls.get(i))
+    }
+
+    pub(super) fn selected_theme(&self) -> ThemeName {
+        self.theme_state
+            .selected()
+            .and_then(|i| ThemeName::ALL.get(i).copied())
+            .unwrap_or(self.prefs.theme)
+    }
+
+    pub(super) fn load_config_lines(&mut self) {
+        let path = config_file_path();
+        self.config_lines = std::fs::read_to_string(&path)
+            .map(|raw| raw.lines().take(80).map(|line| line.to_string()).collect())
+            .unwrap_or_else(|e| vec![format!("Failed to read {}: {e}", path.display())]);
     }
 }
 
@@ -727,6 +769,50 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                     ),
                     false,
                 );
+            }
+
+            AppAction::ApplySavedJql(jql) => {
+                app.set_status("Loading saved query...", false);
+                terminal.draw(|f| ui(f, &mut app))?;
+                match client.search_issues(&jql, None, Some(50)).await {
+                    Ok(result) => {
+                        app.jql = jql;
+                        app.set_issues(result.issues);
+                        app.clear_status();
+                    }
+                    Err(e) => app.set_status(format!("Saved query failed: {e}"), true),
+                }
+            }
+
+            AppAction::SaveTheme => {
+                app.prefs.theme = app.selected_theme();
+                match app.prefs.save() {
+                    Ok(()) => {
+                        app.set_status(format!("✓ Theme set to {}", app.prefs.theme.label()), false)
+                    }
+                    Err(e) => app.set_status(format!("Theme save failed: {e}"), true),
+                }
+            }
+
+            AppAction::LoadServerInfo => {
+                app.set_status("Loading server info...", false);
+                terminal.draw(|f| ui(f, &mut app))?;
+                match client.get_server_info().await {
+                    Ok(info) => {
+                        app.server_info_lines = serde_json::to_string_pretty(&info)
+                            .unwrap_or_else(|_| format!("{info:#?}"))
+                            .lines()
+                            .map(|line| line.to_string())
+                            .collect();
+                        app.clear_status();
+                    }
+                    Err(e) => app.set_status(format!("Server info failed: {e}"), true),
+                }
+            }
+
+            AppAction::LoadConfigView => {
+                app.load_config_lines();
+                app.clear_status();
             }
 
             AppAction::None => {}

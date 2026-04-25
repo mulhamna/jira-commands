@@ -10,9 +10,11 @@ use super::app::App;
 use super::column::{format_column_summary, AVAILABLE_COLUMNS};
 use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
+use super::theme::{Palette, ThemeName};
 
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
+    let palette = app.prefs.theme.palette();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -45,62 +47,70 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ServerInfo => " Jira CLI — Server ".to_string(),
         Mode::ConfigView => " Jira CLI — Config ".to_string(),
         Mode::ThemePicker => " Jira CLI — Themes ".to_string(),
-        Mode::CommentCompose => " Jira CLI — Comment ".to_string(),
-        Mode::LinkUrlInput => " Jira CLI — Link ".to_string(),
     };
 
     let header = Paragraph::new(title).style(
         Style::default()
-            .fg(Color::White)
-            .bg(Color::Blue)
+            .fg(palette.header_fg)
+            .bg(palette.header_bg)
             .add_modifier(Modifier::BOLD),
     );
     f.render_widget(header, chunks[0]);
-    render_footer(f, app, chunks[2]);
+    render_footer(f, app, chunks[2], palette);
 
     match app.mode {
-        Mode::Browse => render_browse(f, app, chunks[1]),
+        Mode::Browse => render_browse(f, app, chunks[1], palette),
         Mode::Search => {
-            render_browse(f, app, chunks[1]);
-            render_search_bar(f, app, size);
+            render_browse(f, app, chunks[1], palette);
+            render_search_bar(f, app, size, palette);
         }
         Mode::Transition => {
-            render_browse(f, app, chunks[1]);
-            render_transition_popup(f, app, size);
+            render_browse(f, app, chunks[1], palette);
+            render_transition_popup(f, app, size, palette);
         }
         Mode::Help => {
-            render_browse(f, app, chunks[1]);
-            render_help_popup(f, size);
+            render_browse(f, app, chunks[1], palette);
+            render_help_popup(f, size, palette);
         }
         Mode::ColumnPicker => {
-            render_browse(f, app, chunks[1]);
-            render_column_picker_popup(f, app, size);
+            render_browse(f, app, chunks[1], palette);
+            render_column_picker_popup(f, app, size, palette);
         }
         Mode::AssigneePicker => {
-            render_browse(f, app, chunks[1]);
-            render_assignee_picker_popup(f, app, size);
+            render_browse(f, app, chunks[1], palette);
+            render_assignee_picker_popup(f, app, size, palette);
         }
         Mode::ComponentPicker => {
-            render_browse(f, app, chunks[1]);
-            render_component_picker_popup(f, app, size);
+            render_browse(f, app, chunks[1], palette);
+            render_component_picker_popup(f, app, size, palette);
         }
-        Mode::SavedJqlPicker
-        | Mode::ServerInfo
-        | Mode::ConfigView
-        | Mode::ThemePicker
-        | Mode::CommentCompose
-        | Mode::LinkUrlInput => render_browse(f, app, chunks[1]),
+        Mode::SavedJqlPicker => {
+            render_browse(f, app, chunks[1], palette);
+            render_saved_jql_popup(f, app, size, palette);
+        }
+        Mode::ThemePicker => {
+            render_browse(f, app, chunks[1], palette);
+            render_theme_picker_popup(f, app, size, palette);
+        }
+        Mode::ServerInfo => {
+            render_browse(f, app, chunks[1], palette);
+            render_text_popup(f, " Server Info ", &app.server_info_lines, size, palette);
+        }
+        Mode::ConfigView => {
+            render_browse(f, app, chunks[1], palette);
+            render_text_popup(f, " Config View ", &app.config_lines, size, palette);
+        }
     }
 }
 
-fn render_footer(f: &mut Frame, app: &App, area: Rect) {
+fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
             " ←/→:tab  Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  t:transition  C:columns  c:create  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -109,6 +119,8 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         Mode::ColumnPicker => " j/k:move  Space:toggle  a:all  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
+        Mode::SavedJqlPicker => " j/k:move  Enter:run query  Esc:cancel".to_string(),
+        Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         _ => " Esc:back".to_string(),
     };
 
@@ -120,7 +132,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         f.render_widget(status_line, area);
         return;
     } else {
-        (Color::DarkGray, Color::Reset)
+        (palette.muted, Color::Reset)
     };
 
     if let Some((msg, true)) = &app.status {
@@ -130,29 +142,29 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let footer = Paragraph::new(text)
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(palette.muted))
         .wrap(Wrap { trim: false });
     f.render_widget(footer, area);
 }
 
-fn render_browse(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_browse(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     if app.focus == Focus::Detail {
-        render_master_detail(f, app, area);
+        render_master_detail(f, app, area, palette);
     } else {
-        render_list(f, app, area);
+        render_list(f, app, area, palette);
     }
 }
 
-fn render_master_detail(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_master_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
         .split(area);
-    render_list(f, app, cols[0]);
-    render_detail(f, app, cols[1]);
+    render_list(f, app, cols[0], palette);
+    render_detail(f, app, cols[1], palette);
 }
 
-fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let columns = if app.visible_columns.is_empty() {
         AVAILABLE_COLUMNS.to_vec()
     } else {
@@ -162,7 +174,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
     let header_cells = columns.iter().map(|column| {
         Cell::from(column.label()).style(
             Style::default()
-                .fg(Color::Yellow)
+                .fg(palette.tab_active)
                 .add_modifier(Modifier::BOLD),
         )
     });
@@ -185,18 +197,27 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect) {
 
     let table = Table::new(rows, widths)
         .header(header)
-        .block(Block::default().borders(Borders::ALL).title(title))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(if app.focus == Focus::Detail {
+                    palette.blur_border
+                } else {
+                    palette.focus_border
+                }))
+                .title(title),
+        )
         .row_highlight_style(
             Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
                 .add_modifier(Modifier::BOLD),
         );
 
     f.render_stateful_widget(table, area, &mut app.table_state);
 }
 
-fn render_detail(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let Some(issue) = app.selected_issue() else {
         return;
     };
@@ -212,10 +233,10 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect) {
             let active = *tab == app.active_tab;
             let style = if active {
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(palette.tab_active)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(palette.tab_inactive)
             };
             Span::styled(format!(" {} ", tab.label()), style)
         })
@@ -224,26 +245,32 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect) {
     let tabs = Paragraph::new(Line::from(tab_titles)).block(
         Block::default()
             .borders(Borders::ALL)
+            .border_style(Style::default().fg(palette.focus_border))
             .title(format!(" {} ", issue.key)),
     );
     f.render_widget(tabs, chunks[0]);
 
     let body = match app.active_tab {
-        DetailTab::Summary => build_summary_lines(issue),
-        DetailTab::Comments => build_comment_lines(app),
-        DetailTab::Worklog => build_worklog_lines(app),
+        DetailTab::Summary => build_summary_lines(issue, palette),
+        DetailTab::Comments => build_comment_lines(app, palette),
+        DetailTab::Worklog => build_worklog_lines(app, palette),
         DetailTab::Attachments => build_attachment_lines(issue),
         DetailTab::Subtasks => build_subtask_lines(issue),
         DetailTab::Links => build_link_lines(app),
     };
 
     let paragraph = Paragraph::new(body)
-        .block(Block::default().borders(Borders::ALL).title(" Detail "))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(" Detail "),
+        )
         .wrap(Wrap { trim: false });
     f.render_widget(paragraph, chunks[1]);
 }
 
-fn build_summary_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
+fn build_summary_lines(issue: &jira_core::model::Issue, palette: Palette) -> Vec<Line<'static>> {
     let created = &issue.created[..10.min(issue.created.len())];
     let updated = &issue.updated[..10.min(issue.updated.len())];
 
@@ -252,7 +279,7 @@ fn build_summary_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
             Span::styled(
                 issue.key.clone(),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(palette.accent)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" — "),
@@ -262,22 +289,22 @@ fn build_summary_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
             ),
         ]),
         Line::from(""),
-        owned_field_line("Type", issue.issue_type.clone()),
-        owned_field_line("Status", issue.status.clone()),
-        owned_field_line("Project", issue.project_key.clone()),
+        owned_field_line("Type", issue.issue_type.clone(), palette),
+        owned_field_line("Status", issue.status.clone(), palette),
+        owned_field_line("Project", issue.project_key.clone(), palette),
     ];
 
     if let Some(p) = &issue.priority {
-        lines.push(owned_field_line("Priority", p.clone()));
+        lines.push(owned_field_line("Priority", p.clone(), palette));
     }
     if let Some(a) = &issue.assignee {
-        lines.push(owned_field_line("Assignee", a.clone()));
+        lines.push(owned_field_line("Assignee", a.clone(), palette));
     }
     if let Some(r) = &issue.reporter {
-        lines.push(owned_field_line("Reporter", r.clone()));
+        lines.push(owned_field_line("Reporter", r.clone(), palette));
     }
-    lines.push(owned_field_line("Created", created.to_string()));
-    lines.push(owned_field_line("Updated", updated.to_string()));
+    lines.push(owned_field_line("Created", created.to_string(), palette));
+    lines.push(owned_field_line("Updated", updated.to_string(), palette));
 
     if let Some(desc) = &issue.description {
         let text = jira_core::adf::adf_to_text(desc);
@@ -297,7 +324,7 @@ fn build_summary_lines(issue: &jira_core::model::Issue) -> Vec<Line<'static>> {
     lines
 }
 
-fn build_comment_lines(app: &App) -> Vec<Line<'static>> {
+fn build_comment_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
     match &app.detail.comments {
         Some(comments) if comments.is_empty() => {
             build_placeholder_lines("Comments", "No comments on this issue.")
@@ -314,7 +341,7 @@ fn build_comment_lines(app: &App) -> Vec<Line<'static>> {
                     Span::styled(
                         author,
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(palette.accent)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::raw(format!("  {}", created)),
@@ -331,7 +358,7 @@ fn build_comment_lines(app: &App) -> Vec<Line<'static>> {
     }
 }
 
-fn build_worklog_lines(app: &App) -> Vec<Line<'static>> {
+fn build_worklog_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
     match &app.detail.worklogs {
         Some(worklogs) if worklogs.is_empty() => {
             build_placeholder_lines("Worklog", "No worklogs on this issue.")
@@ -348,7 +375,7 @@ fn build_worklog_lines(app: &App) -> Vec<Line<'static>> {
                     Span::styled(
                         author,
                         Style::default()
-                            .fg(Color::Cyan)
+                            .fg(palette.accent)
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::raw(format!("  {}  {}", worklog.time_spent, started)),
@@ -463,16 +490,17 @@ fn build_placeholder_lines(title: &str, message: &str) -> Vec<Line<'static>> {
     ]
 }
 
-fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
+fn render_search_bar(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let popup = bottom_bar_rect(area);
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_style(Style::default().fg(palette.focus_border))
         .title(" JQL Search ")
         .style(Style::default().bg(Color::Black));
 
     let input = Paragraph::new(app.search_input.as_str())
         .block(block)
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(palette.header_fg));
 
     f.render_widget(Clear, popup);
     f.render_widget(input, popup);
@@ -483,7 +511,7 @@ fn render_search_bar(f: &mut Frame, app: &App, area: Rect) {
     f.set_cursor_position((cursor_x, cursor_y));
 }
 
-fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let popup_area = centered_rect(50, 60, area);
     let items: Vec<ListItem> = app
         .transitions
@@ -495,12 +523,14 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
                 .title(format!(" Transition: {} ", app.transition_issue_key))
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Blue)
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("> ");
@@ -509,7 +539,7 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, popup_area, &mut app.transition_list_state);
 }
 
-fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let popup_area = centered_rect(54, 72, area);
     let [summary_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -534,20 +564,21 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
 
     let selected_summary = Paragraph::new(vec![
         Line::from(vec![
-            Span::styled("Selected: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Selected: ", Style::default().fg(palette.muted)),
             Span::styled(
                 format_column_summary(&app.visible_columns),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(palette.accent),
             ),
         ]),
         Line::from(Span::styled(
             "Tip: press Space to toggle columns, then S or Enter to save.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(palette.muted),
         )),
     ])
     .block(
         Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
             .title(" Column Settings ")
             .style(Style::default().bg(Color::Black)),
     );
@@ -556,11 +587,13 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Blue)
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("> ");
@@ -572,9 +605,10 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     .block(
         Block::default()
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
             .style(Style::default().bg(Color::Black)),
     )
-    .style(Style::default().fg(Color::DarkGray));
+    .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
     f.render_widget(selected_summary, summary_area);
@@ -582,7 +616,7 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_widget(hints, hint_area);
 }
 
-fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let popup_area = centered_rect(70, 70, area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -597,10 +631,11 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
                 .title(format!(" Assignee: {} ", app.assignee_issue_key))
                 .style(Style::default().bg(Color::Black)),
         )
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(palette.header_fg));
 
     let items: Vec<ListItem> = app
         .assignee_options
@@ -612,11 +647,13 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Blue)
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("> ");
@@ -628,9 +665,10 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     .block(
         Block::default()
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
             .style(Style::default().bg(Color::Black)),
     )
-    .style(Style::default().fg(Color::DarkGray));
+    .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
     f.render_widget(input, input_area);
@@ -648,7 +686,7 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     ));
 }
 
-fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let popup_area = centered_rect(70, 75, area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -663,13 +701,14 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
                 .title(format!(
                     " Components: {} ({}) ",
                     app.component_issue_key, app.component_project_key
                 ))
                 .style(Style::default().bg(Color::Black)),
         )
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(palette.header_fg));
 
     let items: Vec<ListItem> = app
         .component_options
@@ -688,11 +727,13 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Blue)
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("> ");
@@ -705,9 +746,10 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     .block(
         Block::default()
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
             .style(Style::default().bg(Color::Black)),
     )
-    .style(Style::default().fg(Color::DarkGray));
+    .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
     f.render_widget(input, input_area);
@@ -725,7 +767,92 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect) {
     ));
 }
 
-fn render_help_popup(f: &mut Frame, area: Rect) {
+fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let popup_area = centered_rect(60, 60, area);
+    let items: Vec<ListItem> = app
+        .prefs
+        .saved_jqls
+        .iter()
+        .map(|saved| ListItem::new(format!("{}  •  {}", saved.name, saved.jql)))
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(" Saved Queries ")
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    f.render_widget(Clear, popup_area);
+    f.render_stateful_widget(list, popup_area, &mut app.saved_jql_state);
+}
+
+fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let popup_area = centered_rect(40, 45, area);
+    let items: Vec<ListItem> = ThemeName::ALL
+        .iter()
+        .map(|theme| {
+            let marker = if *theme == app.prefs.theme {
+                "✓"
+            } else {
+                " "
+            };
+            ListItem::new(format!("[{marker}] {}", theme.label()))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(" Theme Picker ")
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    f.render_widget(Clear, popup_area);
+    f.render_stateful_widget(list, popup_area, &mut app.theme_state);
+}
+
+fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, palette: Palette) {
+    let popup_area = centered_rect(72, 85, area);
+    let content = if lines.is_empty() {
+        vec![Line::from("No data")]
+    } else {
+        lines.iter().cloned().map(Line::from).collect()
+    };
+
+    let paragraph = Paragraph::new(content)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(title)
+                .style(Style::default().bg(Color::Black)),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(paragraph, popup_area);
+}
+
+fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
     let popup_area = centered_rect(70, 95, area);
 
     let lines = vec![
@@ -736,11 +863,15 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             "Issue List:",
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(palette.tab_active),
         )),
         Line::from("  ↑/k       Move up"),
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
+        Line::from("  p         Open saved queries"),
+        Line::from("  T         Open theme picker"),
+        Line::from("  S         Show server info"),
+        Line::from("  g         Show config file"),
         Line::from("  t         Transition issue"),
         Line::from("  C         Column settings"),
         Line::from("  c         Create new issue"),
@@ -759,7 +890,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             "Detail View:",
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(palette.tab_active),
         )),
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
@@ -767,7 +898,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         Line::from(""),
         Line::from(Span::styled(
             "Press any key to close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(palette.muted),
         )),
     ];
 
@@ -776,6 +907,7 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
                 .title(" Help ")
                 .style(Style::default().bg(Color::Black)),
         )
@@ -783,12 +915,9 @@ fn render_help_popup(f: &mut Frame, area: Rect) {
     f.render_widget(paragraph, popup_area);
 }
 
-fn owned_field_line(label: &str, value: String) -> Line<'static> {
+fn owned_field_line(label: &str, value: String, palette: Palette) -> Line<'static> {
     Line::from(vec![
-        Span::styled(
-            format!("  {label:<12}"),
-            Style::default().fg(Color::DarkGray),
-        ),
+        Span::styled(format!("  {label:<12}"), Style::default().fg(palette.muted)),
         Span::raw(value),
     ])
 }

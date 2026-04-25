@@ -47,11 +47,6 @@ impl ThemeName {
         ThemeName::Gruvbox,
     ];
 
-    pub(super) fn next(self) -> Self {
-        let idx = Self::ALL.iter().position(|t| *t == self).unwrap_or(0);
-        Self::ALL[(idx + 1) % Self::ALL.len()]
-    }
-
     pub(super) fn palette(self) -> Palette {
         match self {
             ThemeName::Default => Palette {

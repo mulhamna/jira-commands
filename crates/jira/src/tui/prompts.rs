@@ -156,21 +156,6 @@ pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<boo
     Ok(true)
 }
 
-pub(super) async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::Text;
-
-    println!("\n── Add Comment to {key} ──────────────────────────────");
-
-    let body = match Text::new("Comment (blank to cancel):").prompt_skippable()? {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return Ok(false),
-    };
-
-    client.add_comment(key, &body).await?;
-    println!("✓ Comment added to {key}");
-    Ok(true)
-}
-
 pub(super) async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bool> {
     use chrono::Local;
     use inquire::Text;

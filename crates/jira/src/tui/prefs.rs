@@ -4,16 +4,42 @@ use anyhow::{Context, Result};
 use jira_core::config::config_file_path;
 
 use super::column::{ColumnKind, AVAILABLE_COLUMNS};
+use super::theme::ThemeName;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub(super) struct SavedJql {
+    pub(super) name: String,
+    pub(super) jql: String,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(super) struct TuiPreferences {
     pub(super) visible_columns: Vec<ColumnKind>,
+    #[serde(default)]
+    pub(super) saved_jqls: Vec<SavedJql>,
+    #[serde(default)]
+    pub(super) theme: ThemeName,
 }
 
 impl Default for TuiPreferences {
     fn default() -> Self {
         Self {
             visible_columns: AVAILABLE_COLUMNS.to_vec(),
+            saved_jqls: vec![
+                SavedJql {
+                    name: "My open issues".into(),
+                    jql: "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC".into(),
+                },
+                SavedJql {
+                    name: "Updated this week".into(),
+                    jql: "updated >= -7d ORDER BY updated DESC".into(),
+                },
+                SavedJql {
+                    name: "Recently created".into(),
+                    jql: "created >= -7d ORDER BY created DESC".into(),
+                },
+            ],
+            theme: ThemeName::Default,
         }
     }
 }

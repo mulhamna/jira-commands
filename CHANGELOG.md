@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.18.0](https://github.com/mulhamna/jira-commands/compare/v0.17.1...v0.18.0) (2026-04-25)
+
+
+### Features
+
+* add Jira Data Center multi-profile auth support ([#111](https://github.com/mulhamna/jira-commands/issues/111)) ([4345cfd](https://github.com/mulhamna/jira-commands/commit/4345cfd28a82a3caca46be4eb47de8e9e9e41d43))
+
 ## [0.17.1](https://github.com/mulhamna/jira-commands/compare/v0.17.0...v0.17.1) (2026-04-24)
 
 

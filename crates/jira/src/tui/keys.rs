@@ -50,6 +50,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             if app.selected_issue().is_some() {
                 app.open_detail();
                 app.clear_status();
+                return AppAction::WarmActiveTab;
             }
             AppAction::None
         }
@@ -127,11 +128,11 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         }
         KeyCode::Left | KeyCode::Char('h') => {
             app.active_tab = app.active_tab.prev();
-            AppAction::None
+            AppAction::WarmActiveTab
         }
         KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
             app.active_tab = app.active_tab.next();
-            AppAction::None
+            AppAction::WarmActiveTab
         }
         KeyCode::Char('t') => AppAction::FetchTransitions,
         KeyCode::Char('o') => AppAction::OpenBrowser,

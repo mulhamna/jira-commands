@@ -94,10 +94,11 @@ pub(super) enum AppAction {
     SaveTheme,
     LoadServerInfo,
     LoadConfigView,
+    WarmActiveTab,
 }
 
 impl App {
-    async fn warm_active_tab(&mut self, client: &JiraClient) {
+    pub(super) async fn warm_active_tab(&mut self, client: &JiraClient) {
         let Some(key) = self.selected_issue_key() else {
             return;
         };
@@ -349,9 +350,8 @@ impl App {
                 lines.push(format!("Config parse failed: {e}"));
                 lines.push(String::new());
                 match std::fs::read_to_string(&path) {
-                    Ok(raw) => {
-                        lines.push("Raw file preview:".to_string());
-                        lines.extend(raw.lines().take(60).map(|line| line.to_string()));
+                    Ok(_raw) => {
+                        lines.push("Raw config preview suppressed to avoid exposing secrets.".to_string());
                     }
                     Err(read_err) => {
                         lines.push(format!("Failed to read raw file: {read_err}"));
@@ -961,6 +961,10 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             AppAction::LoadConfigView => {
                 app.load_config_lines();
                 app.clear_status();
+            }
+
+            AppAction::WarmActiveTab => {
+                app.warm_active_tab(&client).await;
             }
 
             AppAction::None => {}

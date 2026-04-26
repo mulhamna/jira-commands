@@ -351,7 +351,9 @@ impl App {
                 lines.push(String::new());
                 match std::fs::read_to_string(&path) {
                     Ok(_raw) => {
-                        lines.push("Raw config preview suppressed to avoid exposing secrets.".to_string());
+                        lines.push(
+                            "Raw config preview suppressed to avoid exposing secrets.".to_string(),
+                        );
                     }
                     Err(read_err) => {
                         lines.push(format!("Failed to read raw file: {read_err}"));

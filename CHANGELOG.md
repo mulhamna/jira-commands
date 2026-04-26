@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.19.1](https://github.com/mulhamna/jira-commands/compare/v0.19.0...v0.19.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* match archived artifact paths in release checksums ([#116](https://github.com/mulhamna/jira-commands/issues/116)) ([f5c78fd](https://github.com/mulhamna/jira-commands/commit/f5c78fdbb73b07caa25c587dafe0dd163c8508f9))
+
 ## [0.19.0](https://github.com/mulhamna/jira-commands/compare/v0.18.0...v0.19.0) (2026-04-26)
 
 

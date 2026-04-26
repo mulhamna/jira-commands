@@ -29,19 +29,49 @@ Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynam
 
 ```
 crates/
-├── jira-core/    # PUBLIC LIBRARY: API client, auth, model, ADF parser (crates.io: "jira-core")
-├── jira/         # BINARY: clap CLI + TUI (crates.io: "jira-commands", binary: jirac)
-└── jira-mcp/     # MCP SERVER: typed Jira tools via rmcp (crates.io: "jira-mcp", binary: jirac-mcp)
+├── jira-core/                  # PUBLIC LIBRARY (crates.io: "jira-core")
+│   └── src/
+│       ├── adf.rs              # Atlassian Document Format parser
+│       ├── auth.rs             # auth + multi-profile (Cloud + Data Center)
+│       ├── client.rs           # JiraClient — REST API surface
+│       ├── config.rs           # JiraConfig loader (figment: toml + env)
+│       ├── error.rs            # JiraError + Result alias
+│       ├── field_cache.rs      # custom-field id ↔ name resolution cache
+│       └── model/              # attachment, comment, field, issue, sprint, worklog
+├── jira/                       # BINARY (crates.io: "jira-commands", binary: jirac)
+│   └── src/
+│       ├── main.rs
+│       ├── datetime.rs         # datetime helpers
+│       ├── cli/                # clap commands: api, auth, issue, plan
+│       └── tui/                # ratatui TUI — modular split
+│           ├── app.rs          # event loop coordinator
+│           ├── column.rs       # column layout
+│           ├── keys.rs         # keybinding map
+│           ├── mode.rs         # app mode state
+│           ├── panel.rs        # split-pane logic
+│           ├── picker.rs       # native pickers
+│           ├── prefs.rs        # prefs overlay
+│           ├── prompts.rs      # inline prompts
+│           ├── render.rs       # frame render
+│           └── theme.rs        # color theme
+└── jira-mcp/                   # MCP SERVER (crates.io: "jira-mcp", binary: jirac-mcp)
+    └── src/
+        ├── main.rs
+        ├── lib.rs
+        ├── app.rs              # MCP app wiring
+        ├── server.rs           # rmcp server impl
+        ├── models.rs           # MCP tool I/O types
+        └── error.rs
 plugin/
-├── .claude-plugin/  # Claude Code plugin metadata (plugin.json)
-└── skills/          # 12 skills: api, attach, bulk-transition, comment, create-issue, fields, jql, list-issues, transition, update-issue, view-issue, worklog
+├── .claude-plugin/             # Claude Code plugin metadata (plugin.json)
+└── skills/                     # 12 skills: api, attach, bulk-transition, comment, create-issue, fields, jql, list-issues, transition, update-issue, view-issue, worklog
 ```
 
 ### Crate responsibilities
 
-- **`jira-core`** — public API: `JiraClient`, model types, ADF parser, auth, error types. Can be used as a library dependency.
-- **`jira/`** — clap commands, TUI (ratatui + crossterm), interactive prompts (inquire). Binary: `jirac`.
-- **`jira-mcp/`** — MCP server via `rmcp`, exposes `jira-core` as MCP tools for LLM clients.
+- **`jira-core`** — public API: `JiraClient`, model types (split under `model/`), ADF parser, auth (Cloud + Data Center multi-profile), `FieldCache` for custom-field resolution, error types. Library dependency.
+- **`jira/`** — clap commands (`cli/{api,auth,issue,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`.
+- **`jira-mcp/`** — MCP server via `rmcp`, split into `app.rs` (wiring) + `server.rs` (impl) + `models.rs` (I/O types). Exposes `jira-core` as MCP tools for LLM clients. Binary: `jirac-mcp`.
 
 ---
 

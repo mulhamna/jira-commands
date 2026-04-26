@@ -1,0 +1,129 @@
+name: Bug report
+description: Report a defect in jirac, jirac-mcp, jira-core, or the Claude Code plugin
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill out the form below so we can reproduce and triage quickly.
+
+        Before submitting:
+        - Search [existing issues](https://github.com/mulhamna/jira-commands/issues?q=is%3Aissue) to avoid duplicates.
+        - Run `jirac --version` and confirm you're on the latest release.
+        - If the bug involves your Jira instance, **redact** any tokens, emails, or private project keys from logs.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `jirac --version` (or `jirac-mcp --version`).
+      placeholder: "jirac 0.19.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the project is affected?
+      options:
+        - jirac (CLI)
+        - jirac (TUI)
+        - jirac-mcp (MCP server)
+        - jira-core (library)
+        - Claude Code plugin / skill
+        - Homebrew / Chocolatey / Winget packaging
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - Homebrew
+        - Chocolatey
+        - Winget
+        - cargo install
+        - Built from source
+        - GitHub release binary
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: jira-tier
+    attributes:
+      label: Jira tier
+      options:
+        - Jira Cloud (Free / Standard / Premium / Enterprise)
+        - Jira Data Center / Server
+        - Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: OS + version (e.g. `macOS 15.2`, `Ubuntu 24.04`, `Windows 11 23H2`).
+      placeholder: "macOS 15.2 (arm64)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Clear, short description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands, flags, and inputs. Use code blocks.
+      placeholder: |
+        1. `jirac issue create --project ABC --type Task --summary "..."`
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full error message and any panic / stack trace.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output with `RUST_LOG=debug` if applicable. **Redact tokens, emails, and private data.**
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and found no duplicate.
+          required: true
+        - label: I redacted any sensitive data (tokens, emails, internal URLs) from logs.
+          required: true

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.20.0](https://github.com/mulhamna/jira-commands/compare/v0.19.1...v0.20.0) (2026-04-26)
+
+
+### Features
+
+* improve ADF rendering, issue create ergonomics, and TUI workflows ([#119](https://github.com/mulhamna/jira-commands/issues/119)) ([aae963f](https://github.com/mulhamna/jira-commands/commit/aae963f35da132c3239328a9d14b1915386fd7f6))
+
 ## [0.19.1](https://github.com/mulhamna/jira-commands/compare/v0.19.0...v0.19.1) (2026-04-26)
 
 

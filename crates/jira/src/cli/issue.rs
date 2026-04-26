@@ -80,6 +80,7 @@ pub enum IssueCommand {
     ///   jirac issue create -p PROJ -s "Sub-task" -t Sub-task --parent PROJ-100
     ///   jirac issue create -p PROJ -s "Feat" --description-file description.md
     ///   jirac issue create -p PROJ -s "Fix" --field story_points=5 --field customfield_10020=sprint1
+    ///   jirac issue create -p PROJ -s "Plan sprint work" --issue-type Task --sprint "Sprint 24"
     Create {
         /// Project key (e.g. PROJ)
         #[arg(short, long, value_name = "PROJECT")]
@@ -114,6 +115,9 @@ pub enum IssueCommand {
         /// Fix version name(s) to set (comma-separated, e.g. "v1.0,v1.1")
         #[arg(long, value_name = "VERSIONS")]
         fix_version: Option<String>,
+        /// Sprint to assign on create — accepts a sprint ID or exact sprint name
+        #[arg(long, value_name = "SPRINT_ID|NAME")]
+        sprint: Option<String>,
         /// Attach file(s) after creating the issue
         #[arg(long, value_name = "FILE")]
         attachments: Vec<std::path::PathBuf>,
@@ -667,6 +671,7 @@ pub async fn handle(
             components,
             parent,
             fix_version,
+            sprint,
             attachments,
             field,
             no_custom_fields,
@@ -685,6 +690,7 @@ pub async fn handle(
                 components,
                 parent,
                 fix_version,
+                sprint,
                 attachments,
                 field,
                 no_custom_fields,
@@ -921,6 +927,7 @@ async fn create_issue(
     components: Option<String>,
     parent: Option<String>,
     fix_version: Option<String>,
+    sprint: Option<String>,
     attachments: Vec<std::path::PathBuf>,
     field: Vec<String>,
     no_custom_fields: bool,
@@ -957,6 +964,12 @@ async fn create_issue(
         for (k, v) in interactive {
             custom_fields.entry(k).or_insert(v);
         }
+    }
+
+    if let Some(sprint) = sprint {
+        let (field_id, field_value) =
+            resolve_sprint_assignment(&client, &project_key, &issue_type_id, &sprint).await?;
+        custom_fields.insert(field_id, field_value);
     }
 
     let req = CreateIssueRequestV2 {
@@ -1589,6 +1602,132 @@ fn truncate(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}…", &s[..max_len.saturating_sub(1)])
+    }
+}
+
+async fn resolve_sprint_assignment(
+    client: &JiraClient,
+    project_key: &str,
+    issue_type_id: &str,
+    sprint: &str,
+) -> Result<(String, FieldValue)> {
+    if issue_type_id.is_empty() {
+        anyhow::bail!(
+            "Sprint assignment requires a resolved issue type so Jira fields can be inspected"
+        );
+    }
+
+    let fields = client
+        .get_fields_for_issue_type(project_key, issue_type_id)
+        .await
+        .context("Failed to inspect fields for sprint assignment")?;
+
+    let sprint_field = fields
+        .into_iter()
+        .find(|field| {
+            field.name.eq_ignore_ascii_case("Sprint")
+                || field
+                    .schema
+                    .as_ref()
+                    .and_then(|schema| schema.get("custom"))
+                    .and_then(|value| value.as_str())
+                    .map(|custom| custom.contains("gh-sprint"))
+                    .unwrap_or(false)
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Sprint is not available for project {} / this issue type on create",
+                project_key
+            )
+        })?;
+
+    let sprint_id = if let Ok(id) = sprint.trim().parse::<u64>() {
+        id
+    } else {
+        resolve_sprint_id_by_name(client, project_key, sprint).await?
+    };
+
+    Ok((
+        sprint_field.id,
+        FieldValue::Raw(serde_json::json!([{ "id": sprint_id }])),
+    ))
+}
+
+async fn resolve_sprint_id_by_name(
+    client: &JiraClient,
+    project_key: &str,
+    sprint_name: &str,
+) -> Result<u64> {
+    let boards = client
+        .raw_request(
+            "GET",
+            &format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100"),
+            None,
+        )
+        .await
+        .context("Failed to list boards for sprint resolution")?
+        .unwrap_or(Value::Null);
+
+    let board_values = boards
+        .get("values")
+        .and_then(Value::as_array)
+        .ok_or_else(|| anyhow::anyhow!("Unexpected board response while resolving sprint"))?;
+
+    let mut matches = Vec::new();
+
+    for board in board_values {
+        let board_id = match board.get("id").and_then(Value::as_u64) {
+            Some(id) => id,
+            None => continue,
+        };
+
+        let response = client
+            .raw_request(
+                "GET",
+                &format!(
+                    "/rest/agile/1.0/board/{board_id}/sprint?state=active,future,closed&maxResults=100"
+                ),
+                None,
+            )
+            .await;
+
+        let Ok(Some(payload)) = response else {
+            continue;
+        };
+
+        if let Some(values) = payload.get("values").and_then(Value::as_array) {
+            for sprint in values {
+                let Some(name) = sprint.get("name").and_then(Value::as_str) else {
+                    continue;
+                };
+                if name.eq_ignore_ascii_case(sprint_name) {
+                    if let Some(id) = sprint.get("id").and_then(Value::as_u64) {
+                        matches.push((id, board_id, name.to_string()));
+                    }
+                }
+            }
+        }
+    }
+
+    match matches.len() {
+        0 => anyhow::bail!(
+            "Sprint '{}' was not found on any sprint-enabled board for project {}",
+            sprint_name,
+            project_key
+        ),
+        1 => Ok(matches[0].0),
+        _ => {
+            let options = matches
+                .into_iter()
+                .map(|(id, board_id, name)| format!("{name} (id:{id}, board:{board_id})"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            anyhow::bail!(
+                "Sprint '{}' matched multiple sprints. Use a numeric sprint ID instead: {}",
+                sprint_name,
+                options
+            )
+        }
     }
 }
 

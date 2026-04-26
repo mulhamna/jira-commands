@@ -155,13 +155,19 @@ pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<boo
     Ok(true)
 }
 
-pub(super) fn tui_edit_saved_jql(existing: Option<&SavedJql>) -> Result<Option<SavedJql>> {
+pub(super) fn tui_edit_saved_jql(
+    existing: Option<&SavedJql>,
+    suggested_jql: Option<&str>,
+) -> Result<Option<SavedJql>> {
     use inquire::Text;
 
     println!("\n── Saved Query ─────────────────────────────────────");
 
     let name_default = existing.map(|saved| saved.name.as_str()).unwrap_or("");
-    let jql_default = existing.map(|saved| saved.jql.as_str()).unwrap_or("");
+    let jql_default = existing
+        .map(|saved| saved.jql.as_str())
+        .or(suggested_jql)
+        .unwrap_or("");
 
     let name = match Text::new("Name:")
         .with_default(name_default)

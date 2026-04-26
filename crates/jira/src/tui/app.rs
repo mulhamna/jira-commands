@@ -947,13 +947,15 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::CreateSavedJql => {
+                let current_jql = (!app.jql.trim().is_empty()).then_some(app.jql.as_str());
                 suspend_tui(&mut terminal)?;
-                let result = tui_edit_saved_jql(None);
+                let result = tui_edit_saved_jql(None, current_jql);
                 resume_tui(&mut terminal)?;
                 match result {
                     Ok(Some(saved)) => {
                         app.prefs.saved_jqls.push(saved);
-                        app.clamp_saved_jql_selection();
+                        let new_index = app.prefs.saved_jqls.len().saturating_sub(1);
+                        app.saved_jql_state.select(Some(new_index));
                         match app.prefs.save() {
                             Ok(()) => app.set_status("✓ Saved query added", false),
                             Err(e) => app.set_status(
@@ -970,7 +972,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             AppAction::EditSavedJql(index) => {
                 let existing = app.prefs.saved_jqls.get(index).cloned();
                 suspend_tui(&mut terminal)?;
-                let result = tui_edit_saved_jql(existing.as_ref());
+                let result = tui_edit_saved_jql(existing.as_ref(), None);
                 resume_tui(&mut terminal)?;
                 match result {
                     Ok(Some(saved)) => {

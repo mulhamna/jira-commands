@@ -481,32 +481,6 @@ pub enum IssueCommand {
         run: bool,
     },
 
-    /// Create multiple issues from a JSON manifest file
-    ///
-    /// The manifest is a JSON array of issue objects. Each object supports
-    /// the same fields as `jirac issue create` flags.
-    ///
-    /// Manifest format (JSON array):
-    /// [
-    ///   {
-    ///     "project": "PROJ",           (required)
-    ///     "summary": "Issue title",    (required)
-    ///     "type": "Task",              (default: "Task")
-    ///     "assignee": "user@org.com",  (email or "me")
-    ///     "priority": "High",
-    ///     "labels": ["bug", "backend"],
-    ///     "components": ["auth"],
-    ///     "parent": "PROJ-100",
-    ///     "fix_versions": ["v1.0"],
-    ///     "description": "Markdown description",
-    ///     "fields": { "customfield_10016": 5 }
-    ///   }
-    /// ]
-    ///
-    /// Output: prints each created issue key and summary.
-    ///
-    /// Examples:
-    ///   jirac issue bulk-create --manifest issues.json
     /// Run mixed operations from a JSON manifest file
     ///
     /// Each entry in the manifest is an object with an "op" field specifying
@@ -540,6 +514,32 @@ pub enum IssueCommand {
         json: bool,
     },
 
+    /// Create multiple issues from a JSON manifest file
+    ///
+    /// The manifest is a JSON array of issue objects. Each object supports
+    /// the same fields as `jirac issue create` flags.
+    ///
+    /// Manifest format (JSON array):
+    /// [
+    ///   {
+    ///     "project": "PROJ",           (required)
+    ///     "summary": "Issue title",    (required)
+    ///     "type": "Task",              (default: "Task")
+    ///     "assignee": "user@org.com",  (email or "me")
+    ///     "priority": "High",
+    ///     "labels": ["bug", "backend"],
+    ///     "components": ["auth"],
+    ///     "parent": "PROJ-100",
+    ///     "fix_versions": ["v1.0"],
+    ///     "description": "Markdown description",
+    ///     "fields": { "customfield_10016": 5 }
+    ///   }
+    /// ]
+    ///
+    /// Output: prints each created issue key and summary.
+    ///
+    /// Examples:
+    ///   jirac issue bulk-create --manifest issues.json
     #[command(name = "bulk-create")]
     BulkCreate {
         /// Path to the JSON manifest file (array of issue objects)

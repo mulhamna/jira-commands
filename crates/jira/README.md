@@ -19,24 +19,44 @@ Or use one of the workspace-level install options from the root README:
 - Homebrew
 - shell installer on macOS/Linux
 - PowerShell installer on Windows
-- GitHub Releases archives and raw binaries
+- GitHub Releases archives and packaged binaries
 
 ## What this crate provides
 
 - `jirac` primary CLI binary
-- issue listing, viewing, create, update, transition, delete
-- worklog, attachment, bulk-update, bulk-transition, archive
-- interactive TUI flows, including searchable assignee picker, project-scoped component picker, and saved column settings
+- issue listing, viewing, create, update, transition, delete, clone
+- worklog, attachment, bulk-update, bulk-transition, archive, batch, and bulk-create flows
+- interactive TUI flows, including split master-detail, saved JQL picker, theme picker, searchable assignee picker, project-scoped component picker, server summary, config summary, and saved column settings
 - raw Jira REST API passthrough
+- shared config with multi-profile auth support
 
 ## Quick start
 
 ```bash
 jirac auth login
+jirac auth profiles
 jirac issue list
 jirac issue view MYPROJ-123
 jirac issue create -p MYPROJ
 jirac tui -p MYPROJ
+```
+
+## Config and auth
+
+The CLI reads the shared Jira config from:
+- `~/.config/jira/config.toml`
+- `JIRA_PROFILE`
+- `JIRA_URL`
+- `JIRA_EMAIL`
+- `JIRA_TOKEN`
+
+Typical multi-profile flow:
+
+```bash
+jirac auth login --profile work-cloud
+jirac auth login --profile client-dc
+jirac auth profiles
+jirac auth use client-dc
 ```
 
 ## Migration note
@@ -72,4 +92,4 @@ Useful skills include:
 
 ## More docs
 
-See the root README for full installation, MCP usage, release artifacts, and examples.
+See the root README for full installation, TUI shortcuts, MCP usage, release artifacts, and examples.

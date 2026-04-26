@@ -10,38 +10,43 @@ Jira on the command line.
 `jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
 ![jirac TUI preview](assets/readme/sample_tui.jpeg)
+![jirac TUI Split preview](assets/readme/sample_tui_split.jpeg)
 
 ## Highlights
 
-- **Interactive TUI** — browse, create, edit, transition, and assign issues without leaving the terminal
+- **Interactive TUI** — browse, search, create, edit, transition, assign, comment, worklog, upload, and inspect issues without leaving the terminal
+- **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
+- **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes
+- **Multi-profile auth** — store and switch between multiple Jira accounts or deployments
 - **Custom fields** — discovered at runtime via the API, not hardcoded
 - **Attachments** — upload files to any issue from the CLI
 - **Worklogs** — add, list, and delete time entries
-- **Bulk operations** — transition, update, or archive many issues at once with a single JQL query
-
-## Comparison
-
-| Feature                           |      **jirac**       | [jira-cli](https://github.com/ankitpokhrel/jira-cli) (Go) | [jira-cmd](https://github.com/palashkulsh/jira-cmd) (Node) |
-| --------------------------------- | :------------------: | :--------------------------------------------------------: | :---------------------------------------------------------: |
-| Single binary, no runtime deps    |          ✅          |                             ✅                             |                          ❌ (npm)                           |
-| Interactive TUI                   |          ✅          |                             ✅                             |                              ❌                             |
-| Jira REST API version             |        v2 / v3       |                          v2 / v3                           |                             v2                              |
-| Custom fields (runtime discovery) |          ✅          |                    Partial (config-based)                  |                     Partial (field IDs)                     |
-| Attachment upload                 |          ✅          |                             ❌                             |                              ❌                             |
-| Worklogs (add / list / delete)    |          ✅          |                             ❌                             |                       Add / list only                       |
-| Bulk transition                   |          ✅          |                             ❌                             |                              ❌                             |
-| Bulk update                       |          ✅          |                             ❌                             |                              ❌                             |
-| Issue archive                     |          ✅          |                             ❌                             |                              ❌                             |
-| JQL builder (interactive)         |          ✅          |                             ❌                             |                              ❌                             |
-| Raw API passthrough               |          ✅          |                             ❌                             |                              ❌                             |
-| Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
-| MCP server                        |  ✅ (`jirac-mcp`)    |                             ❌                             |                              ❌                             |
-| Multi login / saved profiles      |          ✅          |                             ❌                             |                              ❌                             |
-| macOS / Linux / Windows           |   ✅ / ✅ / ✅       |                    ✅ / ✅ / Partial                       |                      ✅ / ✅ / ✅                           |
-| Jira Data Center / self-managed   |   Cloud + Data Center   |                  Cloud + self-managed                      |                     Cloud + self-managed                    |
+- **Bulk operations** — transition, update, archive, or create many issues from JQL or JSON manifests
 - **JQL builder** — interactive prompt that helps you construct queries
 - **Raw API passthrough** — call any Jira REST endpoint directly
 - **MCP server** — expose Jira as typed tools for editors and AI agents ([docs](crates/jira-mcp/README.md))
+
+## Comparison
+
+| Feature                           |      **jirac**      | [jira-cli](https://github.com/ankitpokhrel/jira-cli) (Go) | [jira-cmd](https://github.com/palashkulsh/jira-cmd) (Node) |
+| --------------------------------- | :-----------------: | :-------------------------------------------------------: | :--------------------------------------------------------: |
+| Single binary, no runtime deps    |          ✅          |                             ✅                             |                          ❌ (npm)                           |
+| Interactive TUI                   |          ✅          |                             ✅                             |                             ❌                              |
+| Jira REST API version             |       v2 / v3       |                          v2 / v3                          |                             v2                             |
+| Custom fields (runtime discovery) |          ✅          |                  Partial (config-based)                   |                    Partial (field IDs)                     |
+| Attachment upload                 |          ✅          |                             ❌                             |                             ❌                              |
+| Worklogs (add / list / delete)    |          ✅          |                             ❌                             |                      Add / list only                       |
+| Bulk transition                   |          ✅          |                             ❌                             |                             ❌                              |
+| Bulk update                       |          ✅          |                             ❌                             |                             ❌                              |
+| Bulk create / batch manifests     |          ✅          |                             ❌                             |                             ❌                              |
+| Issue archive                     |          ✅          |                             ❌                             |                             ❌                              |
+| JQL builder (interactive)         |          ✅          |                             ❌                             |                             ❌                              |
+| Raw API passthrough               |          ✅          |                             ❌                             |                             ❌                              |
+| Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
+| MCP server                        |          ✅          |                             ❌                             |                             ❌                              |
+| Multi login / saved profiles      |          ✅          |                             ❌                             |                             ❌                              |
+| macOS / Linux / Windows           |      ✅ / ✅ / ✅      |                      ✅ / ✅ / Partial                      |                         ✅ / ✅ / ✅                          |
+| Jira Data Center / self-managed   | Cloud + Data Center |                   Cloud + self-managed                    |                    Cloud + self-managed                    |
 
 ## Install
 
@@ -104,6 +109,9 @@ jirac issue transition PROJ-123 --to "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
 jirac issue delete PROJ-123
+jirac issue clone PROJ-123
+jirac issue batch --manifest ops.json
+jirac issue bulk-create --manifest issues.json
 ```
 
 ### Worklogs
@@ -120,6 +128,8 @@ jirac issue worklog delete PROJ-123 --id 10234
 jirac issue bulk-transition -p PROJ -q 'status = "To Do"' -t "In Progress"
 jirac issue bulk-update -p PROJ -q 'status = Done' --field assignee --value me@co.com
 jirac issue archive -p PROJ -q 'status = Done AND updated < -90d'
+jirac issue bulk-create --manifest issues.json
+jirac issue batch --manifest ops.json
 ```
 
 ### JQL builder
@@ -167,7 +177,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, saved JQL picker, theme picker, server summary, and config summary overlays. Press `?` inside the TUI for a complete shortcut reference.
 
 ```bash
 jirac tui -p PROJ
@@ -248,42 +258,19 @@ See [jira-core on crates.io](https://crates.io/crates/jira-core) for full API do
 ```bash
 git clone https://github.com/mulhamna/jira-commands
 cd jira-commands
-cargo build --all
-cargo test --all
+make build       # or: cargo build --all
+make test        # or: cargo test --all
+make smoke       # fmt-check + clippy + test + build (CI gate)
+make help        # list all targets
 ```
 
 ### Workspace layout
 
-```
+```text
 crates/
-├── jira-core/     # Rust library — API client, auth, models, ADF parser
-├── jira/          # CLI binary (jirac) — clap commands + ratatui TUI
-└── jira-mcp/      # MCP server binary (jirac-mcp) — rmcp-based
+  jira-core/   # shared client, models, config, auth
+  jira/        # CLI app
+  jira-mcp/    # MCP server
+assets/        # screenshots and images
+packaging/     # release/install packaging
 ```
-
-Releases are automated via [release-please](https://github.com/googleapis/release-please). See [CHANGELOG.md](CHANGELOG.md) for version history.
-
-## Upgrading from `jira` to `jirac`
-
-The binary was renamed from `jira` to `jirac`. Update any scripts or aliases:
-
-```bash
-alias jira='jirac'
-```
-
-## More documentation
-
-- [INSTALL.md](INSTALL.md) — all installation methods
-- [TUI guide](TUI.md) — full keybinding reference
-- [MCP server](crates/jira-mcp/README.md) — setup and tool list
-- [Claude Code plugin](PLUGIN.md) — slash commands for Claude Code
-- [ClawHub skill](https://clawhub.ai/mulhamna/jirac) — OpenClaw integration
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide
-
-## License
-
-Licensed under [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE).
-
----
-
-<sub>**jirac** is an independent, community-built tool. It is not affiliated with, endorsed by, or sponsored by Atlassian. "Jira" is a trademark of Atlassian.</sub>

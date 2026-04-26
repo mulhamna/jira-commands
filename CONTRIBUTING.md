@@ -16,7 +16,18 @@ Prerequisites:
 - `cargo` and standard Rust development tooling
 - a Jira Cloud account plus API token for real integration testing
 
-Useful commands:
+Useful commands (via `make` — see `make help` for full list):
+
+```bash
+make fmt              # cargo fmt --all
+make lint             # cargo clippy ... -D warnings
+make check            # cargo check --workspace
+make test             # all crate tests
+make audit            # cargo audit
+make smoke            # fmt-check + lint + test + build (CI gate)
+```
+
+Or call cargo directly:
 
 ```bash
 cargo fmt --all
@@ -31,6 +42,9 @@ cargo audit
 Run the CLI locally:
 
 ```bash
+make run ARGS='issue list'
+make run-tui P=PROJ
+# or
 cargo run -p jira-commands -- issue list
 cargo run -p jira-commands -- tui -p PROJ
 ```

@@ -19,9 +19,10 @@ jira-core = "0.12"
 
 ## What this crate provides
 
-- `JiraClient` for Jira REST API v3 operations
+- `JiraClient` for Jira REST API v2 and v3 operations
 - `JiraConfig` for config/env loading
-- `FieldCache` for field metadata reuse
+- multi-profile config store helpers via `JiraProfilesFile`
+- field metadata discovery and reuse
 - issue, worklog, transition, attachment, and bulk-operation helpers
 - Atlassian Document Format helpers for text and Markdown conversion
 
@@ -51,11 +52,33 @@ async fn main() -> anyhow::Result<()> {
 
 Credentials are loaded from:
 - `~/.config/jira/config.toml`
+- `JIRA_PROFILE`
 - `JIRA_URL`
 - `JIRA_EMAIL`
 - `JIRA_TOKEN`
+- `JIRA_PROJECT`
+- `JIRA_TIMEOUT_SECS`
+- `JIRA_DEPLOYMENT`
+- `JIRA_AUTH_TYPE`
+- `JIRA_API_VERSION`
 
 That makes it easy to share config with `jirac` and `jirac-mcp`.
+
+Example config shape:
+
+```toml
+current_profile = "work-cloud"
+
+[profiles.work-cloud]
+base_url = "https://yourcompany.atlassian.net"
+email = "you@example.com"
+token = "your_api_token"
+project = "PROJ"
+timeout_secs = 30
+deployment = "cloud"
+auth_type = "cloud_api_token"
+api_version = 3
+```
 
 ## Related crates
 

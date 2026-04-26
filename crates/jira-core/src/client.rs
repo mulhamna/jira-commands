@@ -877,6 +877,68 @@ impl JiraClient {
             .await
     }
 
+    /// Delete a comment from an issue.
+    pub async fn delete_comment(&self, issue_key: &str, comment_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
+
+        let http = &self.http;
+        self.request_no_body(|| http.delete(&url).headers(headers.clone()))
+            .await
+    }
+
+    /// Delete an attachment by ID.
+    pub async fn delete_attachment(&self, attachment_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/attachment/{attachment_id}"));
+
+        let http = &self.http;
+        self.request_no_body(|| http.delete(&url).headers(headers.clone()))
+            .await
+    }
+
+    /// List remote links on an issue.
+    pub async fn get_remote_links(&self, issue_key: &str) -> Result<Vec<Value>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/remotelink"));
+
+        let http = &self.http;
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
+    }
+
+    /// Add a remote link to an issue.
+    pub async fn add_remote_link(
+        &self,
+        issue_key: &str,
+        url_str: &str,
+        title: &str,
+    ) -> Result<Value> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/remotelink"));
+
+        let payload = json!({
+            "object": {
+                "url": url_str,
+                "title": title,
+            }
+        });
+
+        let http = &self.http;
+        self.request(|| http.post(&url).headers(headers.clone()).json(&payload))
+            .await
+    }
+
+    /// Delete a remote link from an issue.
+    pub async fn delete_remote_link(&self, issue_key: &str, link_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/remotelink/{link_id}"));
+
+        let http = &self.http;
+        self.request_no_body(|| http.delete(&url).headers(headers.clone()))
+            .await
+    }
+
     // ── Bulk ops ─────────────────────────────────────────────────────────────
 
     /// Fetch ALL issues matching a JQL query using cursor-based pagination.

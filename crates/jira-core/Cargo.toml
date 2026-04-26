@@ -21,7 +21,7 @@ dirs = "5"
 thiserror = "1"
 anyhow = "1"
 tracing = "0.1"
-comrak = "0.28"
+comrak = "0.52"
 mime_guess = "2"
 
 [dev-dependencies]

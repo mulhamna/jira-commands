@@ -10,6 +10,6 @@ ReleaseDate: 2026-04-26
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v0.21.0/jirac-windows-x86_64.zip
-    InstallerSha256: e82c29a2b92be0c4bc40ddf3847dd98fd8788e99d48a12368cc9df9d39e3f058
+    InstallerSha256: 3a655db9e56b625e25ff72f04f5e532be4446bc9b6de3a01f8da532113f00ad4
 ManifestType: installer
 ManifestVersion: 1.9.0

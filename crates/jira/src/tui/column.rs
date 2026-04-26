@@ -5,14 +5,19 @@ use ratatui::{
     widgets::Cell,
 };
 
-pub(super) const AVAILABLE_COLUMNS: [ColumnKind; 8] = [
+pub(super) const AVAILABLE_COLUMNS: [ColumnKind; 13] = [
     ColumnKind::Key,
     ColumnKind::Type,
     ColumnKind::Priority,
     ColumnKind::Status,
     ColumnKind::Assignee,
+    ColumnKind::Reporter,
+    ColumnKind::Project,
     ColumnKind::Created,
     ColumnKind::Updated,
+    ColumnKind::Labels,
+    ColumnKind::Components,
+    ColumnKind::FixVersions,
     ColumnKind::Summary,
 ];
 
@@ -23,8 +28,13 @@ pub(super) enum ColumnKind {
     Priority,
     Status,
     Assignee,
+    Reporter,
+    Project,
     Created,
     Updated,
+    Labels,
+    Components,
+    FixVersions,
     Summary,
 }
 
@@ -36,8 +46,13 @@ impl ColumnKind {
             ColumnKind::Priority => "Priority",
             ColumnKind::Status => "Status",
             ColumnKind::Assignee => "Assignee",
+            ColumnKind::Reporter => "Reporter",
+            ColumnKind::Project => "Project",
             ColumnKind::Created => "Created",
             ColumnKind::Updated => "Updated",
+            ColumnKind::Labels => "Labels",
+            ColumnKind::Components => "Components",
+            ColumnKind::FixVersions => "Fix Versions",
             ColumnKind::Summary => "Summary",
         }
     }
@@ -49,9 +64,14 @@ impl ColumnKind {
             ColumnKind::Priority => Constraint::Length(8),
             ColumnKind::Status => Constraint::Length(14),
             ColumnKind::Assignee => Constraint::Length(16),
+            ColumnKind::Reporter => Constraint::Length(16),
+            ColumnKind::Project => Constraint::Length(10),
             ColumnKind::Created => Constraint::Length(11),
             ColumnKind::Updated => Constraint::Length(11),
-            ColumnKind::Summary => Constraint::Min(15),
+            ColumnKind::Labels => Constraint::Min(14),
+            ColumnKind::Components => Constraint::Min(14),
+            ColumnKind::FixVersions => Constraint::Min(14),
+            ColumnKind::Summary => Constraint::Min(24),
         }
     }
 
@@ -69,6 +89,10 @@ impl ColumnKind {
             ColumnKind::Assignee => {
                 Cell::from(issue.assignee.clone().unwrap_or_else(|| "-".into()))
             }
+            ColumnKind::Reporter => {
+                Cell::from(issue.reporter.clone().unwrap_or_else(|| "-".into()))
+            }
+            ColumnKind::Project => Cell::from(issue.project_key.clone()),
             ColumnKind::Created => Cell::from(
                 issue
                     .created
@@ -85,14 +109,10 @@ impl ColumnKind {
                     .to_string(),
             )
             .style(Style::default().fg(Color::DarkGray)),
-            ColumnKind::Summary => {
-                let summary = if issue.summary.len() > 40 {
-                    format!("{}…", &issue.summary[..39])
-                } else {
-                    issue.summary.clone()
-                };
-                Cell::from(summary)
-            }
+            ColumnKind::Labels => Cell::from(join_string_array(issue, "labels")),
+            ColumnKind::Components => Cell::from(join_named_array(issue, "components")),
+            ColumnKind::FixVersions => Cell::from(join_named_array(issue, "fixVersions")),
+            ColumnKind::Summary => Cell::from(issue.summary.clone()),
         }
     }
 }
@@ -108,6 +128,39 @@ pub(super) fn status_color(status: &str) -> Color {
     } else {
         Color::White
     }
+}
+
+fn join_string_array(issue: &Issue, field: &str) -> String {
+    issue
+        .fields
+        .get(field)
+        .and_then(|value| value.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "-".into())
+}
+
+fn join_named_array(issue: &Issue, field: &str) -> String {
+    issue
+        .fields
+        .get(field)
+        .and_then(|value| value.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("name").and_then(|value| value.as_str()))
+                .map(|name| name.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "-".into())
 }
 
 pub(super) fn format_column_summary(columns: &[ColumnKind]) -> String {

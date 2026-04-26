@@ -106,7 +106,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
-            " ←/→:tab  Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  u:upload  o:browser  ?:help  q:quit"
+            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
@@ -264,9 +264,10 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(palette.focus_border))
-                .title(" Detail "),
+                .title(format!(" Detail  (scroll:{}) ", app.detail_scroll)),
         )
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll((app.detail_scroll, 0));
     f.render_widget(paragraph, chunks[1]);
 }
 

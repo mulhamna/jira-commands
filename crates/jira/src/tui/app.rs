@@ -66,6 +66,7 @@ pub(super) struct App {
     pub(super) theme_state: ListState,
     pub(super) server_info_lines: Vec<String>,
     pub(super) config_lines: Vec<String>,
+    pub(super) detail_scroll: u16,
 }
 
 pub(super) enum AppAction {
@@ -181,6 +182,7 @@ impl App {
             theme_state,
             server_info_lines: Vec::new(),
             config_lines: Vec::new(),
+            detail_scroll: 0,
         }
     }
 
@@ -267,17 +269,42 @@ impl App {
 
     pub(super) fn ensure_detail_context(&mut self) {
         if let Some(key) = self.selected_issue_key() {
+            let before = self.detail.issue_key.clone();
             self.detail.reset_for(&key);
+            if before != self.detail.issue_key {
+                self.reset_detail_scroll();
+            }
         }
     }
 
     pub(super) fn open_detail(&mut self) {
         self.focus = Focus::Detail;
         self.ensure_detail_context();
+        self.reset_detail_scroll();
     }
 
     pub(super) fn close_detail(&mut self) {
         self.focus = Focus::List;
+        self.reset_detail_scroll();
+    }
+
+    pub(super) fn reset_detail_scroll(&mut self) {
+        self.detail_scroll = 0;
+    }
+
+    pub(super) fn scroll_detail_down(&mut self, amount: u16) {
+        self.detail_scroll = self.detail_scroll.saturating_add(amount.max(1));
+    }
+
+    pub(super) fn scroll_detail_up(&mut self, amount: u16) {
+        self.detail_scroll = self.detail_scroll.saturating_sub(amount.max(1));
+    }
+
+    pub(super) fn set_active_tab(&mut self, tab: DetailTab) {
+        if self.active_tab != tab {
+            self.active_tab = tab;
+            self.reset_detail_scroll();
+        }
     }
 
     pub(super) fn selected_saved_jql(&self) -> Option<&SavedJql> {

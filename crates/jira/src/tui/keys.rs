@@ -127,12 +127,34 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Left | KeyCode::Char('h') => {
-            app.active_tab = app.active_tab.prev();
+            let next = app.active_tab.prev();
+            app.set_active_tab(next);
             AppAction::WarmActiveTab
         }
         KeyCode::Right | KeyCode::Char('l') | KeyCode::Tab => {
-            app.active_tab = app.active_tab.next();
+            let next = app.active_tab.next();
+            app.set_active_tab(next);
             AppAction::WarmActiveTab
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.scroll_detail_down(1);
+            AppAction::None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.scroll_detail_up(1);
+            AppAction::None
+        }
+        KeyCode::PageDown => {
+            app.scroll_detail_down(8);
+            AppAction::None
+        }
+        KeyCode::PageUp => {
+            app.scroll_detail_up(8);
+            AppAction::None
+        }
+        KeyCode::Home => {
+            app.reset_detail_scroll();
+            AppAction::None
         }
         KeyCode::Char('t') => AppAction::FetchTransitions,
         KeyCode::Char('o') => AppAction::OpenBrowser,

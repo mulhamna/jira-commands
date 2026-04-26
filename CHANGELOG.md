@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.19.0](https://github.com/mulhamna/jira-commands/compare/v0.18.0...v0.19.0) (2026-04-26)
+
+
+### Features
+
+* finish split TUI panels, prefs overlays, and release packaging cleanup ([#114](https://github.com/mulhamna/jira-commands/issues/114)) ([e2b2328](https://github.com/mulhamna/jira-commands/commit/e2b2328035f3bd2924708994e57bb5ea2f6e9504))
+
 ## [0.18.0](https://github.com/mulhamna/jira-commands/compare/v0.17.1...v0.18.0) (2026-04-25)
 
 

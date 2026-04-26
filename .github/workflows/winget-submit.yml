@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: winget-submit-${{ github.event.workflow_run.head_branch || github.event.inputs.release_tag }}
+  group: winget-submit-${{ github.event.workflow_run.head_branch || github.event.inputs.release_tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event.workflow_run.conclusion == 'success' &&
-        (github.event.workflow_run.name == 'Release' || github.event.workflow_run.name == 'Release Recovery')
+        (github.event.workflow_run.name == 'Release' || github.event.workflow_run.name == 'Release Recovery') &&
+        github.event.workflow_run.event == 'push'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -46,15 +46,32 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RELEASE_TAG="${{ inputs.release_tag }}"
           else
-            RELEASE_TAG=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
+            RELEASE_TAG="${{ github.event.workflow_run.head_branch }}"
           fi
 
           test -n "$RELEASE_TAG"
+          case "$RELEASE_TAG" in
+            v*) ;;
+            *)
+              echo "Skipping Winget submit because workflow_run head_branch '$RELEASE_TAG' is not a release tag."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Skipping Winget submit because GitHub release '$RELEASE_TAG' is not published yet."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           VERSION="${RELEASE_TAG#v}"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Download Windows ZIP and compute Winget SHA
+        if: steps.vars.outputs.skip != 'true'
         id: checksums
         run: |
           set -euo pipefail
@@ -68,6 +85,7 @@ jobs:
           echo "release_date=$RELEASE_DATE" >> "$GITHUB_OUTPUT"
 
       - name: Submit Winget PR
+        if: steps.vars.outputs.skip != 'true'
         run: python3 .github/scripts/submit-winget-pr.py
         env:
           GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}

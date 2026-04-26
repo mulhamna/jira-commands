@@ -5,7 +5,12 @@
   <script defer data-domain="keton.id" src="https://plausible.keton.id/js/script.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Official web documentation for jirac (jira-commands): a Rust terminal tool for Jira, with MCP server and plugin support." />
+  <meta name="description" content="Official web documentation for jirac (jira-commands): a Rust terminal tool for Jira, with TUI, MCP server, and plugin support." />
+  <meta property="og:title" content="jirac — Jira on the command line" />
+  <meta property="og:description" content="Single-binary Rust CLI for Jira with split-pane TUI, MCP server, bulk ops, and runtime custom-field discovery." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23124ee5'/%3E%3Ctext x='32' y='41' font-size='26' font-weight='700' text-anchor='middle' fill='white' font-family='Arial, sans-serif'%3Ejc%3C/text%3E%3C/svg%3E" />
   <title>jc Docs - Jira from Terminal</title>
   <script>
@@ -187,6 +192,7 @@
       </a>
       <nav class="hidden items-center gap-5 text-sm md:flex">
         <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#why">Why</a>
+        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#screenshots">Screenshots</a>
         <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#quickstart">Quickstart</a>
         <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#commands">Commands</a>
         <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#mcp">MCP</a>
@@ -203,6 +209,7 @@
     </div>
     <nav class="md:hidden border-t border-slate-200 dark:border-slate-700 px-4 py-2 overflow-x-auto whitespace-nowrap text-sm">
       <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#why">Why</a>
+      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#screenshots">Screenshots</a>
       <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#quickstart">Quickstart</a>
       <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#commands">Commands</a>
       <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#mcp">MCP</a>
@@ -225,9 +232,10 @@
           </div>
           <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Not affiliated with, endorsed by, or sponsored by Atlassian.</p>
         </div>
-        <div class="mt-10 w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-900 p-4 text-slate-100 shadow-soft lg:mt-0">
-          <p class="mb-3 text-xs uppercase tracking-wide text-slate-400">Preview</p>
-          <pre class="overflow-x-auto text-sm leading-6"><code>$ jirac issue list --project CORE
+        <div class="mt-10 w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-900 p-3 text-slate-100 shadow-soft lg:mt-0">
+          <p class="mb-2 text-xs uppercase tracking-wide text-slate-400">Split master-detail TUI</p>
+          <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac split-pane TUI showing issue list with detail panel" class="w-full rounded-lg border border-slate-700" loading="lazy" />
+          <pre class="mt-3 overflow-x-auto text-sm leading-6"><code>$ jirac issue list --project CORE
 CORE-183  In Progress  Refactor auth error handling
 CORE-177  To Do        Add MCP transition confirmation
 CORE-171  Done         Improve TUI issue detail renderer
@@ -260,6 +268,28 @@ $ jirac issue transition CORE-183 --to Done
       </div>
     </section>
 
+    <section id="screenshots" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Screenshots</h2>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Issue browser, split master-detail layout, and interactive JQL builder — all keyboard-driven.</p>
+      <div class="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <figure class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
+          <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui.jpeg" alt="jirac TUI issue list" class="w-full rounded-md border border-slate-200 dark:border-slate-700" loading="lazy" />
+          <figcaption class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">TUI issue list</figcaption>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Browse, search, and filter issues in a sortable table.</p>
+        </figure>
+        <figure class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
+          <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac TUI split master-detail view" class="w-full rounded-md border border-slate-200 dark:border-slate-700" loading="lazy" />
+          <figcaption class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">Split master-detail</figcaption>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Keep list visible while inspecting summary, comments, worklog, attachments, links.</p>
+        </figure>
+        <figure class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
+          <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample-jql.jpeg" alt="jirac interactive JQL builder" class="w-full rounded-md border border-slate-200 dark:border-slate-700" loading="lazy" />
+          <figcaption class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">Interactive JQL builder</figcaption>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Build queries by project, status, and assignee without memorizing JQL syntax.</p>
+        </figure>
+      </div>
+    </section>
+
     <section id="non-tech" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Quick Guide for Non-Tech Users</h2>
@@ -282,8 +312,10 @@ $ jirac issue transition CORE-183 --to Done
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-powershell" class="break-all">powershell -ExecutionPolicy Bypass -Command "&amp; ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-powershell">Copy</button></div>
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-brew" class="break-all">brew tap mulhamna/tap && brew install jira-commands</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-brew">Copy</button></div>
             <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-cargo" class="break-all">cargo install jira-commands</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-cargo">Copy</button></div>
+            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-winget" class="break-all">winget install mulhamna.jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-winget">Copy</button></div>
+            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-choco" class="break-all">choco install jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-choco">Copy</button></div>
           </div>
-          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Winget manifests are maintained in-repo and are meant to be validated and submitted after each GitHub release.</p>
+          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Pick one. Homebrew, Cargo, the install scripts, Winget, and Chocolatey all install the same <code>jirac</code> binary. See <a class="text-brand-700 hover:underline" href="https://github.com/mulhamna/jira-commands/blob/main/INSTALL.md">INSTALL.md</a> for full matrix.</p>
         </article>
         <article class="doc-card rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
           <h3 class="font-semibold">First login</h3>
@@ -297,7 +329,7 @@ $ jirac issue transition CORE-183 --to Done
     <section id="commands" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Command Reference</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Common commands for daily workflow. Releases ship `jirac` and `jirac-mcp`, and Windows installation is available through PowerShell now with Winget manifests maintained in-repo.</p>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Common commands for daily workflow. Releases ship <code>jirac</code> and <code>jirac-mcp</code>; Windows installs via PowerShell, Winget, or Chocolatey.</p>
         <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
           <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
             <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -315,6 +347,11 @@ $ jirac issue transition CORE-183 --to Done
               <tr><td class="px-4 py-3">Add worklog</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --comment "Worked on API"</code></td></tr>
               <tr><td class="px-4 py-3">Upload attachment</td><td class="px-4 py-3 command-cell"><code>jirac issue attach MYPROJ-123 ./screenshot.png</code></td></tr>
               <tr><td class="px-4 py-3">Bulk transition</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk update field</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-update -p MYPROJ -q 'status = Done' --field assignee --value me@co.com</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk create from manifest</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-create --manifest issues.json</code></td></tr>
+              <tr><td class="px-4 py-3">Interactive JQL builder</td><td class="px-4 py-3 command-cell"><code>jirac issue jql</code></td></tr>
+              <tr><td class="px-4 py-3">Switch profile</td><td class="px-4 py-3 command-cell"><code>jirac auth use work-cloud</code></td></tr>
+              <tr><td class="px-4 py-3">Launch TUI</td><td class="px-4 py-3 command-cell"><code>jirac tui -p MYPROJ</code></td></tr>
               <tr><td class="px-4 py-3">Raw API call</td><td class="px-4 py-3 command-cell"><code>jirac api get /rest/api/3/serverInfo</code></td></tr>
             </tbody>
           </table>

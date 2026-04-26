@@ -389,11 +389,11 @@ jobs:
           echo "=== checksums.txt ==="
           cat checksums.txt
 
-          SHA_MACOS_ARM=$(grep ' jirac-macos-aarch64.tar.gz$' checksums.txt | awk '{print $1}')
-          SHA_MACOS_X86=$(grep ' jirac-macos-x86_64.tar.gz$'  checksums.txt | awk '{print $1}')
-          SHA_LINUX_ARM=$(grep ' jirac-linux-aarch64.tar.gz$'  checksums.txt | awk '{print $1}')
-          SHA_LINUX_X86=$(grep ' jirac-linux-x86_64.tar.gz$'   checksums.txt | awk '{print $1}')
-          SHA_WINDOWS_X86=$(grep ' jirac-windows-x86_64.zip$' checksums.txt | awk '{print $1}')
+          SHA_MACOS_ARM=$(grep -E '(^|/)jirac-macos-aarch64\.tar\.gz$' checksums.txt | awk '{print $1}')
+          SHA_MACOS_X86=$(grep -E '(^|/)jirac-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM=$(grep -E '(^|/)jirac-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_LINUX_X86=$(grep -E '(^|/)jirac-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"

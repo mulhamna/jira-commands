@@ -25,8 +25,8 @@ use super::mode::Mode;
 use super::picker::PickerOption;
 use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
-    resume_tui, suspend_tui, tui_add_comment, tui_add_worklog, tui_create_issue, tui_edit_issue,
-    tui_edit_labels, tui_upload_attachment,
+    resume_tui, suspend_tui, tui_add_comment, tui_add_worklog, tui_confirm_delete_saved_jql,
+    tui_create_issue, tui_edit_issue, tui_edit_labels, tui_edit_saved_jql, tui_upload_attachment,
 };
 use super::render::ui;
 use super::theme::ThemeName;
@@ -92,6 +92,9 @@ pub(super) enum AppAction {
     SaveColumnPreferences,
     ResetColumnPreferences,
     ApplySavedJql(String),
+    CreateSavedJql,
+    EditSavedJql(usize),
+    DeleteSavedJql(usize),
     SaveTheme,
     LoadServerInfo,
     LoadConfigView,
@@ -311,6 +314,26 @@ impl App {
         self.saved_jql_state
             .selected()
             .and_then(|i| self.prefs.saved_jqls.get(i))
+    }
+
+    pub(super) fn selected_saved_jql_index(&self) -> Option<usize> {
+        self.saved_jql_state
+            .selected()
+            .filter(|index| *index < self.prefs.saved_jqls.len())
+    }
+
+    pub(super) fn clamp_saved_jql_selection(&mut self) {
+        if self.prefs.saved_jqls.is_empty() {
+            self.saved_jql_state.select(None);
+            return;
+        }
+
+        let idx = self
+            .saved_jql_state
+            .selected()
+            .map(|i| i.min(self.prefs.saved_jqls.len() - 1))
+            .unwrap_or(0);
+        self.saved_jql_state.select(Some(idx));
     }
 
     pub(super) fn selected_theme(&self) -> ThemeName {
@@ -920,6 +943,75 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                         app.clear_status();
                     }
                     Err(e) => app.set_status(format!("Saved query failed: {e}"), true),
+                }
+            }
+
+            AppAction::CreateSavedJql => {
+                suspend_tui(&mut terminal)?;
+                let result = tui_edit_saved_jql(None);
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(Some(saved)) => {
+                        app.prefs.saved_jqls.push(saved);
+                        app.clamp_saved_jql_selection();
+                        match app.prefs.save() {
+                            Ok(()) => app.set_status("✓ Saved query added", false),
+                            Err(e) => app.set_status(
+                                format!("Failed to save saved query preferences: {e}"),
+                                true,
+                            ),
+                        }
+                    }
+                    Ok(None) => app.set_status("Saved query create cancelled", false),
+                    Err(e) => app.set_status(format!("Saved query create failed: {e}"), true),
+                }
+            }
+
+            AppAction::EditSavedJql(index) => {
+                let existing = app.prefs.saved_jqls.get(index).cloned();
+                suspend_tui(&mut terminal)?;
+                let result = tui_edit_saved_jql(existing.as_ref());
+                resume_tui(&mut terminal)?;
+                match result {
+                    Ok(Some(saved)) => {
+                        if let Some(slot) = app.prefs.saved_jqls.get_mut(index) {
+                            *slot = saved;
+                        }
+                        app.saved_jql_state.select(Some(index));
+                        match app.prefs.save() {
+                            Ok(()) => app.set_status("✓ Saved query updated", false),
+                            Err(e) => app.set_status(
+                                format!("Failed to save saved query preferences: {e}"),
+                                true,
+                            ),
+                        }
+                    }
+                    Ok(None) => app.set_status("Saved query edit cancelled", false),
+                    Err(e) => app.set_status(format!("Saved query edit failed: {e}"), true),
+                }
+            }
+
+            AppAction::DeleteSavedJql(index) => {
+                let existing = app.prefs.saved_jqls.get(index).cloned();
+                if let Some(saved) = existing {
+                    suspend_tui(&mut terminal)?;
+                    let result = tui_confirm_delete_saved_jql(&saved);
+                    resume_tui(&mut terminal)?;
+                    match result {
+                        Ok(true) => {
+                            app.prefs.saved_jqls.remove(index);
+                            app.clamp_saved_jql_selection();
+                            match app.prefs.save() {
+                                Ok(()) => app.set_status("✓ Saved query deleted", false),
+                                Err(e) => app.set_status(
+                                    format!("Failed to save saved query preferences: {e}"),
+                                    true,
+                                ),
+                            }
+                        }
+                        Ok(false) => app.set_status("Saved query delete cancelled", false),
+                        Err(e) => app.set_status(format!("Saved query delete failed: {e}"), true),
+                    }
                 }
             }
 

@@ -83,6 +83,9 @@ impl TuiPreferences {
         if !self.visible_columns.contains(&ColumnKind::Summary) {
             self.visible_columns.push(ColumnKind::Summary);
         }
+
+        self.saved_jqls
+            .retain(|saved| !saved.name.trim().is_empty() && !saved.jql.trim().is_empty());
     }
 }
 

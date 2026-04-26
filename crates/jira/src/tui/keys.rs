@@ -468,6 +468,15 @@ fn handle_saved_jql_key(app: &mut App, code: KeyCode) -> AppAction {
             }
             AppAction::None
         }
+        KeyCode::Char('c') => AppAction::CreateSavedJql,
+        KeyCode::Char('e') => app
+            .selected_saved_jql_index()
+            .map(AppAction::EditSavedJql)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('d') => app
+            .selected_saved_jql_index()
+            .map(AppAction::DeleteSavedJql)
+            .unwrap_or(AppAction::None),
         _ => AppAction::None,
     }
 }

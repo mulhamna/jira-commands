@@ -8,6 +8,8 @@ use crossterm::{
 use jira_core::{model::UpdateIssueRequest, JiraClient};
 use ratatui::Terminal;
 
+use super::prefs::SavedJql;
+
 use crate::datetime::build_worklog_started;
 
 use super::picker::prompt_assignee_selection;
@@ -151,6 +153,46 @@ pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<boo
 
     client.update_issue(key, req).await?;
     Ok(true)
+}
+
+pub(super) fn tui_edit_saved_jql(existing: Option<&SavedJql>) -> Result<Option<SavedJql>> {
+    use inquire::Text;
+
+    println!("\n── Saved Query ─────────────────────────────────────");
+
+    let name_default = existing.map(|saved| saved.name.as_str()).unwrap_or("");
+    let jql_default = existing.map(|saved| saved.jql.as_str()).unwrap_or("");
+
+    let name = match Text::new("Name:")
+        .with_default(name_default)
+        .prompt_skippable()?
+    {
+        Some(value) if !value.trim().is_empty() => value.trim().to_string(),
+        _ => return Ok(None),
+    };
+
+    let jql = match Text::new("JQL:")
+        .with_default(jql_default)
+        .prompt_skippable()?
+    {
+        Some(value) if !value.trim().is_empty() => value.trim().to_string(),
+        _ => return Ok(None),
+    };
+
+    Ok(Some(SavedJql { name, jql }))
+}
+
+pub(super) fn tui_confirm_delete_saved_jql(saved: &SavedJql) -> Result<bool> {
+    use inquire::Confirm;
+
+    println!("\n── Delete Saved Query ─────────────────────────────");
+    println!("  {}", saved.name);
+    println!("  {}\n", saved.jql);
+
+    Confirm::new("Delete this saved query?")
+        .with_default(false)
+        .prompt()
+        .map_err(Into::into)
 }
 
 pub(super) async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bool> {

@@ -119,7 +119,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::ColumnPicker => " j/k:move  Space:toggle  a:all  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
-        Mode::SavedJqlPicker => " j/k:move  Enter:run query  Esc:cancel".to_string(),
+        Mode::SavedJqlPicker => " j/k:move  Enter:run  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         _ => " Esc:back".to_string(),
     };
@@ -769,7 +769,16 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palet
 }
 
 fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let popup_area = centered_rect(60, 60, area);
+    let popup_area = centered_rect(68, 68, area);
+    let [summary_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(4),
+        ])
+        .areas(popup_area);
+
     let items: Vec<ListItem> = app
         .prefs
         .saved_jqls
@@ -777,12 +786,42 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
         .map(|saved| ListItem::new(format!("{}  •  {}", saved.name, saved.jql)))
         .collect();
 
+    let selected_summary = if let Some(saved) = app.selected_saved_jql() {
+        Paragraph::new(vec![
+            Line::from(vec![
+                Span::styled("Selected: ", Style::default().fg(palette.muted)),
+                Span::styled(saved.name.clone(), Style::default().fg(palette.accent)),
+            ]),
+            Line::from(Span::styled(
+                saved.jql.clone(),
+                Style::default().fg(palette.header_fg),
+            )),
+        ])
+    } else {
+        Paragraph::new(vec![
+            Line::from(Span::styled(
+                "No saved queries yet.",
+                Style::default().fg(palette.muted),
+            )),
+            Line::from(Span::styled(
+                "Press c to create one.",
+                Style::default().fg(palette.muted),
+            )),
+        ])
+    }
+    .block(
+        Block::default()
+            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
+            .title(" Saved Queries ")
+            .style(Style::default().bg(Color::Black)),
+    );
+
     let list = List::new(items)
         .block(
             Block::default()
-                .borders(Borders::ALL)
+                .borders(Borders::LEFT | Borders::RIGHT)
                 .border_style(Style::default().fg(palette.focus_border))
-                .title(" Saved Queries ")
                 .style(Style::default().bg(Color::Black)),
         )
         .highlight_style(
@@ -793,8 +832,22 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
         )
         .highlight_symbol("> ");
 
+    let hints = Paragraph::new(vec![
+        Line::from("↑/↓ move   Enter run   c create   e edit   d delete"),
+        Line::from("Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(palette.muted));
+
     f.render_widget(Clear, popup_area);
-    f.render_stateful_widget(list, popup_area, &mut app.saved_jql_state);
+    f.render_widget(selected_summary, summary_area);
+    f.render_stateful_widget(list, list_area, &mut app.saved_jql_state);
+    f.render_widget(hints, hint_area);
 }
 
 fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -874,7 +927,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  ↑/k       Move up"),
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
-        Line::from("  p         Open saved queries"),
+        Line::from("  p         Open saved queries (run/create/edit/delete)"),
         Line::from("  T         Open theme picker"),
         Line::from("  S         Show server info"),
         Line::from("  g         Show config file"),

@@ -10,6 +10,7 @@ Jira on the command line.
 `jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
 ![jirac TUI preview](assets/readme/sample_tui.jpeg)
+![jirac TUI Split preview](assets/readme/sample_tui_split.jpeg)
 
 ## Highlights
 
@@ -27,25 +28,25 @@ Jira on the command line.
 
 ## Comparison
 
-| Feature                           | **jirac** | [jira-cli](https://github.com/ankitpokhrel/jira-cli) (Go) | [jira-cmd](https://github.com/palashkulsh/jira-cmd) (Node) |
-| --------------------------------- | :-------: | :--------------------------------------------------------: | :---------------------------------------------------------: |
-| Single binary, no runtime deps    |    ✅     |                             ✅                             |                          ❌ (npm)                           |
-| Interactive TUI                   |    ✅     |                             ✅                             |                              ❌                             |
-| Jira REST API version             |   v2 / v3 |                          v2 / v3                           |                             v2                              |
-| Custom fields (runtime discovery) |    ✅     |                    Partial (config-based)                  |                     Partial (field IDs)                     |
-| Attachment upload                 |    ✅     |                             ❌                             |                              ❌                             |
-| Worklogs (add / list / delete)    |    ✅     |                             ❌                             |                       Add / list only                       |
-| Bulk transition                   |    ✅     |                             ❌                             |                              ❌                             |
-| Bulk update                       |    ✅     |                             ❌                             |                              ❌                             |
-| Bulk create / batch manifests     |    ✅     |                             ❌                             |                              ❌                             |
-| Issue archive                     |    ✅     |                             ❌                             |                              ❌                             |
-| JQL builder (interactive)         |    ✅     |                             ❌                             |                              ❌                             |
-| Raw API passthrough               |    ✅     |                             ❌                             |                              ❌                             |
-| Cursor-based pagination           |    ✅     |                        ❌ (offset)                         |                         ❌ (offset)                         |
-| MCP server                        |    ✅     |                             ❌                             |                              ❌                             |
-| Multi login / saved profiles      |    ✅     |                             ❌                             |                              ❌                             |
-| macOS / Linux / Windows           | ✅ / ✅ / ✅ |                    ✅ / ✅ / Partial                       |                      ✅ / ✅ / ✅                           |
-| Jira Data Center / self-managed   | Cloud + Data Center |                  Cloud + self-managed                      |                     Cloud + self-managed                    |
+| Feature                           |      **jirac**      | [jira-cli](https://github.com/ankitpokhrel/jira-cli) (Go) | [jira-cmd](https://github.com/palashkulsh/jira-cmd) (Node) |
+| --------------------------------- | :-----------------: | :-------------------------------------------------------: | :--------------------------------------------------------: |
+| Single binary, no runtime deps    |          ✅          |                             ✅                             |                          ❌ (npm)                           |
+| Interactive TUI                   |          ✅          |                             ✅                             |                             ❌                              |
+| Jira REST API version             |       v2 / v3       |                          v2 / v3                          |                             v2                             |
+| Custom fields (runtime discovery) |          ✅          |                  Partial (config-based)                   |                    Partial (field IDs)                     |
+| Attachment upload                 |          ✅          |                             ❌                             |                             ❌                              |
+| Worklogs (add / list / delete)    |          ✅          |                             ❌                             |                      Add / list only                       |
+| Bulk transition                   |          ✅          |                             ❌                             |                             ❌                              |
+| Bulk update                       |          ✅          |                             ❌                             |                             ❌                              |
+| Bulk create / batch manifests     |          ✅          |                             ❌                             |                             ❌                              |
+| Issue archive                     |          ✅          |                             ❌                             |                             ❌                              |
+| JQL builder (interactive)         |          ✅          |                             ❌                             |                             ❌                              |
+| Raw API passthrough               |          ✅          |                             ❌                             |                             ❌                              |
+| Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
+| MCP server                        |          ✅          |                             ❌                             |                             ❌                              |
+| Multi login / saved profiles      |          ✅          |                             ❌                             |                             ❌                              |
+| macOS / Linux / Windows           |      ✅ / ✅ / ✅      |                      ✅ / ✅ / Partial                      |                         ✅ / ✅ / ✅                          |
+| Jira Data Center / self-managed   | Cloud + Data Center |                   Cloud + self-managed                    |                    Cloud + self-managed                    |
 
 ## Install
 

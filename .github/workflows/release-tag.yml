@@ -352,15 +352,14 @@ jobs:
             artifacts/**/*
             checksums.txt
 
-  # ── 4. Refresh in-repo package manifests ───────────────────────────────────
-  refresh-package-manifests:
-    name: Refresh package manifests
+  # ── 4. Collect release metadata ────────────────────────────────────────────
+  collect-release-metadata:
+    name: Collect release metadata
     runs-on: ubuntu-latest
     needs: create-release
     timeout-minutes: 10
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     outputs:
       version: ${{ steps.vars.outputs.version }}
       release_date: ${{ steps.vars.outputs.release_date }}
@@ -370,10 +369,6 @@ jobs:
       sha_linux_x86: ${{ steps.vars.outputs.sha_linux_x86 }}
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          ref: main
-
       - name: Download checksums from release
         id: vars
         run: |
@@ -411,6 +406,19 @@ jobs:
             echo "release_date=$RELEASE_DATE"
           } >> "$GITHUB_OUTPUT"
 
+  refresh-package-manifests:
+    name: Refresh package manifests
+    runs-on: ubuntu-latest
+    needs: collect-release-metadata
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: main
+
       - name: Refresh Winget source manifests
         run: |
           python3 - <<'EOF'
@@ -446,9 +454,9 @@ jobs:
               print(f'updated {path}')
           EOF
         env:
-          VERSION: ${{ steps.vars.outputs.version }}
-          RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
-          SHA_WINDOWS_X86: ${{ steps.vars.outputs.sha_windows_x86 }}
+          VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+          RELEASE_DATE: ${{ needs.collect-release-metadata.outputs.release_date }}
+          SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
 
       - name: Refresh Chocolatey source package
         run: |
@@ -480,22 +488,22 @@ jobs:
               print(f'updated {path}')
           EOF
         env:
-          VERSION: ${{ steps.vars.outputs.version }}
-          SHA_WINDOWS_X86: ${{ steps.vars.outputs.sha_windows_x86 }}
+          VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+          SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
 
       - name: Create manifest refresh pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(packaging): refresh manifests for v${{ steps.vars.outputs.version }}"
-          branch: chore/package-manifests-v${{ steps.vars.outputs.version }}
+          commit-message: "chore(packaging): refresh manifests for v${{ needs.collect-release-metadata.outputs.version }}"
+          branch: chore/package-manifests-v${{ needs.collect-release-metadata.outputs.version }}
           delete-branch: true
-          title: "chore(packaging): refresh manifests for v${{ steps.vars.outputs.version }}"
+          title: "chore(packaging): refresh manifests for v${{ needs.collect-release-metadata.outputs.version }}"
           body: |
             ## Summary
 
-            - refresh in-repo Winget source manifests for v${{ steps.vars.outputs.version }}
-            - refresh in-repo Chocolatey package source for v${{ steps.vars.outputs.version }}
+            - refresh in-repo Winget source manifests for v${{ needs.collect-release-metadata.outputs.version }}
+            - refresh in-repo Chocolatey package source for v${{ needs.collect-release-metadata.outputs.version }}
             - update Windows installer URL and SHA256 from the published release
 
             ## Notes
@@ -514,17 +522,17 @@ jobs:
   update-homebrew:
     name: Update Homebrew formula
     runs-on: ubuntu-latest
-    needs: refresh-package-manifests
+    needs: collect-release-metadata
     timeout-minutes: 10
     permissions:
       contents: read
     env:
-      VERSION: ${{ needs.refresh-package-manifests.outputs.version }}
-      SHA_MACOS_ARM: ${{ needs.refresh-package-manifests.outputs.sha_macos_arm }}
-      SHA_MACOS_X86: ${{ needs.refresh-package-manifests.outputs.sha_macos_x86 }}
-      SHA_LINUX_ARM: ${{ needs.refresh-package-manifests.outputs.sha_linux_arm }}
-      SHA_LINUX_X86: ${{ needs.refresh-package-manifests.outputs.sha_linux_x86 }}
-      SHA_WINDOWS_X86: ${{ needs.refresh-package-manifests.outputs.sha_windows_x86 }}
+      VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+      SHA_MACOS_ARM: ${{ needs.collect-release-metadata.outputs.sha_macos_arm }}
+      SHA_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_macos_x86 }}
+      SHA_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_linux_arm }}
+      SHA_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_linux_x86 }}
+      SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
     steps:
       - name: Checkout homebrew-tap
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -581,13 +589,13 @@ jobs:
   publish-chocolatey:
     name: Publish Chocolatey package
     runs-on: windows-latest
-    needs: refresh-package-manifests
+    needs: collect-release-metadata
     timeout-minutes: 15
     permissions:
       contents: read
     env:
-      VERSION: ${{ needs.refresh-package-manifests.outputs.version }}
-      SHA_WINDOWS_X86: ${{ needs.refresh-package-manifests.outputs.sha_windows_x86 }}
+      VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+      SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
       CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

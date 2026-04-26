@@ -561,11 +561,30 @@ impl JiraClient {
 
         #[derive(serde::Deserialize)]
         struct FieldMetaResponse {
-            fields: std::collections::HashMap<String, FieldMeta>,
+            fields: FieldCollection,
         }
 
         #[derive(serde::Deserialize)]
-        struct FieldMeta {
+        #[serde(untagged)]
+        enum FieldCollection {
+            Map(std::collections::HashMap<String, FieldMetaMap>),
+            List(Vec<FieldMetaEntry>),
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FieldMetaMap {
+            name: String,
+            required: bool,
+            schema: Option<Value>,
+            #[serde(rename = "allowedValues")]
+            allowed_values: Option<Vec<Value>>,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FieldMetaEntry {
+            #[serde(rename = "fieldId")]
+            field_id: Option<String>,
+            key: Option<String>,
             name: String,
             required: bool,
             schema: Option<Value>,
@@ -578,28 +597,52 @@ impl JiraClient {
             .request(|| http.get(&url).headers(headers.clone()))
             .await?;
 
-        let fields = resp
-            .fields
-            .into_iter()
-            .map(|(id, meta)| {
-                let field_type = meta
-                    .schema
-                    .as_ref()
-                    .and_then(|s| s.get("type"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
+        let fields = match resp.fields {
+            FieldCollection::Map(fields) => fields
+                .into_iter()
+                .map(|(id, meta)| {
+                    let field_type = meta
+                        .schema
+                        .as_ref()
+                        .and_then(|s| s.get("type"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
 
-                Field {
-                    id,
-                    name: meta.name,
-                    field_type,
-                    required: meta.required,
-                    schema: meta.schema,
-                    allowed_values: meta.allowed_values,
-                }
-            })
-            .collect();
+                    Field {
+                        id,
+                        name: meta.name,
+                        field_type,
+                        required: meta.required,
+                        schema: meta.schema,
+                        allowed_values: meta.allowed_values,
+                    }
+                })
+                .collect(),
+            FieldCollection::List(fields) => fields
+                .into_iter()
+                .map(|meta| {
+                    let field_type = meta
+                        .schema
+                        .as_ref()
+                        .and_then(|s| s.get("type"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    let id = meta.field_id.or(meta.key).unwrap_or_default();
+
+                    Field {
+                        id,
+                        name: meta.name,
+                        field_type,
+                        required: meta.required,
+                        schema: meta.schema,
+                        allowed_values: meta.allowed_values,
+                    }
+                })
+                .collect(),
+        };
 
         Ok(fields)
     }
@@ -1297,5 +1340,100 @@ mod tests {
 
         let info = client.get_server_info().await.expect("server info");
         assert_eq!(info["deploymentType"], Value::String("Cloud".into()));
+    }
+
+    #[tokio::test]
+    async fn get_fields_for_issue_type_supports_map_response() {
+        let server = MockServer::start().await;
+        let expected = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/createmeta/TEST/issuetypes/10001"))
+            .and(header("authorization", expected.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": {
+                    "summary": {
+                        "name": "Summary",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        });
+
+        let fields = client
+            .get_fields_for_issue_type("TEST", "10001")
+            .await
+            .expect("map response should parse");
+
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].id, "summary");
+        assert_eq!(fields[0].name, "Summary");
+        assert!(fields[0].required);
+        assert_eq!(fields[0].field_type, "string");
+    }
+
+    #[tokio::test]
+    async fn get_fields_for_issue_type_supports_list_response() {
+        let server = MockServer::start().await;
+        let expected = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/createmeta/TEST/issuetypes/10002"))
+            .and(header("authorization", expected.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": [
+                    {
+                        "fieldId": "customfield_10553",
+                        "key": "customfield_10553",
+                        "name": "Labels (OSS)",
+                        "required": true,
+                        "schema": {
+                            "custom": "com.atlassian.jira.plugin.system.customfieldtypes:labels",
+                            "items": "string",
+                            "type": "array"
+                        },
+                        "allowedValues": []
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        });
+
+        let fields = client
+            .get_fields_for_issue_type("TEST", "10002")
+            .await
+            .expect("list response should parse");
+
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].id, "customfield_10553");
+        assert_eq!(fields[0].name, "Labels (OSS)");
+        assert!(fields[0].required);
+        assert_eq!(fields[0].field_type, "array");
     }
 }

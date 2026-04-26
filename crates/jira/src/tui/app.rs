@@ -21,12 +21,13 @@ use ratatui::{
 
 use super::column::{format_column_summary, ColumnKind};
 use super::keys;
+use super::modal::{Modal, ModalKind};
 use super::mode::Mode;
 use super::picker::PickerOption;
 use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
-    resume_tui, suspend_tui, tui_add_comment, tui_add_worklog, tui_confirm_delete_saved_jql,
-    tui_create_issue, tui_edit_issue, tui_edit_labels, tui_edit_saved_jql, tui_upload_attachment,
+    resume_tui, suspend_tui, tui_add_worklog, tui_confirm_delete_saved_jql, tui_create_issue,
+    tui_edit_labels, tui_edit_saved_jql,
 };
 use super::render::ui;
 use super::theme::ThemeName;
@@ -67,6 +68,8 @@ pub(super) struct App {
     pub(super) server_info_lines: Vec<String>,
     pub(super) config_lines: Vec<String>,
     pub(super) detail_scroll: u16,
+    pub(super) modal: Option<Modal>,
+    pub(super) prev_mode: Option<Mode>,
 }
 
 pub(super) enum AppAction {
@@ -99,6 +102,8 @@ pub(super) enum AppAction {
     LoadServerInfo,
     LoadConfigView,
     WarmActiveTab,
+    SubmitModal,
+    CancelModal,
 }
 
 impl App {
@@ -186,6 +191,23 @@ impl App {
             server_info_lines: Vec::new(),
             config_lines: Vec::new(),
             detail_scroll: 0,
+            modal: None,
+            prev_mode: None,
+        }
+    }
+
+    pub(super) fn open_modal(&mut self, modal: Modal) {
+        self.prev_mode = Some(self.mode.clone());
+        self.modal = Some(modal);
+        self.mode = Mode::Modal;
+    }
+
+    pub(super) fn close_modal(&mut self) {
+        self.modal = None;
+        if let Some(prev) = self.prev_mode.take() {
+            self.mode = prev;
+        } else {
+            self.mode = Mode::Browse;
         }
     }
 
@@ -503,7 +525,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             continue;
         }
 
-        match keys::handle_key(&mut app, key.code) {
+        match keys::handle_key(&mut app, key) {
             AppAction::Quit => break,
 
             AppAction::Refresh => {
@@ -788,20 +810,20 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::EditIssue(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_edit_issue(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
-                        let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
-                            app.set_issues(r.issues);
-                        }
-                        app.set_status(format!("✓ Updated {key}"), false);
-                    }
-                    Ok(false) => app.set_status("Edit cancelled", false),
-                    Err(e) => app.set_status(format!("Edit failed: {e}"), true),
-                }
+                let (summary, description) = app
+                    .issues
+                    .iter()
+                    .find(|i| i.key == key)
+                    .map(|issue| {
+                        let desc = issue
+                            .description
+                            .as_ref()
+                            .map(jira_core::adf::adf_to_text)
+                            .unwrap_or_default();
+                        (issue.summary.clone(), desc)
+                    })
+                    .unwrap_or_default();
+                app.open_modal(Modal::edit_issue(key, summary, description));
             }
 
             AppAction::AssignIssue(assignee) => {
@@ -823,18 +845,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::AddComment(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_add_comment(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
-                        app.detail.comments = None;
-                        app.warm_active_tab(&client).await;
-                        app.set_status(format!("✓ Comment added to {key}"), false)
-                    }
-                    Ok(false) => app.set_status("Comment cancelled", false),
-                    Err(e) => app.set_status(format!("Comment failed: {e}"), true),
-                }
+                app.open_modal(Modal::add_comment(key));
             }
 
             AppAction::AddWorklog(key) => {
@@ -888,20 +899,120 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::UploadAttachment(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_upload_attachment(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
-                        let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
-                            app.set_issues(r.issues);
-                            app.warm_active_tab(&client).await;
+                app.open_modal(Modal::upload_attachment(key));
+            }
+
+            AppAction::CancelModal => {
+                app.close_modal();
+                app.set_status("Cancelled", false);
+            }
+
+            AppAction::SubmitModal => {
+                let Some(modal) = app.modal.as_ref() else {
+                    continue;
+                };
+                let kind = modal.kind.clone();
+                match kind {
+                    ModalKind::EditIssue { key } => {
+                        let summary = modal.field_text(0);
+                        let description = modal.field_text(1);
+                        let summary_trim = summary.trim();
+                        if summary_trim.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Summary cannot be empty");
+                            }
+                            continue;
                         }
-                        app.set_status(format!("✓ Attachment uploaded to {key}"), false)
+                        let req = UpdateIssueRequest {
+                            summary: Some(summary_trim.to_string()),
+                            description: Some(description),
+                            ..Default::default()
+                        };
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.update_issue(&key, req).await {
+                            Ok(()) => {
+                                app.close_modal();
+                                let jql = app.jql.clone();
+                                if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                                    app.set_issues(r.issues);
+                                }
+                                app.set_status(format!("✓ Updated {key}"), false);
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Update failed: {e}"));
+                                }
+                            }
+                        }
                     }
-                    Ok(false) => app.set_status("Upload cancelled", false),
-                    Err(e) => app.set_status(format!("Upload failed: {e}"), true),
+                    ModalKind::AddComment { key } => {
+                        let body = modal.field_text(0);
+                        let body_trim = body.trim();
+                        if body_trim.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Comment cannot be empty");
+                            }
+                            continue;
+                        }
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.add_comment(&key, body_trim).await {
+                            Ok(_) => {
+                                app.close_modal();
+                                app.detail.comments = None;
+                                app.warm_active_tab(&client).await;
+                                app.set_status(format!("✓ Comment added to {key}"), false);
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Comment failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::UploadAttachment { key } => {
+                        let raw = modal.field_text(0);
+                        let path_str = raw.trim();
+                        if path_str.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Path cannot be empty");
+                            }
+                            continue;
+                        }
+                        let expanded = shellexpand_tilde(path_str);
+                        let path = std::path::PathBuf::from(expanded.as_ref());
+                        if !path.exists() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error(format!("File not found: {path_str}"));
+                            }
+                            continue;
+                        }
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.upload_attachment(&key, &path).await {
+                            Ok(_) => {
+                                app.close_modal();
+                                let jql = app.jql.clone();
+                                if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                                    app.set_issues(r.issues);
+                                    app.warm_active_tab(&client).await;
+                                }
+                                app.set_status(format!("✓ Attachment uploaded to {key}"), false);
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Upload failed: {e}"));
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1099,4 +1210,15 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
+    if let Some(stripped) = path.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            let mut p = std::path::PathBuf::from(home);
+            p.push(stripped);
+            return std::borrow::Cow::Owned(p.to_string_lossy().into_owned());
+        }
+    }
+    std::borrow::Cow::Borrowed(path)
 }

@@ -110,51 +110,6 @@ pub(super) async fn tui_create_issue(
     Ok(Some(issue.key))
 }
 
-pub(super) async fn tui_edit_issue(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::Text;
-
-    println!("\n── Edit {key} ──────────────────────────────────────");
-    println!("  Leave a field blank to keep its current value.\n");
-
-    let summary = Text::new("New summary (blank to skip):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
-
-    let assignee =
-        prompt_assignee_selection(client, "Search new assignee (name/email, blank to skip):")
-            .await?;
-
-    let priority = Text::new("New priority (blank to skip):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
-
-    if summary.is_none() && assignee.is_none() && priority.is_none() {
-        return Ok(false);
-    }
-
-    let req = UpdateIssueRequest {
-        summary,
-        assignee,
-        priority,
-        ..Default::default()
-    };
-
-    client.update_issue(key, req).await?;
-    Ok(true)
-}
-
 pub(super) fn tui_edit_saved_jql(
     existing: Option<&SavedJql>,
     suggested_jql: Option<&str>,
@@ -199,20 +154,6 @@ pub(super) fn tui_confirm_delete_saved_jql(saved: &SavedJql) -> Result<bool> {
         .with_default(false)
         .prompt()
         .map_err(Into::into)
-}
-
-pub(super) async fn tui_add_comment(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::Text;
-
-    println!("\n── Add Comment to {key} ─────────────────────────────");
-
-    let body = match Text::new("Comment (blank to cancel):").prompt_skippable()? {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return Ok(false),
-    };
-
-    client.add_comment(key, &body).await?;
-    Ok(true)
 }
 
 pub(super) async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bool> {
@@ -300,24 +241,5 @@ pub(super) async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bo
     };
 
     client.update_issue(key, req).await?;
-    Ok(true)
-}
-
-pub(super) async fn tui_upload_attachment(client: &JiraClient, key: &str) -> Result<bool> {
-    use inquire::Text;
-
-    println!("\n── Upload Attachment to {key} ────────────────────────");
-
-    let path_str = match Text::new("File path (blank to cancel):").prompt_skippable()? {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return Ok(false),
-    };
-
-    let path = std::path::PathBuf::from(&path_str);
-    if !path.exists() {
-        anyhow::bail!("File not found: {path_str}");
-    }
-
-    client.upload_attachment(key, &path).await?;
     Ok(true)
 }

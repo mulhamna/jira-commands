@@ -8,6 +8,7 @@ use ratatui::{
 
 use super::app::App;
 use super::column::{format_column_summary, AVAILABLE_COLUMNS};
+use super::modal::render_modal;
 use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
 use super::theme::{Palette, ThemeName};
@@ -47,6 +48,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ServerInfo => " Jira CLI — Server ".to_string(),
         Mode::ConfigView => " Jira CLI — Config ".to_string(),
         Mode::ThemePicker => " Jira CLI — Themes ".to_string(),
+        Mode::Modal => " Jira CLI ".to_string(),
     };
 
     let header = Paragraph::new(title).style(
@@ -100,6 +102,12 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             render_browse(f, app, chunks[1], palette);
             render_text_popup(f, " Config View ", &app.config_lines, size, palette);
         }
+        Mode::Modal => {
+            render_browse(f, app, chunks[1], palette);
+            if let Some(modal) = app.modal.as_ref() {
+                render_modal(f, modal, palette, size);
+            }
+        }
     }
 }
 
@@ -121,6 +129,9 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::SavedJqlPicker => " j/k:move  Enter:run  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
+        Mode::Modal => {
+            " Tab:next field  Ctrl+S:submit  Enter:newline (multiline)  Esc:cancel".to_string()
+        }
         _ => " Esc:back".to_string(),
     };
 

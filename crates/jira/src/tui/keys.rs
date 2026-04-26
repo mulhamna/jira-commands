@@ -1,13 +1,26 @@
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyEvent};
 
 use super::app::{App, AppAction};
 use super::column::AVAILABLE_COLUMNS;
+use super::modal::{handle_modal_key, ModalOutcome};
 use super::mode::Mode;
 use super::panel::Focus;
 use super::prefs::TuiPreferences;
 
-pub(super) fn handle_key(app: &mut App, code: KeyCode) -> AppAction {
+pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
+    let code = event.code;
     match &app.mode {
+        Mode::Modal => {
+            let Some(modal) = app.modal.as_mut() else {
+                app.close_modal();
+                return AppAction::None;
+            };
+            match handle_modal_key(modal, event) {
+                ModalOutcome::Cancel => AppAction::CancelModal,
+                ModalOutcome::Submit => AppAction::SubmitModal,
+                ModalOutcome::Continue => AppAction::None,
+            }
+        }
         Mode::Browse => {
             if app.focus == Focus::Detail {
                 handle_view_key(app, code)

@@ -38,6 +38,7 @@ jirac auth profiles
 jirac issue list
 jirac issue view MYPROJ-123
 jirac issue create -p MYPROJ
+jirac issue render --input desc.md
 jirac tui -p MYPROJ
 ```
 

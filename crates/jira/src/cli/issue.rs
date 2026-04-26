@@ -276,6 +276,27 @@ pub enum IssueCommand {
         json: bool,
     },
 
+    /// Render and validate description content before sending it to Jira
+    ///
+    /// Useful for previewing how Markdown or plain text will be converted into
+    /// Atlassian Document Format (ADF), or for validating raw ADF JSON input.
+    ///
+    /// Examples:
+    ///   jirac issue render --input desc.md
+    ///   jirac issue render --input desc.md --format markdown --output text
+    ///   jirac issue render --input desc.adf.json --format adf
+    Render {
+        /// Input file to read. If omitted, reads from stdin.
+        #[arg(long, value_name = "FILE")]
+        input: Option<std::path::PathBuf>,
+        /// Input format: markdown (default), text, or adf
+        #[arg(long, value_name = "FORMAT", default_value = "markdown")]
+        format: String,
+        /// Output format: adf (default) or text
+        #[arg(long, value_name = "FORMAT", default_value = "adf")]
+        output: String,
+    },
+
     /// Manage comments on an issue
     ///
     /// List existing comments or add a new comment in Markdown.
@@ -724,6 +745,11 @@ pub async fn handle(
             )
             .await
         }
+        IssueCommand::Render {
+            input,
+            format,
+            output,
+        } => render_issue_content(input, format, output),
         IssueCommand::Comment { key, command } => comment(client, key, command).await,
         IssueCommand::Worklog { key, command } => worklog(client, key, command).await,
         IssueCommand::BulkTransition {
@@ -1464,7 +1490,68 @@ async fn list_fields(
     Ok(())
 }
 
+fn render_issue_content(
+    input: Option<std::path::PathBuf>,
+    format: String,
+    output: String,
+) -> Result<()> {
+    let content = read_render_input(input.as_deref())?;
+    let format = normalize_render_format(&format)?;
+    let output = normalize_render_output(&output)?;
+
+    let adf = match format {
+        "markdown" => jira_core::adf::markdown_to_adf(&content),
+        "text" => jira_core::adf::plain_text_to_adf(&content),
+        "adf" => serde_json::from_str::<Value>(&content)
+            .context("--format adf requires valid JSON ADF content")?,
+        _ => unreachable!(),
+    };
+
+    match output {
+        "adf" => println!("{}", serde_json::to_string_pretty(&adf)?),
+        "text" => println!("{}", jira_core::adf::adf_to_text(&adf)),
+        _ => unreachable!(),
+    }
+
+    Ok(())
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
+
+fn read_render_input(path: Option<&std::path::Path>) -> Result<String> {
+    match path {
+        Some(path) => std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read input file: {}", path.display())),
+        None => {
+            use std::io::Read;
+
+            let mut input = String::new();
+            std::io::stdin()
+                .read_to_string(&mut input)
+                .context("Failed to read stdin")?;
+            Ok(input)
+        }
+    }
+}
+
+fn normalize_render_format(value: &str) -> Result<&str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "markdown" | "md" => Ok("markdown"),
+        "text" | "txt" => Ok("text"),
+        "adf" | "json" => Ok("adf"),
+        other => {
+            anyhow::bail!("Unsupported input format '{other}'. Use one of: markdown, text, adf")
+        }
+    }
+}
+
+fn normalize_render_output(value: &str) -> Result<&str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "adf" | "json" => Ok("adf"),
+        "text" | "txt" => Ok("text"),
+        other => anyhow::bail!("Unsupported output format '{other}'. Use one of: adf, text"),
+    }
+}
 
 fn spinner_new(msg: impl Into<String>) -> ProgressBar {
     use std::io::IsTerminal;

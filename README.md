@@ -100,6 +100,8 @@ jirac issue list --jql "status = 'In Progress'"     # custom JQL
 jirac issue view PROJ-123                           # view detail
 jirac issue create -p PROJ                          # create (interactive)
 jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
+jirac issue render --input desc.md                  # preview Markdown -> ADF JSON
+jirac issue render --input desc.md --output text    # preview rendered plain text
 
 jirac issue update PROJ-123 --summary "New title"
 jirac issue update PROJ-123 --assignee user@co.com

@@ -201,7 +201,8 @@ pub fn markdown_to_adf(markdown: &str) -> Value {
     use comrak::{parse_document, Arena, Options};
 
     let arena = Arena::new();
-    let options = Options::default();
+    let mut options = Options::default();
+    options.extension.table = true;
     let root = parse_document(&arena, markdown, &options);
 
     let mut content: Vec<Value> = Vec::new();
@@ -458,6 +459,13 @@ fn render_markdown_table<'a>(
         let mut cells: Vec<Value> = Vec::new();
         for cell in row.children() {
             let mut block_content: Vec<Value> = Vec::new();
+            let inline_content = collect_inline_children(cell, unsupported);
+            if !inline_content.is_empty() {
+                block_content.push(json!({
+                    "type": "paragraph",
+                    "content": inline_content
+                }));
+            }
             for child in cell.children() {
                 convert_node(child, &mut block_content, unsupported);
             }
@@ -527,9 +535,25 @@ mod tests {
     }
 
     #[test]
-    fn test_markdown_to_adf_table_falls_back_without_table_extension() {
+    fn test_markdown_to_adf_table_support() {
         let adf = markdown_to_adf("| Name | Status |\n| --- | --- |\n| API | Done |");
-        assert_eq!(adf["content"][0]["type"], "paragraph");
+        assert_eq!(adf["content"][0]["type"], "table");
+        assert_eq!(
+            adf["content"][0]["content"][0]["content"][0]["type"],
+            "tableHeader"
+        );
+        assert_eq!(
+            adf["content"][0]["content"][1]["content"][1]["type"],
+            "tableCell"
+        );
+        assert_eq!(
+            adf["content"][0]["content"][0]["content"][0]["content"][0]["content"][0]["text"],
+            "Name"
+        );
+        assert_eq!(
+            adf["content"][0]["content"][1]["content"][1]["content"][0]["content"][0]["text"],
+            "Done"
+        );
     }
 
     #[test]

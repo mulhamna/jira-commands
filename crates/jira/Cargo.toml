@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 jira-core = { workspace = true }
 clap = { version = "4", features = ["derive"] }
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
 tui-textarea = "0.7"
 inquire = "0.7"

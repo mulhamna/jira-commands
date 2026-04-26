@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.21.0](https://github.com/mulhamna/jira-commands/compare/v0.20.0...v0.21.0) (2026-04-26)
+
+
+### Features
+
+* **tui:** in-TUI modal for edit, comment, and upload ([#123](https://github.com/mulhamna/jira-commands/issues/123)) ([0fd5af3](https://github.com/mulhamna/jira-commands/commit/0fd5af377e8219b9525010f06c63968cf7e987c8))
+
 ## [0.20.0](https://github.com/mulhamna/jira-commands/compare/v0.19.1...v0.20.0) (2026-04-26)
 
 

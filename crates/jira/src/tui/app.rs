@@ -62,6 +62,15 @@ pub(super) struct App {
     pub(super) component_state: ListState,
     pub(super) component_issue_key: String,
     pub(super) component_project_key: String,
+    pub(super) component_catalog: Vec<PickerOption>,
+    pub(super) fix_version_query: String,
+    pub(super) fix_version_cursor: usize,
+    pub(super) fix_version_options: Vec<PickerOption>,
+    pub(super) fix_version_selected: HashSet<String>,
+    pub(super) fix_version_state: ListState,
+    pub(super) fix_version_issue_key: String,
+    pub(super) fix_version_project_key: String,
+    pub(super) fix_version_catalog: Vec<PickerOption>,
     pub(super) prefs: TuiPreferences,
     pub(super) saved_jql_state: ListState,
     pub(super) theme_state: ListState,
@@ -91,6 +100,9 @@ pub(super) enum AppAction {
     EditComponents(String),
     OpenComponentPicker(String),
     RefreshComponentOptions,
+    EditFixVersions(String),
+    OpenFixVersionPicker(String),
+    RefreshFixVersionOptions,
     UploadAttachment(String),
     SaveColumnPreferences,
     ResetColumnPreferences,
@@ -185,6 +197,15 @@ impl App {
             component_state: ListState::default(),
             component_issue_key: String::new(),
             component_project_key: String::new(),
+            component_catalog: Vec::new(),
+            fix_version_query: String::new(),
+            fix_version_cursor: 0,
+            fix_version_options: Vec::new(),
+            fix_version_selected: HashSet::new(),
+            fix_version_state: ListState::default(),
+            fix_version_issue_key: String::new(),
+            fix_version_project_key: String::new(),
+            fix_version_catalog: Vec::new(),
             prefs,
             saved_jql_state,
             theme_state,
@@ -724,6 +745,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 app.component_cursor = 0;
                 app.component_selected.clear();
                 app.component_options.clear();
+                app.component_catalog.clear();
                 app.component_state = ListState::default();
                 match client.get_issue(&key).await {
                     Ok(issue) => {
@@ -733,12 +755,24 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             .map(|(project, _)| project.to_string())
                             .unwrap_or(issue.project_key.clone());
                         app.component_project_key = project_key.clone();
+                        app.component_selected = issue
+                            .fields
+                            .get("components")
+                            .and_then(|v| v.as_array())
+                            .map(|items| {
+                                items
+                                    .iter()
+                                    .filter_map(|item| item.get("name").and_then(|v| v.as_str()))
+                                    .map(|name| name.to_string())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
                         app.mode = Mode::ComponentPicker;
                         app.focus = Focus::List;
                         app.set_status(format!("Loading components for {project_key}..."), false);
                         match client.get_project_components(&project_key).await {
                             Ok(components) => {
-                                app.component_options = components
+                                app.component_catalog = components
                                     .into_iter()
                                     .filter_map(|component| {
                                         let name =
@@ -752,8 +786,9 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                         })
                                     })
                                     .collect();
-                                app.component_options
+                                app.component_catalog
                                     .sort_by_key(|option| option.label.to_lowercase());
+                                app.component_options = app.component_catalog.clone();
                                 app.component_state.select(Some(0));
                                 app.clear_status();
                             }
@@ -766,30 +801,87 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
 
             AppAction::RefreshComponentOptions => {
                 let query = app.component_query.to_lowercase();
-                if let Ok(components) = client
-                    .get_project_components(&app.component_project_key)
-                    .await
-                {
-                    app.component_options = components
-                        .into_iter()
-                        .filter_map(|component| {
-                            let name = component.get("name").and_then(|v| v.as_str())?.trim();
-                            if name.is_empty() {
-                                return None;
-                            }
-                            if !query.is_empty() && !name.to_lowercase().contains(&query) {
-                                return None;
-                            }
-                            Some(PickerOption {
-                                value: name.to_string(),
-                                label: name.to_string(),
+                app.component_options = app
+                    .component_catalog
+                    .iter()
+                    .filter(|option| {
+                        query.is_empty() || option.label.to_lowercase().contains(&query)
+                    })
+                    .cloned()
+                    .collect();
+                app.component_state.select(Some(0));
+            }
+
+            AppAction::OpenFixVersionPicker(key) => {
+                app.fix_version_issue_key = key.clone();
+                app.fix_version_query.clear();
+                app.fix_version_cursor = 0;
+                app.fix_version_selected.clear();
+                app.fix_version_options.clear();
+                app.fix_version_catalog.clear();
+                app.fix_version_state = ListState::default();
+                match client.get_issue(&key).await {
+                    Ok(issue) => {
+                        let project_key = issue
+                            .key
+                            .split_once('-')
+                            .map(|(project, _)| project.to_string())
+                            .unwrap_or(issue.project_key.clone());
+                        app.fix_version_project_key = project_key.clone();
+                        app.fix_version_selected = issue
+                            .fields
+                            .get("fixVersions")
+                            .and_then(|v| v.as_array())
+                            .map(|items| {
+                                items
+                                    .iter()
+                                    .filter_map(|item| item.get("name").and_then(|v| v.as_str()))
+                                    .map(|name| name.to_string())
+                                    .collect()
                             })
-                        })
-                        .collect();
-                    app.component_options
-                        .sort_by_key(|option| option.label.to_lowercase());
-                    app.component_state.select(Some(0));
+                            .unwrap_or_default();
+                        app.mode = Mode::FixVersionPicker;
+                        app.focus = Focus::List;
+                        app.set_status(format!("Loading fix versions for {project_key}..."), false);
+                        match client.get_project_versions(&project_key).await {
+                            Ok(versions) => {
+                                app.fix_version_catalog = versions
+                                    .into_iter()
+                                    .filter_map(|version| {
+                                        let name = version.get("name").and_then(|v| v.as_str())?.trim();
+                                        if name.is_empty() {
+                                            return None;
+                                        }
+                                        Some(PickerOption {
+                                            value: name.to_string(),
+                                            label: name.to_string(),
+                                        })
+                                    })
+                                    .collect();
+                                app.fix_version_catalog
+                                    .sort_by_key(|option| option.label.to_lowercase());
+                                app.fix_version_options = app.fix_version_catalog.clone();
+                                app.fix_version_state.select(Some(0));
+                                app.clear_status();
+                            }
+                            Err(e) => app.set_status(format!("Fix version lookup failed: {e}"), true),
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Issue lookup failed: {e}"), true),
                 }
+            }
+
+            AppAction::RefreshFixVersionOptions => {
+                let query = app.fix_version_query.to_lowercase();
+                app.fix_version_options = app
+                    .fix_version_catalog
+                    .iter()
+                    .filter(|option| {
+                        query.is_empty() || option.label.to_lowercase().contains(&query)
+                    })
+                    .cloned()
+                    .collect();
+                app.fix_version_state.select(Some(0));
             }
 
             AppAction::CreateIssue => {
@@ -895,6 +987,24 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                         app.set_status(format!("✓ Components updated on {key}"), false);
                     }
                     Err(e) => app.set_status(format!("Component edit failed: {e}"), true),
+                }
+            }
+
+            AppAction::EditFixVersions(key) => {
+                let fix_versions = app.fix_version_selected.iter().cloned().collect::<Vec<_>>();
+                let req = UpdateIssueRequest {
+                    fix_versions: Some(fix_versions),
+                    ..Default::default()
+                };
+                match client.update_issue(&key, req).await {
+                    Ok(()) => {
+                        let jql = app.jql.clone();
+                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                            app.set_issues(r.issues);
+                        }
+                        app.set_status(format!("✓ Fix versions updated on {key}"), false);
+                    }
+                    Err(e) => app.set_status(format!("Fix version edit failed: {e}"), true),
                 }
             }
 

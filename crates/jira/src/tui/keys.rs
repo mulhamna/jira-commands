@@ -33,6 +33,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         Mode::ColumnPicker => handle_column_picker_key(app, code),
         Mode::AssigneePicker => handle_assignee_picker_key(app, code),
         Mode::ComponentPicker => handle_component_picker_key(app, code),
+        Mode::FixVersionPicker => handle_fix_version_picker_key(app, code),
         Mode::Help => {
             app.mode = Mode::Browse;
             AppAction::None
@@ -125,6 +126,10 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::OpenComponentPicker)
             .unwrap_or(AppAction::None),
+        KeyCode::Char('v') => app
+            .selected_issue_key()
+            .map(AppAction::OpenFixVersionPicker)
+            .unwrap_or(AppAction::None),
         KeyCode::Char('u') => app
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
@@ -190,6 +195,14 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('w') => app
             .selected_issue_key()
             .map(AppAction::AddWorklog)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('m') => app
+            .selected_issue_key()
+            .map(AppAction::OpenComponentPicker)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('v') => app
+            .selected_issue_key()
+            .map(AppAction::OpenFixVersionPicker)
             .unwrap_or(AppAction::None),
         KeyCode::Char('u') => app
             .selected_issue_key()
@@ -607,6 +620,92 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Enter => {
             app.mode = Mode::Browse;
             AppAction::EditComponents(app.component_issue_key.clone())
+        }
+        _ => AppAction::None,
+    }
+}
+
+fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            let i = app
+                .fix_version_state
+                .selected()
+                .map(|i| (i + 1).min(app.fix_version_options.len().saturating_sub(1)))
+                .unwrap_or(0);
+            app.fix_version_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            let i = app
+                .fix_version_state
+                .selected()
+                .map(|i| i.saturating_sub(1))
+                .unwrap_or(0);
+            app.fix_version_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Left => {
+            if app.fix_version_cursor > 0 {
+                app.fix_version_cursor -= 1;
+            }
+            AppAction::None
+        }
+        KeyCode::Right => {
+            if app.fix_version_cursor < app.fix_version_query.chars().count() {
+                app.fix_version_cursor += 1;
+            }
+            AppAction::None
+        }
+        KeyCode::Backspace => {
+            if app.fix_version_cursor > 0 {
+                app.fix_version_cursor -= 1;
+                let byte_pos = app
+                    .fix_version_query
+                    .char_indices()
+                    .nth(app.fix_version_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(app.fix_version_query.len());
+                let char_len = app.fix_version_query[byte_pos..]
+                    .chars()
+                    .next()
+                    .map(|c| c.len_utf8())
+                    .unwrap_or(0);
+                app.fix_version_query.drain(byte_pos..byte_pos + char_len);
+                return AppAction::RefreshFixVersionOptions;
+            }
+            AppAction::None
+        }
+        KeyCode::Char(' ') => {
+            if let Some(idx) = app.fix_version_state.selected() {
+                if let Some(option) = app.fix_version_options.get(idx) {
+                    if app.fix_version_selected.contains(&option.value) {
+                        app.fix_version_selected.remove(&option.value);
+                    } else {
+                        app.fix_version_selected.insert(option.value.clone());
+                    }
+                }
+            }
+            AppAction::None
+        }
+        KeyCode::Char(c) => {
+            let byte_pos = app
+                .fix_version_query
+                .char_indices()
+                .nth(app.fix_version_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(app.fix_version_query.len());
+            app.fix_version_query.insert(byte_pos, c);
+            app.fix_version_cursor += 1;
+            AppAction::RefreshFixVersionOptions
+        }
+        KeyCode::Enter => {
+            app.mode = Mode::Browse;
+            AppAction::EditFixVersions(app.fix_version_issue_key.clone())
         }
         _ => AppAction::None,
     }

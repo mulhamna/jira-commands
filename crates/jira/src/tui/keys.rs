@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use super::app::{App, AppAction};
-use super::column::AVAILABLE_COLUMNS;
+use super::column::default_column_ids;
 use super::modal::{handle_modal_key, ModalOutcome};
 use super::mode::Mode;
 use super::panel::Focus;
@@ -83,6 +83,8 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
         }
         KeyCode::Char('C') => {
             app.mode = Mode::ColumnPicker;
+            app.column_picker_filter.clear();
+            app.column_picker_state.select(Some(0));
             AppAction::None
         }
         KeyCode::Char('p') => {
@@ -330,20 +332,24 @@ fn handle_transition_key(app: &mut App, code: KeyCode) -> AppAction {
 
 fn handle_column_picker_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
-        KeyCode::Esc | KeyCode::Char('q') => {
+        KeyCode::Esc => {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
+            let total = app.filtered_picker_fields().len();
+            if total == 0 {
+                return AppAction::None;
+            }
             let i = app
                 .column_picker_state
                 .selected()
-                .map(|i| (i + 1).min(AVAILABLE_COLUMNS.len() - 1))
+                .map(|i| (i + 1).min(total - 1))
                 .unwrap_or(0);
             app.column_picker_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .column_picker_state
                 .selected()
@@ -354,29 +360,52 @@ fn handle_column_picker_key(app: &mut App, code: KeyCode) -> AppAction {
         }
         KeyCode::Char(' ') => {
             if let Some(idx) = app.column_picker_state.selected() {
-                let column = AVAILABLE_COLUMNS[idx];
-                if app.visible_columns.contains(&column) {
-                    if app.visible_columns.len() > 1 {
-                        app.visible_columns.retain(|c| *c != column);
+                let filtered = app.filtered_picker_fields();
+                if let Some(spec) = filtered.get(idx) {
+                    let id = spec.id.clone();
+                    if app.visible_columns.contains(&id) {
+                        if app.visible_columns.len() > 1 {
+                            app.visible_columns.retain(|c| c != &id);
+                        } else {
+                            app.set_status("Keep at least one visible column", true);
+                        }
                     } else {
-                        app.set_status("Keep at least one visible column", true);
+                        app.visible_columns.push(id);
                     }
-                } else {
-                    app.visible_columns.push(column);
                 }
             }
             AppAction::None
         }
-        KeyCode::Enter | KeyCode::Char('s') => {
+        KeyCode::Enter => {
             app.mode = Mode::Browse;
             AppAction::SaveColumnPreferences
         }
-        KeyCode::Char('a') => {
-            app.visible_columns = AVAILABLE_COLUMNS.to_vec();
-            app.set_status("Selected all available columns", false);
+        KeyCode::Backspace => {
+            app.column_picker_filter.pop();
+            app.column_picker_state.select(Some(0));
             AppAction::None
         }
-        KeyCode::Char('r') => {
+        KeyCode::Char(c)
+            if c.is_ascii() && (c.is_alphanumeric() || c == ' ' || c == '-' || c == '_') =>
+        {
+            // Treat alphanumeric input as filter text. Preserve special hotkeys via Ctrl/Alt elsewhere.
+            // Note: KeyCode::Char(' ') is handled above, so we won't reach here for ' '.
+            app.column_picker_filter.push(c);
+            app.column_picker_state.select(Some(0));
+            AppAction::None
+        }
+        KeyCode::Tab => {
+            // Reset filter
+            app.column_picker_filter.clear();
+            app.column_picker_state.select(Some(0));
+            AppAction::None
+        }
+        KeyCode::F(2) => {
+            app.visible_columns = default_column_ids();
+            app.set_status("Selected all built-in columns", false);
+            AppAction::None
+        }
+        KeyCode::F(5) => {
             app.visible_columns = TuiPreferences::default().visible_columns;
             AppAction::ResetColumnPreferences
         }

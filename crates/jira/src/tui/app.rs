@@ -8,7 +8,7 @@ use crossterm::{
 };
 use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
 use jira_core::{
-    model::{Issue, UpdateIssueRequest},
+    model::{field::Field, Issue, UpdateIssueRequest},
     JiraClient,
 };
 
@@ -19,7 +19,7 @@ use ratatui::{
     Terminal,
 };
 
-use super::column::{format_column_summary, ColumnKind};
+use super::column::{format_column_summary, ColumnSpec};
 use super::keys;
 use super::modal::{Modal, ModalKind};
 use super::mode::Mode;
@@ -48,8 +48,10 @@ pub(super) struct App {
     pub(super) transitions: Vec<(String, String)>,
     pub(super) transition_list_state: ListState,
     pub(super) transition_issue_key: String,
-    pub(super) visible_columns: Vec<ColumnKind>,
+    pub(super) visible_columns: Vec<String>,
     pub(super) column_picker_state: ListState,
+    pub(super) column_picker_filter: String,
+    pub(super) available_fields: Vec<Field>,
     pub(super) assignee_query: String,
     pub(super) assignee_cursor: usize,
     pub(super) assignee_options: Vec<PickerOption>,
@@ -185,6 +187,8 @@ impl App {
             transition_issue_key: String::new(),
             visible_columns: prefs.visible_columns.clone(),
             column_picker_state,
+            column_picker_filter: String::new(),
+            available_fields: Vec::new(),
             assignee_query: String::new(),
             assignee_cursor: 0,
             assignee_options: Vec::new(),
@@ -379,6 +383,74 @@ impl App {
         self.saved_jql_state.select(Some(idx));
     }
 
+    /// Field IDs to fetch for the current visible columns plus the base set
+    /// required by the Issue parser.
+    pub(super) fn search_fields(&self) -> Vec<String> {
+        const BASE: &[&str] = &[
+            "summary",
+            "status",
+            "assignee",
+            "reporter",
+            "priority",
+            "issuetype",
+            "project",
+            "created",
+            "updated",
+            "description",
+            "attachment",
+        ];
+        let mut out: Vec<String> = BASE.iter().map(|s| s.to_string()).collect();
+        for id in &self.visible_columns {
+            if !out.iter().any(|x| x == id) {
+                out.push(id.clone());
+            }
+        }
+        out
+    }
+
+    pub(super) fn visible_column_specs(&self) -> Vec<ColumnSpec> {
+        self.visible_columns
+            .iter()
+            .map(|id| {
+                if let Some(field) = self.available_fields.iter().find(|f| &f.id == id) {
+                    ColumnSpec::from_field(field)
+                } else {
+                    ColumnSpec::for_id(id)
+                }
+            })
+            .collect()
+    }
+
+    /// Combined list of selectable fields for the column picker:
+    /// built-in columns first (in canonical order), then any custom/extra fields
+    /// fetched from the Jira instance, deduped by ID.
+    pub(super) fn picker_field_list(&self) -> Vec<ColumnSpec> {
+        use super::column::BUILTIN_COLUMNS;
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut out = Vec::new();
+        for b in BUILTIN_COLUMNS {
+            seen.insert(b.id.to_string());
+            out.push(ColumnSpec::for_id(b.id));
+        }
+        for f in &self.available_fields {
+            if seen.insert(f.id.clone()) {
+                out.push(ColumnSpec::from_field(f));
+            }
+        }
+        out
+    }
+
+    pub(super) fn filtered_picker_fields(&self) -> Vec<ColumnSpec> {
+        let q = self.column_picker_filter.trim().to_lowercase();
+        let all = self.picker_field_list();
+        if q.is_empty() {
+            return all;
+        }
+        all.into_iter()
+            .filter(|c| c.label.to_lowercase().contains(&q) || c.id.to_lowercase().contains(&q))
+            .collect()
+    }
+
     pub(super) fn selected_theme(&self) -> ThemeName {
         self.theme_state
             .selected()
@@ -505,6 +577,18 @@ impl App {
     }
 }
 
+async fn search_visible(
+    client: &JiraClient,
+    jql: &str,
+    app: &App,
+) -> jira_core::error::Result<jira_core::model::issue::SearchResult> {
+    let owned = app.search_fields();
+    let fields: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
+    client
+        .search_issues_with_fields(jql, None, Some(50), &fields)
+        .await
+}
+
 pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> {
     let jql = if let Some(proj) = &project {
         format!("project = {proj} ORDER BY updated DESC")
@@ -522,9 +606,13 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
 
     let mut app = App::new(jql.clone(), base_url, project.clone());
 
+    if let Ok(fields) = client.list_fields().await {
+        app.available_fields = fields;
+    }
+
     app.set_status("Loading issues...", false);
     terminal.draw(|f| ui(f, &mut app))?;
-    match client.search_issues(&jql, None, Some(50)).await {
+    match search_visible(&client, &jql, &app).await {
         Ok(result) => {
             app.set_issues(result.issues);
             app.clear_status();
@@ -553,7 +641,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 let jql = app.jql.clone();
                 app.set_status("Refreshing...", false);
                 terminal.draw(|f| ui(f, &mut app))?;
-                match client.search_issues(&jql, None, Some(50)).await {
+                match search_visible(&client, &jql, &app).await {
                     Ok(result) => {
                         app.set_issues(result.issues);
                         if app.focus == Focus::Detail {
@@ -568,7 +656,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             AppAction::ExecuteSearch(jql) => {
                 app.set_status("Searching...", false);
                 terminal.draw(|f| ui(f, &mut app))?;
-                match client.search_issues(&jql, None, Some(50)).await {
+                match search_visible(&client, &jql, &app).await {
                     Ok(result) => {
                         app.jql = jql;
                         app.set_issues(result.issues);
@@ -620,7 +708,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                         let jql = app.jql.clone();
                         app.set_status(format!("✓ Transitioned {issue_key}"), false);
                         terminal.draw(|f| ui(f, &mut app))?;
-                        if let Ok(result) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(result) = search_visible(&client, &jql, &app).await {
                             app.set_issues(result.issues);
                             app.warm_active_tab(&client).await;
                         }
@@ -894,7 +982,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match result {
                     Ok(Some(key)) => {
                         let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(r) = search_visible(&client, &jql, &app).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Created {key}"), false);
@@ -930,7 +1018,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match client.update_issue(&key, req).await {
                     Ok(()) => {
                         let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(r) = search_visible(&client, &jql, &app).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Assigned {key}"), false);
@@ -965,7 +1053,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match result {
                     Ok(true) => {
                         let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(r) = search_visible(&client, &jql, &app).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Labels updated on {key}"), false);
@@ -984,7 +1072,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match client.update_issue(&key, req).await {
                     Ok(()) => {
                         let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(r) = search_visible(&client, &jql, &app).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Components updated on {key}"), false);
@@ -1002,7 +1090,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 match client.update_issue(&key, req).await {
                     Ok(()) => {
                         let jql = app.jql.clone();
-                        if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                        if let Ok(r) = search_visible(&client, &jql, &app).await {
                             app.set_issues(r.issues);
                         }
                         app.set_status(format!("✓ Fix versions updated on {key}"), false);
@@ -1049,7 +1137,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             Ok(()) => {
                                 app.close_modal();
                                 let jql = app.jql.clone();
-                                if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                                if let Ok(r) = search_visible(&client, &jql, &app).await {
                                     app.set_issues(r.issues);
                                 }
                                 app.set_status(format!("✓ Updated {key}"), false);
@@ -1113,7 +1201,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             Ok(_) => {
                                 app.close_modal();
                                 let jql = app.jql.clone();
-                                if let Ok(r) = client.search_issues(&jql, None, Some(50)).await {
+                                if let Ok(r) = search_visible(&client, &jql, &app).await {
                                     app.set_issues(r.issues);
                                     app.warm_active_tab(&client).await;
                                 }
@@ -1133,11 +1221,12 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 app.prefs.visible_columns = app.visible_columns.clone();
                 app.prefs.normalize();
                 app.visible_columns = app.prefs.visible_columns.clone();
+                let specs = app.visible_column_specs();
                 match app.prefs.save() {
                     Ok(()) => app.set_status(
                         format!(
                             "✓ Saved column preferences ({})",
-                            format_column_summary(&app.visible_columns)
+                            format_column_summary(&specs)
                         ),
                         false,
                     ),
@@ -1148,10 +1237,11 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::ResetColumnPreferences => {
+                let specs = app.visible_column_specs();
                 app.set_status(
                     format!(
                         "Reset to default columns ({})",
-                        format_column_summary(&app.visible_columns)
+                        format_column_summary(&specs)
                     ),
                     false,
                 );
@@ -1160,7 +1250,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             AppAction::ApplySavedJql(jql) => {
                 app.set_status("Loading saved query...", false);
                 terminal.draw(|f| ui(f, &mut app))?;
-                match client.search_issues(&jql, None, Some(50)).await {
+                match search_visible(&client, &jql, &app).await {
                     Ok(result) => {
                         app.jql = jql;
                         app.set_issues(result.issues);

@@ -284,14 +284,38 @@ impl JiraClient {
         next_page_token: Option<&str>,
         max_results: Option<u32>,
     ) -> Result<SearchResult> {
+        const DEFAULT_FIELDS: &[&str] = &[
+            "summary",
+            "status",
+            "assignee",
+            "reporter",
+            "priority",
+            "issuetype",
+            "project",
+            "created",
+            "updated",
+            "description",
+        ];
+        self.search_issues_with_fields(jql, next_page_token, max_results, DEFAULT_FIELDS)
+            .await
+    }
+
+    /// Search issues with an explicit `fields` list (e.g. `["*all"]`, `["*navigable"]`,
+    /// or specific field IDs like `["summary", "components", "customfield_10010"]`).
+    pub async fn search_issues_with_fields(
+        &self,
+        jql: &str,
+        next_page_token: Option<&str>,
+        max_results: Option<u32>,
+        fields: &[&str],
+    ) -> Result<SearchResult> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/search/jql");
 
         let mut body = json!({
             "jql": jql,
             "maxResults": max_results.unwrap_or(50),
-            "fields": ["summary", "status", "assignee", "reporter", "priority",
-                       "issuetype", "project", "created", "updated", "description"]
+            "fields": fields,
         });
 
         if let Some(token) = next_page_token {
@@ -310,6 +334,47 @@ impl JiraClient {
             next_page_token: raw.next_page_token,
             total: raw.total,
         })
+    }
+
+    /// Fetch all visible fields (system + custom) from the Jira instance.
+    /// Endpoint: `GET /rest/api/3/field`.
+    pub async fn list_fields(&self) -> Result<Vec<Field>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url("/field");
+
+        #[derive(serde::Deserialize)]
+        struct FieldEntry {
+            id: String,
+            name: String,
+            #[serde(default)]
+            schema: Option<Value>,
+        }
+
+        let http = &self.http;
+        let raw: Vec<FieldEntry> = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(raw
+            .into_iter()
+            .map(|f| {
+                let field_type = f
+                    .schema
+                    .as_ref()
+                    .and_then(|s| s.get("type"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                Field {
+                    id: f.id,
+                    name: f.name,
+                    field_type,
+                    required: false,
+                    schema: f.schema,
+                    allowed_values: None,
+                }
+            })
+            .collect())
     }
 
     /// Fetch a single issue by key.

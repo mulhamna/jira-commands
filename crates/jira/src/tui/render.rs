@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use super::app::App;
-use super::column::{format_column_summary, AVAILABLE_COLUMNS};
+use super::column::format_column_summary;
 use super::modal::render_modal;
 use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
@@ -129,7 +129,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
         Mode::Transition => " j/k:move  Enter:execute  Esc:cancel".to_string(),
         Mode::Help => " Any key: close".to_string(),
-        Mode::ColumnPicker => " j/k:move  Space:toggle  a:all  Enter:save  Esc:cancel".to_string(),
+        Mode::ColumnPicker => " ↑/↓:move  Space:toggle  type:filter  Tab:clear  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::FixVersionPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
@@ -182,14 +182,10 @@ fn render_master_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palet
 }
 
 fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let columns = if app.visible_columns.is_empty() {
-        AVAILABLE_COLUMNS.to_vec()
-    } else {
-        app.visible_columns.clone()
-    };
+    let columns = app.visible_column_specs();
 
-    let header_cells = columns.iter().map(|column| {
-        Cell::from(column.label()).style(
+    let header_cells = columns.iter().map(|col| {
+        Cell::from(col.label.clone()).style(
             Style::default()
                 .fg(palette.tab_active)
                 .add_modifier(Modifier::BOLD),
@@ -200,12 +196,12 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let rows = app.issues.iter().map(|issue| {
         let cells = columns
             .iter()
-            .map(|column| column.cell(issue))
+            .map(|col| col.cell(issue))
             .collect::<Vec<_>>();
         Row::new(cells)
     });
 
-    let widths: Vec<Constraint> = columns.iter().map(|column| column.width()).collect();
+    let widths: Vec<Constraint> = columns.iter().map(|col| col.width).collect();
     let title = if app.focus == Focus::Detail {
         " Issues (master) "
     } else {
@@ -558,41 +554,39 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pa
 }
 
 fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let popup_area = centered_rect(54, 72, area);
-    let [summary_area, list_area, hint_area] = Layout::default()
+    let popup_area = centered_rect(58, 80, area);
+    let [header_area, search_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Min(8),
-            Constraint::Length(4),
+            Constraint::Length(3),
         ])
         .areas(popup_area);
 
-    let items: Vec<ListItem> = AVAILABLE_COLUMNS
+    let filtered = app.filtered_picker_fields();
+    let specs = app.visible_column_specs();
+
+    let items: Vec<ListItem> = filtered
         .iter()
-        .map(|column| {
-            let checked = if app.visible_columns.contains(column) {
+        .map(|col| {
+            let checked = if app.visible_columns.contains(&col.id) {
                 "[x]"
             } else {
                 "[ ]"
             };
-            ListItem::new(format!("{checked} {}", column.label()))
+            ListItem::new(format!("{checked} {} ({})", col.label, col.id))
         })
         .collect();
 
-    let selected_summary = Paragraph::new(vec![
-        Line::from(vec![
-            Span::styled("Selected: ", Style::default().fg(palette.muted)),
-            Span::styled(
-                format_column_summary(&app.visible_columns),
-                Style::default().fg(palette.accent),
-            ),
-        ]),
-        Line::from(Span::styled(
-            "Tip: press Space to toggle columns, then S or Enter to save.",
-            Style::default().fg(palette.muted),
-        )),
-    ])
+    let selected_summary = Paragraph::new(vec![Line::from(vec![
+        Span::styled("Active: ", Style::default().fg(palette.muted)),
+        Span::styled(
+            format_column_summary(&specs),
+            Style::default().fg(palette.accent),
+        ),
+    ])])
     .block(
         Block::default()
             .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
@@ -600,6 +594,29 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
             .title(" Column Settings ")
             .style(Style::default().bg(Color::Black)),
     );
+
+    let search_display = format!(
+        "{}{}",
+        app.column_picker_filter,
+        if app.column_picker_filter.is_empty() {
+            "type to filter..."
+        } else {
+            ""
+        }
+    );
+    let search_bar = Paragraph::new(search_display)
+        .style(Style::default().fg(if app.column_picker_filter.is_empty() {
+            palette.muted
+        } else {
+            palette.accent
+        }))
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(" Search ")
+                .style(Style::default().bg(Color::Black)),
+        );
 
     let list = List::new(items)
         .block(
@@ -616,10 +633,9 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
         )
         .highlight_symbol("> ");
 
-    let hints = Paragraph::new(vec![
-        Line::from("↑/↓ move   Space toggle   a select all   r reset defaults"),
-        Line::from("s or Enter save   Esc cancel"),
-    ])
+    let hints = Paragraph::new(Line::from(
+        "↑/↓ move   Space toggle   Enter save   Tab clear filter   Esc cancel",
+    ))
     .block(
         Block::default()
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
@@ -629,7 +645,8 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
     .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
-    f.render_widget(selected_summary, summary_area);
+    f.render_widget(selected_summary, header_area);
+    f.render_widget(search_bar, search_area);
     f.render_stateful_widget(list, list_area, &mut app.column_picker_state);
     f.render_widget(hints, hint_area);
 }

@@ -2,8 +2,9 @@ use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{Context, Result};
 use jira_core::config::config_file_path;
+use serde_json::Value;
 
-use super::column::{ColumnKind, AVAILABLE_COLUMNS};
+use super::column::{default_column_ids, BUILTIN_COLUMNS};
 use super::theme::ThemeName;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -14,7 +15,8 @@ pub(super) struct SavedJql {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(super) struct TuiPreferences {
-    pub(super) visible_columns: Vec<ColumnKind>,
+    #[serde(deserialize_with = "deserialize_column_ids")]
+    pub(super) visible_columns: Vec<String>,
     #[serde(default)]
     pub(super) saved_jqls: Vec<SavedJql>,
     #[serde(default)]
@@ -24,7 +26,7 @@ pub(super) struct TuiPreferences {
 impl Default for TuiPreferences {
     fn default() -> Self {
         Self {
-            visible_columns: AVAILABLE_COLUMNS.to_vec(),
+            visible_columns: default_column_ids(),
             saved_jqls: vec![
                 SavedJql {
                     name: "My open issues".into(),
@@ -74,14 +76,16 @@ impl TuiPreferences {
 
     pub(super) fn normalize(&mut self) {
         let mut seen = HashSet::new();
-        self.visible_columns.retain(|c| seen.insert(*c));
-        self.visible_columns
-            .retain(|c| AVAILABLE_COLUMNS.contains(c));
+        self.visible_columns.retain(|c| seen.insert(c.clone()));
+        self.visible_columns.retain(|c| !c.trim().is_empty());
         if self.visible_columns.is_empty() {
-            self.visible_columns = AVAILABLE_COLUMNS.to_vec();
+            self.visible_columns = default_column_ids();
         }
-        if !self.visible_columns.contains(&ColumnKind::Summary) {
-            self.visible_columns.push(ColumnKind::Summary);
+        // Always keep summary visible — it's the main display column.
+        if !self.visible_columns.iter().any(|c| c == "summary")
+            && BUILTIN_COLUMNS.iter().any(|b| b.id == "summary")
+        {
+            self.visible_columns.push("summary".to_string());
         }
 
         self.saved_jqls
@@ -93,4 +97,36 @@ fn tui_preferences_path() -> PathBuf {
     let mut path = config_file_path();
     path.set_file_name("tui-preferences.json");
     path
+}
+
+/// Deserialize column IDs, accepting both new string IDs and legacy enum variants
+/// (e.g. `"Key"` → `"key"`, `"FixVersions"` → `"fixVersions"`, `"Type"` → `"issuetype"`).
+fn deserialize_column_ids<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let raw = Vec::<Value>::deserialize(deserializer)?;
+    Ok(raw.into_iter().filter_map(legacy_to_id).collect())
+}
+
+fn legacy_to_id(v: Value) -> Option<String> {
+    let s = v.as_str()?.to_string();
+    let mapped = match s.as_str() {
+        "Key" => "key",
+        "Type" => "issuetype",
+        "Priority" => "priority",
+        "Status" => "status",
+        "Assignee" => "assignee",
+        "Reporter" => "reporter",
+        "Project" => "project",
+        "Created" => "created",
+        "Updated" => "updated",
+        "Labels" => "labels",
+        "Components" => "components",
+        "FixVersions" => "fixVersions",
+        "Summary" => "summary",
+        other => other,
+    };
+    Some(mapped.to_string())
 }

@@ -75,6 +75,7 @@ pub(super) struct App {
     pub(super) fix_version_catalog: Vec<PickerOption>,
     pub(super) prefs: TuiPreferences,
     pub(super) saved_jql_state: ListState,
+    pub(super) jql_picker_filter: String,
     pub(super) theme_state: ListState,
     pub(super) server_info_lines: Vec<String>,
     pub(super) config_lines: Vec<String>,
@@ -212,6 +213,7 @@ impl App {
             fix_version_catalog: Vec::new(),
             prefs,
             saved_jql_state,
+            jql_picker_filter: String::new(),
             theme_state,
             server_info_lines: Vec::new(),
             config_lines: Vec::new(),
@@ -357,16 +359,35 @@ impl App {
         }
     }
 
+    /// Returns filtered (orig_index, SavedJql) pairs matching jql_picker_filter.
+    pub(super) fn filtered_saved_jqls(&self) -> Vec<(usize, &SavedJql)> {
+        let q = self.jql_picker_filter.trim().to_lowercase();
+        self.prefs
+            .saved_jqls
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| {
+                q.is_empty()
+                    || s.name.to_lowercase().contains(&q)
+                    || s.jql.to_lowercase().contains(&q)
+            })
+            .collect()
+    }
+
     pub(super) fn selected_saved_jql(&self) -> Option<&SavedJql> {
+        let filtered = self.filtered_saved_jqls();
         self.saved_jql_state
             .selected()
-            .and_then(|i| self.prefs.saved_jqls.get(i))
+            .and_then(|i| filtered.get(i))
+            .map(|(_, s)| *s)
     }
 
     pub(super) fn selected_saved_jql_index(&self) -> Option<usize> {
+        let filtered = self.filtered_saved_jqls();
         self.saved_jql_state
             .selected()
-            .filter(|index| *index < self.prefs.saved_jqls.len())
+            .and_then(|i| filtered.get(i))
+            .map(|(orig, _)| *orig)
     }
 
     pub(super) fn clamp_saved_jql_selection(&mut self) {

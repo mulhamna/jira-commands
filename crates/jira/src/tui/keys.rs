@@ -88,6 +88,8 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Char('p') => {
+            app.jql_picker_filter.clear();
+            app.saved_jql_state.select(Some(0));
             app.mode = Mode::SavedJqlPicker;
             AppAction::None
         }
@@ -494,20 +496,24 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
 
 fn handle_saved_jql_key(app: &mut App, code: KeyCode) -> AppAction {
     match code {
-        KeyCode::Esc | KeyCode::Char('q') => {
+        KeyCode::Esc => {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
+            let total = app.filtered_saved_jqls().len();
+            if total == 0 {
+                return AppAction::None;
+            }
             let i = app
                 .saved_jql_state
                 .selected()
-                .map(|i| (i + 1).min(app.prefs.saved_jqls.len().saturating_sub(1)))
+                .map(|i| (i + 1).min(total - 1))
                 .unwrap_or(0);
             app.saved_jql_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .saved_jql_state
                 .selected()
@@ -523,15 +529,30 @@ fn handle_saved_jql_key(app: &mut App, code: KeyCode) -> AppAction {
             }
             AppAction::None
         }
-        KeyCode::Char('c') => AppAction::CreateSavedJql,
-        KeyCode::Char('e') => app
+        KeyCode::Tab => {
+            app.jql_picker_filter.clear();
+            app.saved_jql_state.select(Some(0));
+            AppAction::None
+        }
+        KeyCode::Backspace => {
+            app.jql_picker_filter.pop();
+            app.saved_jql_state.select(Some(0));
+            AppAction::None
+        }
+        KeyCode::Char('c') if app.jql_picker_filter.is_empty() => AppAction::CreateSavedJql,
+        KeyCode::Char('e') if app.jql_picker_filter.is_empty() => app
             .selected_saved_jql_index()
             .map(AppAction::EditSavedJql)
             .unwrap_or(AppAction::None),
-        KeyCode::Char('d') => app
+        KeyCode::Char('d') if app.jql_picker_filter.is_empty() => app
             .selected_saved_jql_index()
             .map(AppAction::DeleteSavedJql)
             .unwrap_or(AppAction::None),
+        KeyCode::Char(c) => {
+            app.jql_picker_filter.push(c);
+            app.saved_jql_state.select(Some(0));
+            AppAction::None
+        }
         _ => AppAction::None,
     }
 }

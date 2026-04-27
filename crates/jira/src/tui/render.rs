@@ -133,7 +133,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::FixVersionPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
-        Mode::SavedJqlPicker => " j/k:move  Enter:run  c:new  e:edit  d:delete  Esc:cancel".to_string(),
+        Mode::SavedJqlPicker => " ↑/↓:move  Enter:run  type:filter  Tab:clear  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         Mode::Modal => {
             " Tab:next field  Ctrl+S:submit  Enter:newline (multiline)  Esc:cancel".to_string()
@@ -884,21 +884,22 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
 }
 
 fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let popup_area = centered_rect(68, 68, area);
-    let [summary_area, list_area, hint_area] = Layout::default()
+    let popup_area = centered_rect(72, 75, area);
+    let [summary_area, search_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(4),
+            Constraint::Length(3),
+            Constraint::Min(6),
+            Constraint::Length(3),
         ])
         .areas(popup_area);
 
-    let items: Vec<ListItem> = app
-        .prefs
-        .saved_jqls
+    let filtered = app.filtered_saved_jqls();
+
+    let items: Vec<ListItem> = filtered
         .iter()
-        .map(|saved| ListItem::new(format!("{}  •  {}", saved.name, saved.jql)))
+        .map(|(_, saved)| ListItem::new(format!("{}  •  {}", saved.name, saved.jql)))
         .collect();
 
     let selected_summary = if let Some(saved) = app.selected_saved_jql() {
@@ -912,7 +913,7 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
                 Style::default().fg(palette.header_fg),
             )),
         ])
-    } else {
+    } else if app.prefs.saved_jqls.is_empty() {
         Paragraph::new(vec![
             Line::from(Span::styled(
                 "No saved queries yet.",
@@ -923,6 +924,11 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
                 Style::default().fg(palette.muted),
             )),
         ])
+    } else {
+        Paragraph::new(Line::from(Span::styled(
+            "No results.",
+            Style::default().fg(palette.muted),
+        )))
     }
     .block(
         Block::default()
@@ -931,6 +937,23 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
             .title(" Saved Queries ")
             .style(Style::default().bg(Color::Black)),
     );
+
+    let search_display = if app.jql_picker_filter.is_empty() {
+        Span::styled("type to filter...", Style::default().fg(palette.muted))
+    } else {
+        Span::styled(
+            app.jql_picker_filter.clone(),
+            Style::default().fg(palette.accent),
+        )
+    };
+    let search_bar = Paragraph::new(Line::from(search_display))
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(" Search ")
+                .style(Style::default().bg(Color::Black)),
+        );
 
     let list = List::new(items)
         .block(
@@ -947,10 +970,9 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
         )
         .highlight_symbol("> ");
 
-    let hints = Paragraph::new(vec![
-        Line::from("↑/↓ move   Enter run   c create   e edit   d delete"),
-        Line::from("Esc cancel"),
-    ])
+    let hints = Paragraph::new(Line::from(
+        "↑/↓ move   Enter run   c create   e edit   d delete   Tab clear   Esc cancel",
+    ))
     .block(
         Block::default()
             .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
@@ -961,6 +983,7 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
 
     f.render_widget(Clear, popup_area);
     f.render_widget(selected_summary, summary_area);
+    f.render_widget(search_bar, search_area);
     f.render_stateful_widget(list, list_area, &mut app.saved_jql_state);
     f.render_widget(hints, hint_area);
 }

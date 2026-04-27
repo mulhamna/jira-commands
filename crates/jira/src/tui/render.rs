@@ -44,6 +44,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ColumnPicker => " Jira CLI — Columns ".to_string(),
         Mode::AssigneePicker => " Jira CLI — Assignee Picker ".to_string(),
         Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
+        Mode::FixVersionPicker => " Jira CLI — Fix Version Picker ".to_string(),
         Mode::SavedJqlPicker => " Jira CLI — Saved Queries ".to_string(),
         Mode::ServerInfo => " Jira CLI — Server ".to_string(),
         Mode::ConfigView => " Jira CLI — Config ".to_string(),
@@ -86,6 +87,10 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             render_browse(f, app, chunks[1], palette);
             render_component_picker_popup(f, app, size, palette);
         }
+        Mode::FixVersionPicker => {
+            render_browse(f, app, chunks[1], palette);
+            render_fix_version_picker_popup(f, app, size, palette);
+        }
         Mode::SavedJqlPicker => {
             render_browse(f, app, chunks[1], palette);
             render_saved_jql_popup(f, app, size, palette);
@@ -114,11 +119,11 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
-            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  u:upload  o:browser  ?:help  q:quit"
+            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  a:assign  ;:comment  w:worklog  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  a:assign  ;:comment  w:worklog  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -127,6 +132,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::ColumnPicker => " j/k:move  Space:toggle  a:all  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
+        Mode::FixVersionPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::SavedJqlPicker => " j/k:move  Enter:run  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         Mode::Modal => {
@@ -699,7 +705,7 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palett
 }
 
 fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let popup_area = centered_rect(70, 75, area);
+    let popup_area = side_panel_rect(area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -772,6 +778,87 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palet
         .component_query
         .chars()
         .take(app.component_cursor)
+        .collect();
+    f.set_cursor_position((
+        input_area.x + 1 + before_cursor.len() as u16,
+        input_area.y + 1,
+    ));
+}
+
+fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let popup_area = side_panel_rect(area);
+    let [input_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(4),
+        ])
+        .areas(popup_area);
+
+    let input = Paragraph::new(app.fix_version_query.as_str())
+        .block(
+            Block::default()
+                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(format!(
+                    " Fix Versions: {} ({}) ",
+                    app.fix_version_issue_key, app.fix_version_project_key
+                ))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(palette.header_fg));
+
+    let items: Vec<ListItem> = app
+        .fix_version_options
+        .iter()
+        .map(|option| {
+            let checked = if app.fix_version_selected.contains(&option.value) {
+                "[x]"
+            } else {
+                "[ ]"
+            };
+            ListItem::new(format!("{checked} {}", option.label))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let hints = Paragraph::new(vec![
+        Line::from("Type to filter project fix versions"),
+        Line::from("↑/↓ move   Space toggle   Enter save"),
+        Line::from("Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(palette.muted));
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(input, input_area);
+    f.render_stateful_widget(list, list_area, &mut app.fix_version_state);
+    f.render_widget(hints, hint_area);
+
+    let before_cursor: String = app
+        .fix_version_query
+        .chars()
+        .take(app.fix_version_cursor)
         .collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
@@ -1018,4 +1105,12 @@ fn bottom_bar_rect(r: Rect) -> Rect {
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(r);
     layout[1]
+}
+
+fn side_panel_rect(area: Rect) -> Rect {
+    let [_, panel] = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
+        .areas(area);
+    panel
 }

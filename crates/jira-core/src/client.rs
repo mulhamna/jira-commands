@@ -677,6 +677,19 @@ impl JiraClient {
         Ok(components)
     }
 
+    /// List fix versions available within a project.
+    pub async fn get_project_versions(&self, project_key: &str) -> Result<Vec<Value>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/project/{project_key}/versions"));
+
+        let http = &self.http;
+        let versions: Vec<Value> = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(versions)
+    }
+
     /// Upload a file as an attachment to an issue.
     pub async fn upload_attachment(
         &self,

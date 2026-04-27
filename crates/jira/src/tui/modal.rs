@@ -189,7 +189,7 @@ fn forward_to_focus(modal: &mut Modal, key: KeyEvent) {
 }
 
 pub(super) fn render_modal(f: &mut Frame, modal: &Modal, palette: Palette, area: Rect) {
-    let outer = centered_rect(80, 80, area);
+    let outer = side_modal_rect(area);
     f.render_widget(Clear, outer);
 
     let block = Block::default()
@@ -255,22 +255,10 @@ pub(super) fn render_modal(f: &mut Frame, modal: &Modal, palette: Palette, area:
     f.render_widget(status, chunks[status_idx]);
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(area);
-
-    Layout::default()
+fn side_modal_rect(area: Rect) -> Rect {
+    let panels = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[0]
+        .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
+        .split(area);
+    panels[1]
 }

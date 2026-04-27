@@ -14,18 +14,22 @@ use crate::datetime::build_worklog_started;
 
 use super::picker::prompt_assignee_selection;
 
-pub(super) fn suspend_tui<B: ratatui::backend::Backend + io::Write>(
-    terminal: &mut Terminal<B>,
-) -> Result<()> {
+pub(super) fn suspend_tui<B>(terminal: &mut Terminal<B>) -> Result<()>
+where
+    B: ratatui::backend::Backend + io::Write,
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     Ok(())
 }
 
-pub(super) fn resume_tui<B: ratatui::backend::Backend + io::Write>(
-    terminal: &mut Terminal<B>,
-) -> Result<()> {
+pub(super) fn resume_tui<B>(terminal: &mut Terminal<B>) -> Result<()>
+where
+    B: ratatui::backend::Backend + io::Write,
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
     enable_raw_mode()?;
     execute!(terminal.backend_mut(), EnterAlternateScreen)?;
     terminal.clear()?;

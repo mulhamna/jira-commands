@@ -14,6 +14,7 @@ pub(super) enum ModalKind {
     EditIssue { key: String },
     AddComment { key: String },
     UploadAttachment { key: String },
+    AddWorklog { key: String },
 }
 
 impl ModalKind {
@@ -22,6 +23,7 @@ impl ModalKind {
             ModalKind::EditIssue { key } => format!(" Edit {key} "),
             ModalKind::AddComment { key } => format!(" Comment on {key} "),
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
+            ModalKind::AddWorklog { key } => format!(" Log Work on {key} "),
         }
     }
 
@@ -30,6 +32,9 @@ impl ModalKind {
             ModalKind::EditIssue { .. } => " Tab: next field   Ctrl+S: save   Esc: cancel ",
             ModalKind::AddComment { .. } => " Ctrl+S: send   Esc: cancel ",
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
+            ModalKind::AddWorklog { .. } => {
+                " Tab: next field   Ctrl+S: log   Esc: cancel "
+            }
         }
     }
 }
@@ -106,6 +111,43 @@ impl Modal {
                 area,
                 multiline: false,
             }],
+            focus: 0,
+            error: None,
+            busy: false,
+        }
+    }
+
+    pub(super) fn add_worklog(key: String) -> Self {
+        let make = |placeholder: &'static str| {
+            let mut a = TextArea::default();
+            a.set_cursor_line_style(Style::default());
+            a.set_placeholder_text(placeholder);
+            a
+        };
+        Self {
+            kind: ModalKind::AddWorklog { key },
+            fields: vec![
+                ModalField {
+                    label: "Time spent  (e.g. 2h, 30m, 1d, 1h 30m)",
+                    area: make("required"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Date  (YYYY-MM-DD, blank = today)",
+                    area: make("blank = today"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Start time  (HH:MM, blank = now)",
+                    area: make("blank = now"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Comment  (optional)",
+                    area: make(""),
+                    multiline: true,
+                },
+            ],
             focus: 0,
             error: None,
             busy: false,

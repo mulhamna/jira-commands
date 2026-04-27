@@ -10,7 +10,6 @@ use ratatui::Terminal;
 
 use super::prefs::SavedJql;
 
-use crate::datetime::build_worklog_started;
 
 use super::picker::prompt_assignee_selection;
 
@@ -160,63 +159,6 @@ pub(super) fn tui_confirm_delete_saved_jql(saved: &SavedJql) -> Result<bool> {
         .map_err(Into::into)
 }
 
-pub(super) async fn tui_add_worklog(client: &JiraClient, key: &str) -> Result<bool> {
-    use chrono::Local;
-    use inquire::Text;
-
-    println!("\n── Add Worklog to {key} ──────────────────────────────");
-    println!("  Time format examples: 2h, 30m, 1d, 1h 30m");
-    println!(
-        "  Date format: YYYY-MM-DD (blank = today {})",
-        Local::now().format("%Y-%m-%d")
-    );
-    println!(
-        "  Start time format: HH:MM or HH:MM:SS (blank = now {})\n",
-        Local::now().format("%H:%M")
-    );
-
-    let time = match Text::new("Time spent (blank to cancel):").prompt_skippable()? {
-        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
-        _ => return Ok(false),
-    };
-
-    let date = Text::new("Date (blank = today):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
-
-    let start = Text::new("Start time (blank = now):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
-
-    let comment = Text::new("Comment (blank to skip):")
-        .prompt_skippable()?
-        .and_then(|s| {
-            if s.trim().is_empty() {
-                None
-            } else {
-                Some(s.trim().to_string())
-            }
-        });
-
-    let started = build_worklog_started(date.as_deref(), start.as_deref())?;
-
-    client
-        .add_worklog(key, &time, comment.as_deref(), started.as_deref())
-        .await?;
-    Ok(true)
-}
 
 pub(super) async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bool> {
     use inquire::Text;

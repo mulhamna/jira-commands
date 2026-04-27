@@ -26,8 +26,8 @@ use super::mode::Mode;
 use super::picker::PickerOption;
 use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
-    resume_tui, suspend_tui, tui_add_worklog, tui_confirm_delete_saved_jql, tui_create_issue,
-    tui_edit_labels, tui_edit_saved_jql,
+    resume_tui, suspend_tui, tui_confirm_delete_saved_jql, tui_create_issue, tui_edit_labels,
+    tui_edit_saved_jql,
 };
 use super::render::ui;
 use super::theme::ThemeName;
@@ -1032,18 +1032,7 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
             }
 
             AppAction::AddWorklog(key) => {
-                suspend_tui(&mut terminal)?;
-                let result = tui_add_worklog(&client, &key).await;
-                resume_tui(&mut terminal)?;
-                match result {
-                    Ok(true) => {
-                        app.detail.worklogs = None;
-                        app.warm_active_tab(&client).await;
-                        app.set_status(format!("✓ Worklog added to {key}"), false)
-                    }
-                    Ok(false) => app.set_status("Worklog cancelled", false),
-                    Err(e) => app.set_status(format!("Worklog failed: {e}"), true),
-                }
+                app.open_modal(Modal::add_worklog(key));
             }
 
             AppAction::EditLabels(key) => {
@@ -1210,6 +1199,60 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             Err(e) => {
                                 if let Some(m) = app.modal.as_mut() {
                                     m.set_error(format!("Upload failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::AddWorklog { key } => {
+                        let time_spent = modal.field_text(0);
+                        let time_spent = time_spent.trim();
+                        if time_spent.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Time spent is required (e.g. 2h, 30m)");
+                            }
+                            continue;
+                        }
+                        let date_raw = modal.field_text(1);
+                        let date = date_raw.trim();
+                        let date = if date.is_empty() { None } else { Some(date) };
+                        let start_raw = modal.field_text(2);
+                        let start = start_raw.trim();
+                        let start = if start.is_empty() { None } else { Some(start) };
+                        let comment_raw = modal.field_text(3);
+                        let comment = comment_raw.trim();
+                        let comment = if comment.is_empty() {
+                            None
+                        } else {
+                            Some(comment)
+                        };
+
+                        let started = match crate::datetime::build_worklog_started(date, start) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client
+                            .add_worklog(&key, time_spent, comment, started.as_deref())
+                            .await
+                        {
+                            Ok(_) => {
+                                app.close_modal();
+                                app.detail.worklogs = None;
+                                app.warm_active_tab(&client).await;
+                                app.set_status(format!("✓ Worklog added to {key}"), false);
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Worklog failed: {e}"));
                                 }
                             }
                         }

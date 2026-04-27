@@ -848,7 +848,8 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                 app.fix_version_catalog = versions
                                     .into_iter()
                                     .filter_map(|version| {
-                                        let name = version.get("name").and_then(|v| v.as_str())?.trim();
+                                        let name =
+                                            version.get("name").and_then(|v| v.as_str())?.trim();
                                         if name.is_empty() {
                                             return None;
                                         }
@@ -864,7 +865,9 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                 app.fix_version_state.select(Some(0));
                                 app.clear_status();
                             }
-                            Err(e) => app.set_status(format!("Fix version lookup failed: {e}"), true),
+                            Err(e) => {
+                                app.set_status(format!("Fix version lookup failed: {e}"), true)
+                            }
                         }
                     }
                     Err(e) => app.set_status(format!("Issue lookup failed: {e}"), true),

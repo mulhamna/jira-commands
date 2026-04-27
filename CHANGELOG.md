@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.21.1](https://github.com/mulhamna/jira-commands/compare/v0.21.0...v0.21.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* move TUI editors to side panel and restore issue selectors ([#138](https://github.com/mulhamna/jira-commands/issues/138)) ([72ae91a](https://github.com/mulhamna/jira-commands/commit/72ae91a3625d33871b69ffb731dba3389f073bd7))
+
 ## [0.21.0](https://github.com/mulhamna/jira-commands/compare/v0.20.0...v0.21.0) (2026-04-26)
 
 

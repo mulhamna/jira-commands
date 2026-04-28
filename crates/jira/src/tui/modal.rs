@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -55,6 +57,7 @@ pub(super) struct Modal {
     pub mention_options: Vec<PickerOption>,
     pub mention_state: ListState,
     pub mention_map: Vec<(String, String)>,
+    pub mention_cache: HashMap<String, Vec<PickerOption>>,
 }
 
 impl Modal {
@@ -91,6 +94,7 @@ impl Modal {
             mention_options: Vec::new(),
             mention_state: ListState::default(),
             mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -112,6 +116,7 @@ impl Modal {
             mention_options: Vec::new(),
             mention_state: ListState::default(),
             mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -133,6 +138,7 @@ impl Modal {
             mention_options: Vec::new(),
             mention_state: ListState::default(),
             mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -175,6 +181,7 @@ impl Modal {
             mention_options: Vec::new(),
             mention_state: ListState::default(),
             mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -266,6 +273,7 @@ fn handle_mention_key(modal: &mut Modal, code: KeyCode) -> ModalOutcome {
             modal.mention_active = false;
             modal.mention_query.clear();
             modal.mention_options.clear();
+            modal.mention_state = ListState::default();
             ModalOutcome::Continue
         }
         KeyCode::Down | KeyCode::Char('j') => {
@@ -395,7 +403,9 @@ fn render_mention_overlay(f: &mut Frame, modal: &mut Modal, palette: Palette, ar
     };
 
     let title = if modal.mention_query.is_empty() {
-        " @mention — type to search ".to_string()
+        " @mention — type 2+ chars ".to_string()
+    } else if modal.mention_query.chars().count() < 2 {
+        format!(" @{}  (type {} more) ", modal.mention_query, 2 - modal.mention_query.chars().count())
     } else {
         format!(" @{} ", modal.mention_query)
     };

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io, time::Duration};
+use std::{collections::{HashMap, HashSet}, io, time::Duration};
 
 use anyhow::Result;
 use crossterm::{
@@ -79,7 +79,9 @@ pub(super) struct App {
     pub(super) sprint_options: Vec<PickerOption>,
     pub(super) sprint_state: ListState,
     pub(super) sprint_issue_key: String,
+    pub(super) sprint_project_key: String,
     pub(super) sprint_catalog: Vec<Sprint>,
+    pub(super) sprint_cache: HashMap<String, Vec<Sprint>>,
     pub(super) prefs: TuiPreferences,
     pub(super) saved_jql_state: ListState,
     pub(super) jql_picker_filter: String,
@@ -228,7 +230,9 @@ impl App {
             sprint_options: Vec::new(),
             sprint_state: ListState::default(),
             sprint_issue_key: String::new(),
+            sprint_project_key: String::new(),
             sprint_catalog: Vec::new(),
+            sprint_cache: HashMap::new(),
             prefs,
             saved_jql_state,
             jql_picker_filter: String::new(),
@@ -1028,8 +1032,26 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             .split_once('-')
                             .map(|(p, _)| p.to_string())
                             .unwrap_or(issue.project_key.clone());
+                        app.sprint_project_key = project_key.clone();
                         app.mode = Mode::SprintPicker;
                         app.focus = Focus::List;
+
+                        if let Some(cached) = app.sprint_cache.get(&project_key).cloned() {
+                            app.sprint_options = cached
+                                .iter()
+                                .map(|s| PickerOption {
+                                    value: s.id.to_string(),
+                                    label: format!("{}  [{}]", s.name, s.state),
+                                })
+                                .collect();
+                            app.sprint_catalog = cached;
+                            if !app.sprint_options.is_empty() {
+                                app.sprint_state.select(Some(0));
+                            }
+                            app.clear_status();
+                            continue;
+                        }
+
                         app.set_status(format!("Loading sprints for {project_key}..."), false);
                         match client.list_sprints_for_project(&project_key).await {
                             Ok(sprints) => {
@@ -1040,7 +1062,8 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                         label: format!("{}  [{}]", s.name, s.state),
                                     })
                                     .collect();
-                                app.sprint_catalog = sprints;
+                                app.sprint_catalog = sprints.clone();
+                                app.sprint_cache.insert(project_key, sprints);
                                 if !app.sprint_options.is_empty() {
                                     app.sprint_state.select(Some(0));
                                 }
@@ -1099,10 +1122,25 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
 
             AppAction::RefreshMentionOptions => {
                 if let Some(modal) = app.modal.as_mut() {
-                    let query = modal.mention_query.clone();
+                    let query = modal.mention_query.trim().to_string();
+                    if query.chars().count() < 2 {
+                        modal.mention_options.clear();
+                        modal.mention_state = ListState::default();
+                        continue;
+                    }
+
+                    if let Some(cached) = modal.mention_cache.get(&query).cloned() {
+                        modal.mention_options = cached;
+                        modal.mention_state = ListState::default();
+                        if !modal.mention_options.is_empty() {
+                            modal.mention_state.select(Some(0));
+                        }
+                        continue;
+                    }
+
                     match client.search_users(&query).await {
                         Ok(users) => {
-                            modal.mention_options = users
+                            let options: Vec<PickerOption> = users
                                 .iter()
                                 .filter_map(|u| {
                                     let display =
@@ -1114,10 +1152,19 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                                         label: display,
                                     })
                                 })
+                                .take(10)
                                 .collect();
-                            modal.mention_state = ListState::default();
-                            if !modal.mention_options.is_empty() {
-                                modal.mention_state.select(Some(0));
+
+                            if let Some(modal) = app.modal.as_mut() {
+                                if modal.mention_query.trim() != query {
+                                    continue;
+                                }
+                                modal.mention_cache.insert(query, options.clone());
+                                modal.mention_options = options;
+                                modal.mention_state = ListState::default();
+                                if !modal.mention_options.is_empty() {
+                                    modal.mention_state.select(Some(0));
+                                }
                             }
                         }
                         Err(_) => {}

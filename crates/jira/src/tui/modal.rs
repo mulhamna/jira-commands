@@ -405,7 +405,11 @@ fn render_mention_overlay(f: &mut Frame, modal: &mut Modal, palette: Palette, ar
     let title = if modal.mention_query.is_empty() {
         " @mention — type 2+ chars ".to_string()
     } else if modal.mention_query.chars().count() < 2 {
-        format!(" @{}  (type {} more) ", modal.mention_query, 2 - modal.mention_query.chars().count())
+        format!(
+            " @{}  (type {} more) ",
+            modal.mention_query,
+            2 - modal.mention_query.chars().count()
+        )
     } else {
         format!(" @{} ", modal.mention_query)
     };

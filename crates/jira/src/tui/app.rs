@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, HashSet}, io, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    time::Duration,
+};
 
 use anyhow::Result;
 use crossterm::{
@@ -36,10 +40,31 @@ use super::theme::ThemeName;
 pub(super) fn looks_like_jql(input: &str) -> bool {
     let lower = input.trim().to_lowercase();
     [
-        "project =", "assignee =", "status =", "summary ~", "text ~", "order by",
-        "labels =", "labels in", "sprint =", "fixversion", "component", "issuetype",
-        "resolution", "created >=", "updated >=", "priority =", "reporter =", " and ",
-        " or ", " not ", " in (", " is empty", " is not empty", "parent =", "key =",
+        "project =",
+        "assignee =",
+        "status =",
+        "summary ~",
+        "text ~",
+        "order by",
+        "labels =",
+        "labels in",
+        "sprint =",
+        "fixversion",
+        "component",
+        "issuetype",
+        "resolution",
+        "created >=",
+        "updated >=",
+        "priority =",
+        "reporter =",
+        " and ",
+        " or ",
+        " not ",
+        " in (",
+        " is empty",
+        " is not empty",
+        "parent =",
+        "key =",
     ]
     .iter()
     .any(|needle| lower.contains(needle))

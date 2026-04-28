@@ -276,7 +276,7 @@ fn handle_mention_key(modal: &mut Modal, code: KeyCode) -> ModalOutcome {
             modal.mention_state = ListState::default();
             ModalOutcome::Continue
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             let i = modal
                 .mention_state
                 .selected()
@@ -285,7 +285,7 @@ fn handle_mention_key(modal: &mut Modal, code: KeyCode) -> ModalOutcome {
             modal.mention_state.select(Some(i));
             ModalOutcome::Continue
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = modal
                 .mention_state
                 .selected()

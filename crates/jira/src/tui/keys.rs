@@ -432,7 +432,7 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             let i = app
                 .assignee_state
                 .selected()
@@ -441,7 +441,7 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.assignee_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .assignee_state
                 .selected()
@@ -606,7 +606,7 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             let i = app
                 .component_state
                 .selected()
@@ -615,7 +615,7 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.component_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .component_state
                 .selected()
@@ -692,7 +692,7 @@ fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             let i = app
                 .fix_version_state
                 .selected()
@@ -701,7 +701,7 @@ fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.fix_version_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .fix_version_state
                 .selected()
@@ -778,7 +778,7 @@ fn handle_sprint_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::None
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down => {
             let i = app
                 .sprint_state
                 .selected()
@@ -787,7 +787,7 @@ fn handle_sprint_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.sprint_state.select(Some(i));
             AppAction::None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up => {
             let i = app
                 .sprint_state
                 .selected()

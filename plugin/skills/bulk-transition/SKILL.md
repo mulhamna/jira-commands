@@ -12,9 +12,10 @@ Steps:
    - JQL filter, or enough context to build one
    - whether the user wants to skip confirmation
 3. If no JQL is provided, build one from the request, for example `project = PROJ AND status = "To Do"`.
-4. Run `jirac issue bulk-transition -p <PROJECT> -q '<JQL>' -t '<STATUS>' [--force]`.
+4. Run `jirac issue bulk-transition --jql '<JQL>' --to '<STATUS>' [--force]`.
 5. Make it clear how many issues are affected and whether confirmation is still required.
 
 Examples:
-- "transition all To Do issues in PROJ to In Progress" → `jirac issue bulk-transition -p PROJ -q 'project = PROJ AND status = "To Do"' -t 'In Progress'`
-- "close all done issues in PROJ without asking" → `jirac issue bulk-transition -p PROJ -q 'project = PROJ AND status = Done' -t 'Closed' --force`
+- "transition all To Do issues in PROJ to In Progress" → `jirac issue bulk-transition --jql 'project = PROJ AND status = "To Do"' --to 'In Progress'`
+- "close all done issues in PROJ without asking" → `jirac issue bulk-transition --jql 'project = PROJ AND status = Done' --to 'Closed' --force`
+- "move my open sprint issues to Done" → `jirac issue bulk-transition --jql 'assignee = currentUser() AND sprint = openSprints()' --to Done`

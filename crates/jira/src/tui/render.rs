@@ -45,6 +45,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::AssigneePicker => " Jira CLI — Assignee Picker ".to_string(),
         Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
         Mode::FixVersionPicker => " Jira CLI — Fix Version Picker ".to_string(),
+        Mode::SprintPicker => " Jira CLI — Sprint Picker ".to_string(),
         Mode::SavedJqlPicker => " Jira CLI — Saved Queries ".to_string(),
         Mode::ServerInfo => " Jira CLI — Server ".to_string(),
         Mode::ConfigView => " Jira CLI — Config ".to_string(),
@@ -91,6 +92,10 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             render_browse(f, app, chunks[1], palette);
             render_fix_version_picker_popup(f, app, size, palette);
         }
+        Mode::SprintPicker => {
+            render_browse(f, app, chunks[1], palette);
+            render_sprint_picker_popup(f, app, size, palette);
+        }
         Mode::SavedJqlPicker => {
             render_browse(f, app, chunks[1], palette);
             render_saved_jql_popup(f, app, size, palette);
@@ -109,7 +114,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::Modal => {
             render_browse(f, app, chunks[1], palette);
-            if let Some(modal) = app.modal.as_ref() {
+            if let Some(modal) = app.modal.as_mut() {
                 render_modal(f, modal, palette, size);
             }
         }
@@ -133,6 +138,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::FixVersionPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
+        Mode::SprintPicker => " type:filter  j/k:move  Enter:assign to sprint  Esc:cancel".to_string(),
         Mode::SavedJqlPicker => " ↑/↓:move  Enter:run  type:filter  Tab:clear  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         Mode::Modal => {
@@ -877,6 +883,72 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
         .chars()
         .take(app.fix_version_cursor)
         .collect();
+    f.set_cursor_position((
+        input_area.x + 1 + before_cursor.len() as u16,
+        input_area.y + 1,
+    ));
+}
+
+fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let popup_area = side_panel_rect(area);
+    let [input_area, list_area, hint_area] = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(4),
+        ])
+        .areas(popup_area);
+
+    let input = Paragraph::new(app.sprint_query.as_str())
+        .block(
+            Block::default()
+                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(format!(" Sprint: {} ", app.sprint_issue_key))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(palette.header_fg));
+
+    let items: Vec<ListItem> = app
+        .sprint_options
+        .iter()
+        .map(|option| ListItem::new(option.label.clone()))
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let hints = Paragraph::new(vec![
+        Line::from("Type to filter sprints"),
+        Line::from("↑/↓ move   Enter assign   Esc cancel"),
+    ])
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+            .border_style(Style::default().fg(palette.focus_border))
+            .style(Style::default().bg(Color::Black)),
+    )
+    .style(Style::default().fg(palette.muted));
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(input, input_area);
+    f.render_stateful_widget(list, list_area, &mut app.sprint_state);
+    f.render_widget(hints, hint_area);
+
+    let before_cursor: String = app.sprint_query.chars().take(app.sprint_cursor).collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,

@@ -1,12 +1,15 @@
+use std::collections::HashMap;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use tui_textarea::TextArea;
 
+use super::picker::PickerOption;
 use super::theme::Palette;
 
 #[derive(Debug, Clone)]
@@ -49,6 +52,12 @@ pub(super) struct Modal {
     pub focus: usize,
     pub error: Option<String>,
     pub busy: bool,
+    pub mention_active: bool,
+    pub mention_query: String,
+    pub mention_options: Vec<PickerOption>,
+    pub mention_state: ListState,
+    pub mention_map: Vec<(String, String)>,
+    pub mention_cache: HashMap<String, Vec<PickerOption>>,
 }
 
 impl Modal {
@@ -80,6 +89,12 @@ impl Modal {
             focus: 0,
             error: None,
             busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -96,6 +111,12 @@ impl Modal {
             focus: 0,
             error: None,
             busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -112,6 +133,12 @@ impl Modal {
             focus: 0,
             error: None,
             busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -149,6 +176,12 @@ impl Modal {
             focus: 0,
             error: None,
             busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
         }
     }
 
@@ -183,6 +216,8 @@ pub(super) enum ModalOutcome {
     Cancel,
     Submit,
     Continue,
+    MentionQueryChanged,
+    MentionSelected(usize),
 }
 
 /// Forward a key event to the focused textarea, with submit/cancel/nav handling.
@@ -191,7 +226,17 @@ pub(super) fn handle_modal_key(modal: &mut Modal, key: KeyEvent) -> ModalOutcome
         return ModalOutcome::Continue;
     }
 
+    if modal.mention_active {
+        return handle_mention_key(modal, key.code);
+    }
+
     match (key.code, key.modifiers) {
+        (KeyCode::Char('@'), _) if matches!(modal.kind, ModalKind::AddComment { .. }) => {
+            modal.mention_active = true;
+            modal.mention_query.clear();
+            modal.mention_options.clear();
+            ModalOutcome::MentionQueryChanged
+        }
         (KeyCode::Esc, _) => ModalOutcome::Cancel,
         (KeyCode::Char('s'), KeyModifiers::CONTROL)
         | (KeyCode::Char('S'), KeyModifiers::CONTROL) => ModalOutcome::Submit,
@@ -222,13 +267,60 @@ pub(super) fn handle_modal_key(modal: &mut Modal, key: KeyEvent) -> ModalOutcome
     }
 }
 
+fn handle_mention_key(modal: &mut Modal, code: KeyCode) -> ModalOutcome {
+    match code {
+        KeyCode::Esc => {
+            modal.mention_active = false;
+            modal.mention_query.clear();
+            modal.mention_options.clear();
+            modal.mention_state = ListState::default();
+            ModalOutcome::Continue
+        }
+        KeyCode::Down => {
+            let i = modal
+                .mention_state
+                .selected()
+                .map(|i| (i + 1).min(modal.mention_options.len().saturating_sub(1)))
+                .unwrap_or(0);
+            modal.mention_state.select(Some(i));
+            ModalOutcome::Continue
+        }
+        KeyCode::Up => {
+            let i = modal
+                .mention_state
+                .selected()
+                .map(|i| i.saturating_sub(1))
+                .unwrap_or(0);
+            modal.mention_state.select(Some(i));
+            ModalOutcome::Continue
+        }
+        KeyCode::Enter => {
+            if let Some(idx) = modal.mention_state.selected() {
+                if idx < modal.mention_options.len() {
+                    return ModalOutcome::MentionSelected(idx);
+                }
+            }
+            ModalOutcome::Continue
+        }
+        KeyCode::Backspace => {
+            modal.mention_query.pop();
+            ModalOutcome::MentionQueryChanged
+        }
+        KeyCode::Char(c) => {
+            modal.mention_query.push(c);
+            ModalOutcome::MentionQueryChanged
+        }
+        _ => ModalOutcome::Continue,
+    }
+}
+
 fn forward_to_focus(modal: &mut Modal, key: KeyEvent) {
     if let Some(field) = modal.fields.get_mut(modal.focus) {
         field.area.input(key);
     }
 }
 
-pub(super) fn render_modal(f: &mut Frame, modal: &Modal, palette: Palette, area: Rect) {
+pub(super) fn render_modal(f: &mut Frame, modal: &mut Modal, palette: Palette, area: Rect) {
     let outer = side_modal_rect(area);
     f.render_widget(Clear, outer);
 
@@ -293,6 +385,59 @@ pub(super) fn render_modal(f: &mut Frame, modal: &Modal, palette: Palette, area:
     };
     let status = Paragraph::new(status_text).style(status_style);
     f.render_widget(status, chunks[status_idx]);
+
+    if modal.mention_active {
+        render_mention_overlay(f, modal, palette, inner);
+    }
+}
+
+fn render_mention_overlay(f: &mut Frame, modal: &mut Modal, palette: Palette, area: Rect) {
+    let count = modal.mention_options.len() as u16;
+    let height = (count + 2).clamp(3, 10);
+    let y = area.y + area.height.saturating_sub(height + 2);
+    let overlay = Rect {
+        x: area.x,
+        y,
+        width: area.width,
+        height,
+    };
+
+    let title = if modal.mention_query.is_empty() {
+        " @mention — type 2+ chars ".to_string()
+    } else if modal.mention_query.chars().count() < 2 {
+        format!(
+            " @{}  (type {} more) ",
+            modal.mention_query,
+            2 - modal.mention_query.chars().count()
+        )
+    } else {
+        format!(" @{} ", modal.mention_query)
+    };
+
+    let items: Vec<ListItem> = modal
+        .mention_options
+        .iter()
+        .map(|opt| ListItem::new(opt.label.clone()))
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border))
+                .title(title)
+                .style(Style::default().bg(Color::Black)),
+        )
+        .highlight_style(
+            Style::default()
+                .bg(palette.highlight)
+                .fg(palette.header_fg)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    f.render_widget(Clear, overlay);
+    f.render_stateful_widget(list, overlay, &mut modal.mention_state);
 }
 
 fn side_modal_rect(area: Rect) -> Rect {

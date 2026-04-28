@@ -176,6 +176,81 @@ fn render_table(node: &Value, out: &mut String, depth: usize) {
     }
 }
 
+/// Inject ADF mention nodes into a document for each `@DisplayName` in `mention_map`.
+///
+/// Scans every text node and replaces `@DisplayName` occurrences with proper ADF
+/// mention nodes that Jira resolves to user accounts.
+pub fn inject_mentions(node: &mut Value, mention_map: &[(String, String)]) {
+    if mention_map.is_empty() {
+        return;
+    }
+    inject_mentions_node(node, mention_map);
+}
+
+fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)]) {
+    if let Some(Value::Array(content)) = node.get_mut("content") {
+        let old = std::mem::take(content);
+        let mut new_content: Vec<Value> = Vec::new();
+        for child in old {
+            let child_type = child
+                .get("type")
+                .and_then(|t| t.as_str())
+                .map(str::to_owned);
+            let child_text = child
+                .get("text")
+                .and_then(|t| t.as_str())
+                .map(str::to_owned);
+            if child_type.as_deref() == Some("text") {
+                if let Some(text) = child_text {
+                    new_content.extend(expand_text_mentions(&text, mention_map));
+                    continue;
+                }
+            }
+            new_content.push(child);
+        }
+        *content = new_content;
+    }
+    if let Some(Value::Array(content)) = node.get_mut("content") {
+        for child in content.iter_mut() {
+            inject_mentions_node(child, mention_map);
+        }
+    }
+}
+
+fn expand_text_mentions(text: &str, mention_map: &[(String, String)]) -> Vec<Value> {
+    let mut nodes: Vec<Value> = vec![json!({ "type": "text", "text": text })];
+    for (display_name, account_id) in mention_map {
+        let pattern = format!("@{display_name}");
+        let mut next: Vec<Value> = Vec::new();
+        for node in nodes {
+            let node_type = node.get("type").and_then(|t| t.as_str()).map(str::to_owned);
+            let node_text = node.get("text").and_then(|t| t.as_str()).map(str::to_owned);
+            if node_type.as_deref() == Some("text") {
+                if let Some(t) = node_text {
+                    if t.contains(pattern.as_str()) {
+                        let parts: Vec<&str> = t.split(pattern.as_str()).collect();
+                        for (i, part) in parts.iter().enumerate() {
+                            if !part.is_empty() {
+                                next.push(json!({ "type": "text", "text": *part }));
+                            }
+                            if i < parts.len() - 1 {
+                                next.push(json!({
+                                    "type": "mention",
+                                    "attrs": { "id": account_id, "text": pattern }
+                                }));
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+            next.push(node);
+        }
+        nodes = next;
+    }
+    nodes
+}
+
 /// Convert plain text to ADF JSON — each non-empty line becomes a paragraph.
 pub fn plain_text_to_adf(text: &str) -> Value {
     let mut content: Vec<Value> = text

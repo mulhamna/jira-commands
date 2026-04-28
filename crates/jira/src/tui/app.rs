@@ -1,4 +1,8 @@
-use std::{collections::HashSet, io, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    time::Duration,
+};
 
 use anyhow::Result;
 use crossterm::{
@@ -8,7 +12,8 @@ use crossterm::{
 };
 use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
 use jira_core::{
-    model::{field::Field, Issue, UpdateIssueRequest},
+    adf::{inject_mentions, markdown_to_adf},
+    model::{field::Field, Issue, Sprint, UpdateIssueRequest},
     JiraClient,
 };
 
@@ -31,6 +36,54 @@ use super::prompts::{
 };
 use super::render::ui;
 use super::theme::ThemeName;
+
+pub(super) fn looks_like_jql(input: &str) -> bool {
+    let lower = input.trim().to_lowercase();
+    [
+        "project =",
+        "assignee =",
+        "status =",
+        "summary ~",
+        "text ~",
+        "order by",
+        "labels =",
+        "labels in",
+        "sprint =",
+        "fixversion",
+        "component",
+        "issuetype",
+        "resolution",
+        "created >=",
+        "updated >=",
+        "priority =",
+        "reporter =",
+        " and ",
+        " or ",
+        " not ",
+        " in (",
+        " is empty",
+        " is not empty",
+        "parent =",
+        "key =",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+pub(super) fn build_search_jql(app: &App, raw: &str) -> String {
+    let input = raw.trim();
+    if looks_like_jql(input) {
+        return input.to_string();
+    }
+
+    let summary_clause = format!("summary ~ {:?}", input);
+
+    if let Some(project) = &app.default_project {
+        format!("project = {project} AND {summary_clause} ORDER BY updated DESC")
+    } else {
+        format!("assignee = currentUser() AND {summary_clause} ORDER BY updated DESC")
+    }
+}
 
 pub(super) struct App {
     pub(super) issues: Vec<Issue>,
@@ -73,6 +126,14 @@ pub(super) struct App {
     pub(super) fix_version_issue_key: String,
     pub(super) fix_version_project_key: String,
     pub(super) fix_version_catalog: Vec<PickerOption>,
+    pub(super) sprint_query: String,
+    pub(super) sprint_cursor: usize,
+    pub(super) sprint_options: Vec<PickerOption>,
+    pub(super) sprint_state: ListState,
+    pub(super) sprint_issue_key: String,
+    pub(super) sprint_project_key: String,
+    pub(super) sprint_catalog: Vec<Sprint>,
+    pub(super) sprint_cache: HashMap<String, Vec<Sprint>>,
     pub(super) prefs: TuiPreferences,
     pub(super) saved_jql_state: ListState,
     pub(super) jql_picker_filter: String,
@@ -106,6 +167,11 @@ pub(super) enum AppAction {
     EditFixVersions(String),
     OpenFixVersionPicker(String),
     RefreshFixVersionOptions,
+    OpenSprintPicker(String),
+    RefreshSprintOptions,
+    ApplySprintSelection(String),
+    RefreshMentionOptions,
+    SelectMention(usize),
     UploadAttachment(String),
     SaveColumnPreferences,
     ResetColumnPreferences,
@@ -211,6 +277,14 @@ impl App {
             fix_version_issue_key: String::new(),
             fix_version_project_key: String::new(),
             fix_version_catalog: Vec::new(),
+            sprint_query: String::new(),
+            sprint_cursor: 0,
+            sprint_options: Vec::new(),
+            sprint_state: ListState::default(),
+            sprint_issue_key: String::new(),
+            sprint_project_key: String::new(),
+            sprint_catalog: Vec::new(),
+            sprint_cache: HashMap::new(),
             prefs,
             saved_jql_state,
             jql_picker_filter: String::new(),
@@ -996,6 +1070,174 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                 app.fix_version_state.select(Some(0));
             }
 
+            AppAction::OpenSprintPicker(key) => {
+                app.sprint_issue_key = key.clone();
+                app.sprint_query.clear();
+                app.sprint_cursor = 0;
+                app.sprint_options.clear();
+                app.sprint_catalog.clear();
+                app.sprint_state = ListState::default();
+                match client.get_issue(&key).await {
+                    Ok(issue) => {
+                        let project_key = issue
+                            .key
+                            .split_once('-')
+                            .map(|(p, _)| p.to_string())
+                            .unwrap_or(issue.project_key.clone());
+                        app.sprint_project_key = project_key.clone();
+                        app.mode = Mode::SprintPicker;
+                        app.focus = Focus::List;
+
+                        if let Some(cached) = app.sprint_cache.get(&project_key).cloned() {
+                            app.sprint_options = cached
+                                .iter()
+                                .map(|s| PickerOption {
+                                    value: s.id.to_string(),
+                                    label: format!("{}  [{}]", s.name, s.state),
+                                })
+                                .collect();
+                            app.sprint_catalog = cached;
+                            if !app.sprint_options.is_empty() {
+                                app.sprint_state.select(Some(0));
+                            }
+                            app.clear_status();
+                            continue;
+                        }
+
+                        app.set_status(format!("Loading sprints for {project_key}..."), false);
+                        match client.list_sprints_for_project(&project_key).await {
+                            Ok(sprints) => {
+                                app.sprint_options = sprints
+                                    .iter()
+                                    .map(|s| PickerOption {
+                                        value: s.id.to_string(),
+                                        label: format!("{}  [{}]", s.name, s.state),
+                                    })
+                                    .collect();
+                                app.sprint_catalog = sprints.clone();
+                                app.sprint_cache.insert(project_key, sprints);
+                                if !app.sprint_options.is_empty() {
+                                    app.sprint_state.select(Some(0));
+                                }
+                                app.clear_status();
+                            }
+                            Err(e) => app.set_status(format!("Sprint lookup failed: {e}"), true),
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Issue lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshSprintOptions => {
+                let query = app.sprint_query.to_lowercase();
+                app.sprint_options = app
+                    .sprint_catalog
+                    .iter()
+                    .filter(|s| {
+                        query.is_empty()
+                            || s.name.to_lowercase().contains(&query)
+                            || s.state.to_lowercase().contains(&query)
+                    })
+                    .map(|s| PickerOption {
+                        value: s.id.to_string(),
+                        label: format!("{}  [{}]", s.name, s.state),
+                    })
+                    .collect();
+                app.sprint_state.select(Some(0));
+            }
+
+            AppAction::ApplySprintSelection(key) => {
+                if let Some(idx) = app.sprint_state.selected() {
+                    if let Some(option) = app.sprint_options.get(idx).cloned() {
+                        let sprint_label = option.label.clone();
+                        if let Ok(sprint_id) = option.value.parse::<u64>() {
+                            app.mode = Mode::Browse;
+                            match client.add_issue_to_sprint(sprint_id, &key).await {
+                                Ok(()) => {
+                                    let jql = app.jql.clone();
+                                    if let Ok(r) = search_visible(&client, &jql, &app).await {
+                                        app.set_issues(r.issues);
+                                    }
+                                    app.set_status(
+                                        format!("✓ {key} added to {sprint_label}"),
+                                        false,
+                                    );
+                                }
+                                Err(e) => {
+                                    app.set_status(format!("Sprint update failed: {e}"), true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            AppAction::RefreshMentionOptions => {
+                if let Some(modal) = app.modal.as_mut() {
+                    let query = modal.mention_query.trim().to_string();
+                    if query.chars().count() < 2 {
+                        modal.mention_options.clear();
+                        modal.mention_state = ListState::default();
+                        continue;
+                    }
+
+                    if let Some(cached) = modal.mention_cache.get(&query).cloned() {
+                        modal.mention_options = cached;
+                        modal.mention_state = ListState::default();
+                        if !modal.mention_options.is_empty() {
+                            modal.mention_state.select(Some(0));
+                        }
+                        continue;
+                    }
+
+                    if let Ok(users) = client.search_users(&query).await {
+                        let options: Vec<PickerOption> = users
+                            .iter()
+                            .filter_map(|u| {
+                                let display =
+                                    u.get("displayName").and_then(|v| v.as_str())?.to_string();
+                                let account_id =
+                                    u.get("accountId").and_then(|v| v.as_str())?.to_string();
+                                Some(PickerOption {
+                                    value: account_id,
+                                    label: display,
+                                })
+                            })
+                            .take(10)
+                            .collect();
+
+                        if let Some(modal) = app.modal.as_mut() {
+                            if modal.mention_query.trim() != query {
+                                continue;
+                            }
+                            modal.mention_cache.insert(query, options.clone());
+                            modal.mention_options = options;
+                            modal.mention_state = ListState::default();
+                            if !modal.mention_options.is_empty() {
+                                modal.mention_state.select(Some(0));
+                            }
+                        }
+                    }
+                }
+            }
+
+            AppAction::SelectMention(idx) => {
+                if let Some(modal) = app.modal.as_mut() {
+                    if let Some(option) = modal.mention_options.get(idx).cloned() {
+                        let display_name = option.label.clone();
+                        let account_id = option.value.clone();
+                        let at_text = format!("@{display_name}");
+                        if let Some(field) = modal.fields.get_mut(modal.focus) {
+                            field.area.insert_str(&at_text);
+                        }
+                        modal.mention_map.push((display_name, account_id));
+                        modal.mention_active = false;
+                        modal.mention_query.clear();
+                        modal.mention_options.clear();
+                    }
+                }
+            }
+
             AppAction::CreateIssue => {
                 suspend_tui(&mut terminal)?;
                 let result = tui_create_issue(&client, app.default_project.clone()).await;
@@ -1161,7 +1403,8 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                     }
                     ModalKind::AddComment { key } => {
                         let body = modal.field_text(0);
-                        let body_trim = body.trim();
+                        let mention_map = modal.mention_map.clone();
+                        let body_trim = body.trim().to_string();
                         if body_trim.is_empty() {
                             if let Some(m) = app.modal.as_mut() {
                                 m.set_error("Comment cannot be empty");
@@ -1172,7 +1415,9 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                             m.busy = true;
                         }
                         terminal.draw(|f| ui(f, &mut app))?;
-                        match client.add_comment(&key, body_trim).await {
+                        let mut adf = markdown_to_adf(&body_trim);
+                        inject_mentions(&mut adf, &mention_map);
+                        match client.add_comment_adf(&key, adf).await {
                             Ok(_) => {
                                 app.close_modal();
                                 app.detail.comments = None;

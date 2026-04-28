@@ -614,6 +614,32 @@ impl JiraClient {
         Ok(resp.issue_types)
     }
 
+    /// Resolve an issue type by exact or case-insensitive name within a project.
+    pub async fn get_issue_type_by_name(
+        &self,
+        project_key: &str,
+        issue_type_name: &str,
+    ) -> Result<IssueType> {
+        let issue_types = self.get_issue_types(project_key).await?;
+
+        issue_types
+            .iter()
+            .find(|it| it.name == issue_type_name)
+            .or_else(|| {
+                issue_types
+                    .iter()
+                    .find(|it| it.name.eq_ignore_ascii_case(issue_type_name))
+            })
+            .cloned()
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: format!(
+                    "Issue type '{}' not found in project {}",
+                    issue_type_name, project_key
+                ),
+            })
+    }
+
     /// Get fields for a specific issue type within a project (with allowed values).
     pub async fn get_fields_for_issue_type(
         &self,
@@ -1203,6 +1229,82 @@ impl JiraClient {
         }
 
         Ok(())
+    }
+
+    /// Move an issue using Jira's native bulk move API.
+    pub async fn move_issue(
+        &self,
+        issue_key: &str,
+        target_project_key: &str,
+        target_issue_type_id: &str,
+        target_parent: Option<&str>,
+    ) -> Result<Issue> {
+        let mapping_key = match target_parent {
+            Some(parent) => format!("{target_project_key},{target_issue_type_id},{parent}"),
+            None => format!("{target_project_key},{target_issue_type_id}"),
+        };
+
+        let body = json!({
+            "sendBulkNotification": true,
+            "targetToSourcesMapping": {
+                mapping_key: {
+                    "inferClassificationDefaults": true,
+                    "inferFieldDefaults": true,
+                    "inferStatusDefaults": true,
+                    "inferSubtaskTypeDefault": true,
+                    "issueIdsOrKeys": [issue_key]
+                }
+            }
+        });
+
+        let submitted = self
+            .raw_request("POST", "/rest/api/3/bulk/issues/move", Some(body))
+            .await?
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Bulk move returned an empty response".into(),
+            })?;
+
+        let task_id = submitted
+            .get("taskId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Bulk move response did not include a taskId".into(),
+            })?;
+
+        const MAX_POLLS: usize = 60;
+        for _ in 0..MAX_POLLS {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+
+            let progress = self
+                .raw_request("GET", &format!("/rest/api/3/bulk/queue/{task_id}"), None)
+                .await?
+                .ok_or_else(|| JiraError::Api {
+                    status: 0,
+                    message: "Bulk move progress returned an empty response".into(),
+                })?;
+
+            match progress
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+            {
+                "COMPLETE" => return self.get_issue(issue_key).await,
+                "FAILED" | "DEAD" | "CANCELLED" => {
+                    return Err(JiraError::Api {
+                        status: 0,
+                        message: progress.to_string(),
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        Err(JiraError::Api {
+            status: 0,
+            message: format!("Timed out waiting for Jira bulk move task {task_id}"),
+        })
     }
 
     // ── Raw API passthrough ───────────────────────────────────────────────────

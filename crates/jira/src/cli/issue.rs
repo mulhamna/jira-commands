@@ -145,6 +145,8 @@ pub enum IssueCommand {
     /// At least one field flag must be provided. Only supplied flags are changed.
     /// Assignee can be an email address or "me" (resolves to current user's accountId).
     ///
+    /// Note: use `jirac issue change-type` for native issue type changes.
+    ///
     /// Examples:
     ///   jirac issue update PROJ-123 --summary "Updated title"
     ///   jirac issue update PROJ-123 --assignee me --priority High
@@ -414,9 +416,9 @@ pub enum IssueCommand {
     /// Copies: summary, description, type, priority, labels, components,
     /// and fix versions. Assignee is NOT copied by default.
     ///
-    /// Use --move to delete the original after cloning (move semantics).
-    /// Use --assignee to set a new assignee on the clone.
-    /// Use --json to output the created clone as JSON.
+    /// Use --move to delete the original after cloning.
+    /// For Jira-native move semantics that preserve issue identity/history,
+    /// use `jirac issue move` instead.
     ///
     /// Examples:
     ///   jirac issue clone PROJ-123                      # clone in same project
@@ -440,6 +442,55 @@ pub enum IssueCommand {
         #[arg(long)]
         r#move: bool,
         /// Output the cloned issue as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Change an issue to another issue type using Jira's native move semantics
+    ///
+    /// Keeps the existing issue identity and history. This uses Jira's native
+    /// move API under the hood, even when staying within the same project.
+    ///
+    /// By default the issue stays in its current project. If the issue type is
+    /// not available in that project, Jira will reject the move.
+    ///
+    /// Examples:
+    ///   jirac issue change-type PROJ-123 Bug
+    ///   jirac issue change-type PROJ-123 Story --json
+    #[command(name = "change-type")]
+    ChangeType {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        /// Target issue type name in the current project (e.g. Bug, Story, Task)
+        issue_type: String,
+        /// Output the moved issue as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Move an issue to another project using Jira's native move semantics
+    ///
+    /// Keeps the existing issue identity and history. By default this keeps the
+    /// current issue type name, resolved in the target project. Use --issue-type
+    /// to override when the target project uses a different issue type.
+    ///
+    /// This command uses Jira's native bulk move API for a single issue, with
+    /// default field/status/classification inference enabled. If Jira requires
+    /// explicit mappings for your workflow, the API may reject the move.
+    ///
+    /// Examples:
+    ///   jirac issue move PROJ-123 OTHER
+    ///   jirac issue move PROJ-123 OTHER --issue-type Task
+    ///   jirac issue move PROJ-123 OTHER --json
+    Move {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        /// Target project key (e.g. OTHER)
+        project: String,
+        /// Target issue type name in the destination project. Defaults to the current issue type name.
+        #[arg(long, value_name = "TYPE")]
+        issue_type: Option<String>,
+        /// Output the moved issue as JSON
         #[arg(long)]
         json: bool,
     },
@@ -782,6 +833,17 @@ pub async fn handle(
             r#move,
             json,
         } => clone_issue(client, key, project, summary, assignee, r#move, json).await,
+        IssueCommand::ChangeType {
+            key,
+            issue_type,
+            json,
+        } => change_issue_type(client, key, issue_type, json).await,
+        IssueCommand::Move {
+            key,
+            project,
+            issue_type,
+            json,
+        } => move_issue_native(client, key, project, issue_type, json).await,
         IssueCommand::Batch { manifest, json } => batch_manifest(client, manifest, json).await,
     }
 }
@@ -2487,6 +2549,94 @@ async fn batch_manifest(
                 println!("  ✓ {op_str}{key_display}: {status_str}");
             }
         }
+    }
+
+    Ok(())
+}
+
+// ─── native move / type change ───────────────────────────────────────────────
+
+async fn change_issue_type(
+    client: JiraClient,
+    key: String,
+    issue_type: String,
+    json: bool,
+) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching {key}..."));
+    let source = client
+        .get_issue(&key)
+        .await
+        .context("Failed to fetch source issue")?;
+    spinner.finish_and_clear();
+
+    let target_issue_type = client
+        .get_issue_type_by_name(&source.project_key, &issue_type)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to resolve issue type '{}' in project {}",
+                issue_type, source.project_key
+            )
+        })?;
+
+    let spinner = spinner_new(format!("Changing issue type for {key}..."));
+    let moved = client
+        .move_issue(&key, &source.project_key, &target_issue_type.id, None)
+        .await
+        .context("Failed to change issue type")?;
+    spinner.finish_and_clear();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&moved)?);
+    } else {
+        println!(
+            "✓ Changed issue type: {} → {} ({})",
+            key, moved.key, moved.issue_type
+        );
+    }
+
+    Ok(())
+}
+
+async fn move_issue_native(
+    client: JiraClient,
+    key: String,
+    project: String,
+    issue_type: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching {key}..."));
+    let source = client
+        .get_issue(&key)
+        .await
+        .context("Failed to fetch source issue")?;
+    spinner.finish_and_clear();
+
+    let target_issue_type_name = issue_type.unwrap_or_else(|| source.issue_type.clone());
+    let target_issue_type = client
+        .get_issue_type_by_name(&project, &target_issue_type_name)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to resolve issue type '{}' in project {}",
+                target_issue_type_name, project
+            )
+        })?;
+
+    let spinner = spinner_new(format!("Moving {key} to {project}..."));
+    let moved = client
+        .move_issue(&key, &project, &target_issue_type.id, None)
+        .await
+        .context("Failed to move issue")?;
+    spinner.finish_and_clear();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&moved)?);
+    } else {
+        println!(
+            "✓ Moved natively: {} → {} ({})",
+            key, moved.key, moved.project_key
+        );
     }
 
     Ok(())

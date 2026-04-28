@@ -19,6 +19,7 @@ use crate::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
             SearchResult, UpdateIssueRequest,
         },
+        sprint::Sprint,
         worklog::Worklog,
     },
 };
@@ -753,6 +754,98 @@ impl JiraClient {
             .await?;
 
         Ok(versions)
+    }
+
+    /// List active and future sprints for a project via the Agile API.
+    pub async fn list_sprints_for_project(&self, project_key: &str) -> Result<Vec<Sprint>> {
+        let boards_path =
+            format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100");
+        let boards_resp = self
+            .raw_request("GET", &boards_path, None)
+            .await?
+            .unwrap_or_default();
+
+        let board_ids: Vec<u64> = boards_resp
+            .get("values")
+            .and_then(|v| v.as_array())
+            .map(|boards| {
+                boards
+                    .iter()
+                    .filter_map(|b| b.get("id").and_then(|id| id.as_u64()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        let mut sprints: Vec<Sprint> = Vec::new();
+
+        for board_id in board_ids {
+            let sprint_path = format!(
+                "/rest/agile/1.0/board/{board_id}/sprint?state=active,future&maxResults=200"
+            );
+            let Ok(Some(resp)) = self.raw_request("GET", &sprint_path, None).await else {
+                continue;
+            };
+            if let Some(values) = resp.get("values").and_then(|v| v.as_array()) {
+                for s in values {
+                    let id = s.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
+                    if id == 0 || !seen.insert(id) {
+                        continue;
+                    }
+                    sprints.push(Sprint {
+                        id,
+                        name: s
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        state: s
+                            .get("state")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        board_id: Some(board_id),
+                        start_date: s
+                            .get("startDate")
+                            .and_then(|v| v.as_str())
+                            .map(str::to_owned),
+                        end_date: s.get("endDate").and_then(|v| v.as_str()).map(str::to_owned),
+                    });
+                }
+            }
+        }
+
+        sprints.sort_by(|a, b| {
+            let order = |s: &str| if s == "active" { 0u8 } else { 1u8 };
+            order(&a.state)
+                .cmp(&order(&b.state))
+                .then(a.name.cmp(&b.name))
+        });
+
+        Ok(sprints)
+    }
+
+    /// Add an issue to a sprint (Agile API).
+    pub async fn add_issue_to_sprint(&self, sprint_id: u64, issue_key: &str) -> Result<()> {
+        let path = format!("/rest/agile/1.0/sprint/{sprint_id}/issue");
+        let body = json!({ "issues": [issue_key] });
+        self.raw_request("POST", &path, Some(body)).await?;
+        Ok(())
+    }
+
+    /// Add a comment using pre-built ADF JSON (skips Markdown conversion).
+    pub async fn add_comment_adf(&self, issue_key: &str, adf: Value) -> Result<Comment> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
+        let payload = json!({ "body": adf });
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.post(&url).headers(headers.clone()).json(&payload))
+            .await?;
+        Comment::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse comment".into(),
+        })
     }
 
     /// Upload a file as an attachment to an issue.

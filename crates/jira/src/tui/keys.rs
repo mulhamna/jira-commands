@@ -19,6 +19,8 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
                 ModalOutcome::Cancel => AppAction::CancelModal,
                 ModalOutcome::Submit => AppAction::SubmitModal,
                 ModalOutcome::Continue => AppAction::None,
+                ModalOutcome::MentionQueryChanged => AppAction::RefreshMentionOptions,
+                ModalOutcome::MentionSelected(idx) => AppAction::SelectMention(idx),
             }
         }
         Mode::Browse => {
@@ -34,6 +36,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         Mode::AssigneePicker => handle_assignee_picker_key(app, code),
         Mode::ComponentPicker => handle_component_picker_key(app, code),
         Mode::FixVersionPicker => handle_fix_version_picker_key(app, code),
+        Mode::SprintPicker => handle_sprint_picker_key(app, code),
         Mode::Help => {
             app.mode = Mode::Browse;
             AppAction::None
@@ -134,6 +137,10 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::OpenFixVersionPicker)
             .unwrap_or(AppAction::None),
+        KeyCode::Char('s') => app
+            .selected_issue_key()
+            .map(AppAction::OpenSprintPicker)
+            .unwrap_or(AppAction::None),
         KeyCode::Char('u') => app
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
@@ -207,6 +214,10 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('v') => app
             .selected_issue_key()
             .map(AppAction::OpenFixVersionPicker)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('s') => app
+            .selected_issue_key()
+            .map(AppAction::OpenSprintPicker)
             .unwrap_or(AppAction::None),
         KeyCode::Char('u') => app
             .selected_issue_key()
@@ -757,6 +768,77 @@ fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::Browse;
             AppAction::EditFixVersions(app.fix_version_issue_key.clone())
         }
+        _ => AppAction::None,
+    }
+}
+
+fn handle_sprint_picker_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            let i = app
+                .sprint_state
+                .selected()
+                .map(|i| (i + 1).min(app.sprint_options.len().saturating_sub(1)))
+                .unwrap_or(0);
+            app.sprint_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            let i = app
+                .sprint_state
+                .selected()
+                .map(|i| i.saturating_sub(1))
+                .unwrap_or(0);
+            app.sprint_state.select(Some(i));
+            AppAction::None
+        }
+        KeyCode::Left => {
+            if app.sprint_cursor > 0 {
+                app.sprint_cursor -= 1;
+            }
+            AppAction::None
+        }
+        KeyCode::Right => {
+            if app.sprint_cursor < app.sprint_query.chars().count() {
+                app.sprint_cursor += 1;
+            }
+            AppAction::None
+        }
+        KeyCode::Backspace => {
+            if app.sprint_cursor > 0 {
+                app.sprint_cursor -= 1;
+                let byte_pos = app
+                    .sprint_query
+                    .char_indices()
+                    .nth(app.sprint_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(app.sprint_query.len());
+                let char_len = app.sprint_query[byte_pos..]
+                    .chars()
+                    .next()
+                    .map(|c| c.len_utf8())
+                    .unwrap_or(0);
+                app.sprint_query.drain(byte_pos..byte_pos + char_len);
+                return AppAction::RefreshSprintOptions;
+            }
+            AppAction::None
+        }
+        KeyCode::Char(c) => {
+            let byte_pos = app
+                .sprint_query
+                .char_indices()
+                .nth(app.sprint_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(app.sprint_query.len());
+            app.sprint_query.insert(byte_pos, c);
+            app.sprint_cursor += 1;
+            AppAction::RefreshSprintOptions
+        }
+        KeyCode::Enter => AppAction::ApplySprintSelection(app.sprint_issue_key.clone()),
         _ => AppAction::None,
     }
 }

@@ -8,6 +8,7 @@ pub(super) enum Mode {
     AssigneePicker,
     ComponentPicker,
     FixVersionPicker,
+    SprintPicker,
     SavedJqlPicker,
     ServerInfo,
     ConfigView,

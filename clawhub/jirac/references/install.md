@@ -9,6 +9,9 @@ Choose the installer that fits your environment. Prefer package managers or veri
 ```bash
 brew tap mulhamna/tap
 brew install jira-commands
+
+# Optional MCP server
+brew install jira-mcp
 ```
 
 ### Cargo

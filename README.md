@@ -52,7 +52,11 @@ Jira on the command line.
 
 ```bash
 # Homebrew (macOS / Linux)
-brew tap mulhamna/tap && brew install jira-commands
+brew tap mulhamna/tap
+brew install jira-commands
+
+# Optional MCP server
+brew install jira-mcp
 
 # Cargo
 cargo install jira-commands

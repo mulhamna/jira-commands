@@ -29,7 +29,7 @@ Choose the installer that fits your environment. For detailed step-by-step instr
 
 | Method | macOS | Linux | Windows | Notes |
 | --- | --- | --- | --- | --- |
-| Homebrew | Yes | Yes | No | `jirac` formula via `mulhamna/tap` |
+| Homebrew | Yes | Yes | No | `jira-commands` and `jira-mcp` formulas via `mulhamna/tap` |
 | Install script | Yes | Yes | No | Downloads latest release asset |
 | PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
 | Cargo | Yes | Yes | Yes | Best for Rust users |
@@ -42,7 +42,11 @@ Choose the installer that fits your environment. For detailed step-by-step instr
 #### Homebrew (macOS / Linux)
 
 ```bash
-brew tap mulhamna/tap && brew install jira-commands
+brew tap mulhamna/tap
+brew install jira-commands
+
+# Optional MCP server
+brew install jira-mcp
 ```
 
 #### Install script (macOS / Linux)
@@ -285,6 +289,10 @@ export JIRA_TOKEN=your_api_token
 ### Install
 
 ```bash
+brew tap mulhamna/tap
+brew install jira-mcp
+
+# or
 cargo install jira-mcp
 ```
 

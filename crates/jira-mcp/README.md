@@ -10,6 +10,11 @@
 ## Install
 
 ```bash
+# Homebrew (macOS / Linux)
+brew tap mulhamna/tap
+brew install jira-mcp
+
+# Cargo
 cargo install jira-mcp
 ```
 

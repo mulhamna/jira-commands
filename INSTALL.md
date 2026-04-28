@@ -6,7 +6,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 
 | Method               | macOS | Linux | Windows | Notes                                  |
 | -------------------- | ----- | ----- | ------- | -------------------------------------- |
-| Homebrew             | ✅     | ✅     | No      | `jirac` formula via `mulhamna/tap`     |
+| Homebrew             | ✅     | ✅     | No      | `jira-commands` and `jira-mcp` via `mulhamna/tap` |
 | Install script       | ✅     | ✅     | No      | Downloads latest release asset         |
 | PowerShell installer | ❌     | ❌     | ✅       | Installs `jirac.exe` to user-local bin |
 | Cargo                | ✅     | ✅     | ✅       | Best for Rust users                    |
@@ -19,6 +19,16 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 ```bash
 brew tap mulhamna/tap
 brew install jira-commands
+
+# Optional MCP server
+brew install jira-mcp
+```
+
+Install both binaries with Homebrew:
+
+```bash
+brew tap mulhamna/tap
+brew install jira-commands jira-mcp
 ```
 
 ## Install script (macOS / Linux)

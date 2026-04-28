@@ -367,6 +367,10 @@ jobs:
       sha_macos_x86: ${{ steps.vars.outputs.sha_macos_x86 }}
       sha_linux_arm: ${{ steps.vars.outputs.sha_linux_arm }}
       sha_linux_x86: ${{ steps.vars.outputs.sha_linux_x86 }}
+      sha_mcp_macos_arm: ${{ steps.vars.outputs.sha_mcp_macos_arm }}
+      sha_mcp_macos_x86: ${{ steps.vars.outputs.sha_mcp_macos_x86 }}
+      sha_mcp_linux_arm: ${{ steps.vars.outputs.sha_mcp_linux_arm }}
+      sha_mcp_linux_x86: ${{ steps.vars.outputs.sha_mcp_linux_x86 }}
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
     steps:
       - name: Download checksums from release
@@ -388,12 +392,20 @@ jobs:
           SHA_MACOS_X86=$(grep -E '(^|/)jirac-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_LINUX_ARM=$(grep -E '(^|/)jirac-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_LINUX_X86=$(grep -E '(^|/)jirac-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
+          SHA_MCP_MACOS_ARM=$(grep -E '(^|/)jirac-mcp-macos-aarch64\.tar\.gz$' checksums.txt | awk '{print $1}')
+          SHA_MCP_MACOS_X86=$(grep -E '(^|/)jirac-mcp-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_MCP_LINUX_ARM=$(grep -E '(^|/)jirac-mcp-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_MCP_LINUX_X86=$(grep -E '(^|/)jirac-mcp-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
           SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"
           test -n "$SHA_LINUX_ARM"
           test -n "$SHA_LINUX_X86"
+          test -n "$SHA_MCP_MACOS_ARM"
+          test -n "$SHA_MCP_MACOS_X86"
+          test -n "$SHA_MCP_LINUX_ARM"
+          test -n "$SHA_MCP_LINUX_X86"
           test -n "$SHA_WINDOWS_X86"
 
           {
@@ -402,6 +414,10 @@ jobs:
             echo "sha_macos_x86=$SHA_MACOS_X86"
             echo "sha_linux_arm=$SHA_LINUX_ARM"
             echo "sha_linux_x86=$SHA_LINUX_X86"
+            echo "sha_mcp_macos_arm=$SHA_MCP_MACOS_ARM"
+            echo "sha_mcp_macos_x86=$SHA_MCP_MACOS_X86"
+            echo "sha_mcp_linux_arm=$SHA_MCP_LINUX_ARM"
+            echo "sha_mcp_linux_x86=$SHA_MCP_LINUX_X86"
             echo "sha_windows_x86=$SHA_WINDOWS_X86"
             echo "release_date=$RELEASE_DATE"
           } >> "$GITHUB_OUTPUT"
@@ -532,6 +548,10 @@ jobs:
       SHA_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_macos_x86 }}
       SHA_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_linux_arm }}
       SHA_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_linux_x86 }}
+      SHA_MCP_MACOS_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_arm }}
+      SHA_MCP_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_x86 }}
+      SHA_MCP_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_arm }}
+      SHA_MCP_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_x86 }}
       SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
     steps:
       - name: Checkout homebrew-tap
@@ -541,39 +561,49 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
-      - name: Verify formula exists
-        run: test -f homebrew-tap/Formula/jira-commands.rb
+      - name: Verify formulas exist
+        run: |
+          test -f homebrew-tap/Formula/jira-commands.rb
+          test -f homebrew-tap/Formula/jira-mcp.rb
 
-      - name: Update formula version and SHA256
+      - name: Update formula versions and SHA256
         run: |
           python3 - <<'EOF'
           import re, os
 
-          formula_path = "homebrew-tap/Formula/jira-commands.rb"
-          with open(formula_path) as f:
-              content = f.read()
-
           version      = os.environ["VERSION"]
-          sha_map = {
-              "jirac-macos-aarch64": os.environ["SHA_MACOS_ARM"],
-              "jirac-macos-x86_64":  os.environ["SHA_MACOS_X86"],
-              "jirac-linux-aarch64": os.environ["SHA_LINUX_ARM"],
-              "jirac-linux-x86_64":  os.environ["SHA_LINUX_X86"],
+          formulas = {
+              "homebrew-tap/Formula/jira-commands.rb": {
+                  "jirac-macos-aarch64": os.environ["SHA_MACOS_ARM"],
+                  "jirac-macos-x86_64":  os.environ["SHA_MACOS_X86"],
+                  "jirac-linux-aarch64": os.environ["SHA_LINUX_ARM"],
+                  "jirac-linux-x86_64":  os.environ["SHA_LINUX_X86"],
+              },
+              "homebrew-tap/Formula/jira-mcp.rb": {
+                  "jirac-mcp-macos-aarch64": os.environ["SHA_MCP_MACOS_ARM"],
+                  "jirac-mcp-macos-x86_64":  os.environ["SHA_MCP_MACOS_X86"],
+                  "jirac-mcp-linux-aarch64": os.environ["SHA_MCP_LINUX_ARM"],
+                  "jirac-mcp-linux-x86_64":  os.environ["SHA_MCP_LINUX_X86"],
+              },
           }
 
-          content = re.sub(r'version "[^"]+"', f'version "{version}"', content)
+          for formula_path, sha_map in formulas.items():
+              with open(formula_path) as f:
+                  content = f.read()
 
-          for binary, sha in sha_map.items():
-              content = re.sub(
-                  rf'(url "[^"]*{re.escape(binary)}[^"]*"\n\s+sha256 ")[^"]+"',
-                  rf'\g<1>{sha}"',
-                  content,
-              )
+              content = re.sub(r'version "[^"]+"', f'version "{version}"', content)
 
-          with open(formula_path, "w") as f:
-              f.write(content)
+              for binary, sha in sha_map.items():
+                  content = re.sub(
+                      rf'(url "[^"]*{re.escape(binary)}[^"]*"\n\s+sha256 ")[^"]+"',
+                      rf'\g<1>{sha}"',
+                      content,
+                  )
 
-          print(f"Formula updated to v{version}")
+              with open(formula_path, "w") as f:
+                  f.write(content)
+
+              print(f"Updated {formula_path} to v{version}")
           EOF
 
       - name: Commit and push to homebrew-tap
@@ -581,7 +611,7 @@ jobs:
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/jira-commands.rb
+          git add Formula/jira-commands.rb Formula/jira-mcp.rb
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump jira-commands to v${VERSION}"
           git push

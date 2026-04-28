@@ -33,6 +33,33 @@ use super::prompts::{
 use super::render::ui;
 use super::theme::ThemeName;
 
+pub(super) fn looks_like_jql(input: &str) -> bool {
+    let lower = input.trim().to_lowercase();
+    [
+        "project =", "assignee =", "status =", "summary ~", "text ~", "order by",
+        "labels =", "labels in", "sprint =", "fixversion", "component", "issuetype",
+        "resolution", "created >=", "updated >=", "priority =", "reporter =", " and ",
+        " or ", " not ", " in (", " is empty", " is not empty", "parent =", "key =",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+pub(super) fn build_search_jql(app: &App, raw: &str) -> String {
+    let input = raw.trim();
+    if looks_like_jql(input) {
+        return input.to_string();
+    }
+
+    let summary_clause = format!("summary ~ {:?}", input);
+
+    if let Some(project) = &app.default_project {
+        format!("project = {project} AND {summary_clause} ORDER BY updated DESC")
+    } else {
+        format!("assignee = currentUser() AND {summary_clause} ORDER BY updated DESC")
+    }
+}
+
 pub(super) struct App {
     pub(super) issues: Vec<Issue>,
     pub(super) table_state: TableState,

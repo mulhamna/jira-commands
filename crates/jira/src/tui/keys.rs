@@ -234,12 +234,12 @@ fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Enter => {
-            let jql = app.search_input.trim().to_string();
+            let query = app.search_input.trim().to_string();
             app.mode = Mode::Browse;
-            if jql.is_empty() {
+            if query.is_empty() {
                 AppAction::None
             } else {
-                AppAction::ExecuteSearch(jql)
+                AppAction::ExecuteSearch(super::app::build_search_jql(app, &query))
             }
         }
         KeyCode::Left => {

@@ -156,3 +156,5 @@ Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files 
 When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.
 
 **Manual bump required:** changes to `plugin/` (skills, metadata) must also bump the version in `plugin/.claude-plugin/plugin.json` — release-please does NOT touch this file.
+
+**Manual bump required:** changes to `clawhub/jirac/` (SKILL.md, references) must also bump `clawhub/jirac/VERSION` — release-please does NOT touch this file. CI publishes to ClawHub on push to `main` only when `clawhub/jirac/**` changes.

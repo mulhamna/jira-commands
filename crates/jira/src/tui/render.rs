@@ -150,8 +150,12 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let (fg, bg) = if let Some((_, true)) = &app.status {
         (Color::White, Color::Red)
     } else if let Some((msg, false)) = &app.status {
-        let status_line = Paragraph::new(format!(" {msg}"))
-            .style(Style::default().fg(Color::Black).bg(Color::Green));
+        let (fg, bg) = if msg.starts_with("Update available:") {
+            (Color::Black, Color::Yellow)
+        } else {
+            (Color::Black, Color::Green)
+        };
+        let status_line = Paragraph::new(format!(" {msg}")).style(Style::default().fg(fg).bg(bg));
         f.render_widget(status_line, area);
         return;
     } else {

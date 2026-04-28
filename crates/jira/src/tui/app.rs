@@ -36,6 +36,7 @@ use super::prompts::{
 };
 use super::render::ui;
 use super::theme::ThemeName;
+use crate::version_check::{self, UpdateNotice};
 
 pub(super) fn looks_like_jql(input: &str) -> bool {
     let lower = input.trim().to_lowercase();
@@ -686,7 +687,11 @@ async fn search_visible(
         .await
 }
 
-pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> {
+pub async fn run_tui(
+    client: JiraClient,
+    project: Option<String>,
+    update_notice: Option<UpdateNotice>,
+) -> Result<()> {
     let jql = if let Some(proj) = &project {
         format!("project = {proj} ORDER BY updated DESC")
     } else {
@@ -702,6 +707,9 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new(jql.clone(), base_url, project.clone());
+    if let Some(notice) = &update_notice {
+        app.set_status(version_check::tui_message(notice), false);
+    }
 
     if let Ok(fields) = client.list_fields().await {
         app.available_fields = fields;

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.22.0](https://github.com/mulhamna/jira-commands/compare/v0.21.2...v0.22.0) (2026-04-28)
+
+
+### Features
+
+* improve TUI sprint, mention, and search flows ([#145](https://github.com/mulhamna/jira-commands/issues/145)) ([3a23448](https://github.com/mulhamna/jira-commands/commit/3a234482d2899471e0c2492f025d8b69bbcf7953))
+
 ## [0.21.2](https://github.com/mulhamna/jira-commands/compare/v0.21.1...v0.21.2) (2026-04-28)
 
 

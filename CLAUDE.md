@@ -154,3 +154,5 @@ Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files 
 ### Plugin marketplace
 
 When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.
+
+**Manual bump required:** changes to `plugin/` (skills, metadata) must also bump the version in `plugin/.claude-plugin/plugin.json` — release-please does NOT touch this file.

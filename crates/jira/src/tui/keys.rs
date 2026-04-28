@@ -145,6 +145,14 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
             .unwrap_or(AppAction::None),
+        KeyCode::Char('y') => app
+            .selected_issue_key()
+            .map(AppAction::OpenChangeTypeModal)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('M') => app
+            .selected_issue_key()
+            .map(AppAction::OpenMoveIssueModal)
+            .unwrap_or(AppAction::None),
         _ => AppAction::None,
     }
 }
@@ -222,6 +230,14 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('u') => app
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('y') => app
+            .selected_issue_key()
+            .map(AppAction::OpenChangeTypeModal)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('M') => app
+            .selected_issue_key()
+            .map(AppAction::OpenMoveIssueModal)
             .unwrap_or(AppAction::None),
         _ => AppAction::None,
     }

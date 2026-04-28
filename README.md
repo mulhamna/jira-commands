@@ -14,7 +14,7 @@ Jira on the command line.
 
 ## Highlights
 
-- **Interactive TUI** — browse, search, create, edit, transition, assign, comment, worklog, upload, and inspect issues without leaving the terminal
+- **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, worklog, upload, and inspect issues without leaving the terminal
 - **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
 - **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes
 - **Multi-profile auth** — store and switch between multiple Jira accounts or deployments
@@ -115,6 +115,8 @@ jirac issue transition PROJ-123 --to "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
 jirac issue delete PROJ-123
+jirac issue change-type PROJ-123 Story
+jirac issue move PROJ-123 OTHER
 jirac issue clone PROJ-123
 jirac issue batch --manifest ops.json
 jirac issue bulk-create --manifest issues.json
@@ -183,7 +185,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, saved JQL picker, theme picker, server summary, and config summary overlays. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, saved JQL picker, theme picker, server summary, config summary overlays, and in-TUI modals for native issue type changes and project moves. Press `?` inside the TUI for a complete shortcut reference.
 
 ```bash
 jirac tui -p PROJ

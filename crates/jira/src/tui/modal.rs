@@ -14,10 +14,26 @@ use super::theme::Palette;
 
 #[derive(Debug, Clone)]
 pub(super) enum ModalKind {
-    EditIssue { key: String },
-    AddComment { key: String },
-    UploadAttachment { key: String },
-    AddWorklog { key: String },
+    EditIssue {
+        key: String,
+    },
+    AddComment {
+        key: String,
+    },
+    UploadAttachment {
+        key: String,
+    },
+    AddWorklog {
+        key: String,
+    },
+    ChangeIssueType {
+        key: String,
+        current_project: String,
+    },
+    MoveIssue {
+        key: String,
+        current_issue_type: String,
+    },
 }
 
 impl ModalKind {
@@ -27,6 +43,8 @@ impl ModalKind {
             ModalKind::AddComment { key } => format!(" Comment on {key} "),
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
             ModalKind::AddWorklog { key } => format!(" Log Work on {key} "),
+            ModalKind::ChangeIssueType { key, .. } => format!(" Change Type: {key} "),
+            ModalKind::MoveIssue { key, .. } => format!(" Move Issue: {key} "),
         }
     }
 
@@ -36,6 +54,10 @@ impl ModalKind {
             ModalKind::AddComment { .. } => " Ctrl+S: send   Esc: cancel ",
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
             ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
+            ModalKind::ChangeIssueType { .. } => {
+                " Tab: next field   Ctrl+S: change type   Esc: cancel "
+            }
+            ModalKind::MoveIssue { .. } => " Tab: next field   Ctrl+S: move issue   Esc: cancel ",
         }
     }
 }
@@ -171,6 +193,78 @@ impl Modal {
                     label: "Comment  (optional)",
                     area: make(""),
                     multiline: true,
+                },
+            ],
+            focus: 0,
+            error: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn change_issue_type(
+        key: String,
+        current_project: String,
+        current_issue_type: String,
+    ) -> Self {
+        let mut area = TextArea::from(vec![current_issue_type.clone()]);
+        area.set_cursor_line_style(Style::default());
+        area.set_placeholder_text("Task / Story / Bug / Epic / ...");
+        Self {
+            kind: ModalKind::ChangeIssueType {
+                key,
+                current_project,
+            },
+            fields: vec![ModalField {
+                label: "Target issue type name",
+                area,
+                multiline: false,
+            }],
+            focus: 0,
+            error: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn move_issue(
+        key: String,
+        _current_project: String,
+        current_issue_type: String,
+    ) -> Self {
+        let mut project_area = TextArea::default();
+        project_area.set_cursor_line_style(Style::default());
+        project_area.set_placeholder_text("target project key, e.g. OTHER");
+
+        let mut type_area = TextArea::from(vec![current_issue_type.clone()]);
+        type_area.set_cursor_line_style(Style::default());
+        type_area.set_placeholder_text("blank = keep current issue type name");
+
+        Self {
+            kind: ModalKind::MoveIssue {
+                key,
+                current_issue_type,
+            },
+            fields: vec![
+                ModalField {
+                    label: "Target project key",
+                    area: project_area,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Target issue type name  (blank = keep current type name)",
+                    area: type_area,
+                    multiline: false,
                 },
             ],
             focus: 0,

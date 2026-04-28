@@ -1,8 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
-  <script defer data-domain="jirac.keton.id" src="https://plausible.keton.id/js/script.js"></script>
-  <script defer data-domain="keton.id" src="https://plausible.keton.id/js/script.js"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-LFHBF9XWMJ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-LFHBF9XWMJ');
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Official web documentation for jirac (jira-commands): a Rust terminal tool for Jira, with TUI, MCP server, and plugin support." />
@@ -225,7 +230,7 @@
         <div class="max-w-2xl">
           <p class="mb-3 inline-flex rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">Terminal Jira CLI + MCP</p>
           <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">Manage Jira faster from terminal with <span class="text-brand-700">jirac</span></h1>
-          <p class="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-400">Open-source Rust tool for issue management, JQL search, worklog, attachments, bulk actions, TUI mode, and MCP integration.</p>
+          <p class="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-400">Open-source Rust tool for issue management, native backlog type changes, native project moves, JQL search, worklog, attachments, bulk actions, TUI mode, and MCP integration.</p>
           <div class="mt-8 flex flex-wrap gap-3">
             <a href="#quickstart" class="rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700">Get Started</a>
             <a href="#non-tech" class="rounded-md border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-brand-300 hover:text-brand-700">For Non-Tech Users</a>
@@ -275,7 +280,7 @@ $ jirac issue transition CORE-183 --to Done
         <figure class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
           <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui.jpeg" alt="jirac TUI issue list" class="w-full rounded-md border border-slate-200 dark:border-slate-700" loading="lazy" />
           <figcaption class="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">TUI issue list</figcaption>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Browse, search, and filter issues in a sortable table.</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Browse, search, and filter backlog items in a sortable table.</p>
         </figure>
         <figure class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
           <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac TUI split master-detail view" class="w-full rounded-md border border-slate-200 dark:border-slate-700" loading="lazy" />
@@ -346,6 +351,8 @@ $ jirac issue transition CORE-183 --to Done
               <tr><td class="px-4 py-3">Transition issue</td><td class="px-4 py-3 command-cell"><code>jirac issue transition MYPROJ-123 --to Done</code></td></tr>
               <tr><td class="px-4 py-3">Add worklog</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --comment "Worked on API"</code></td></tr>
               <tr><td class="px-4 py-3">Upload attachment</td><td class="px-4 py-3 command-cell"><code>jirac issue attach MYPROJ-123 ./screenshot.png</code></td></tr>
+              <tr><td class="px-4 py-3">Change backlog type natively</td><td class="px-4 py-3 command-cell"><code>jirac issue change-type MYPROJ-123 Story</code></td></tr>
+              <tr><td class="px-4 py-3">Move backlog to another project natively</td><td class="px-4 py-3 command-cell"><code>jirac issue move MYPROJ-123 OTHER</code></td></tr>
               <tr><td class="px-4 py-3">Bulk transition</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"</code></td></tr>
               <tr><td class="px-4 py-3">Bulk update field</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-update -p MYPROJ -q 'status = Done' --field assignee --value me@co.com</code></td></tr>
               <tr><td class="px-4 py-3">Bulk create from manifest</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-create --manifest issues.json</code></td></tr>
@@ -361,7 +368,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including modal-based backlog type changes and direct project moves.</p>
       <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
           <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -376,9 +383,13 @@ $ jirac issue transition CORE-183 --to Done
             <tr><td class="px-4 py-3"><span class="keycap">Enter</span></td><td class="px-4 py-3">Open details for the selected issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">c</span></td><td class="px-4 py-3">Create a new issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">e</span></td><td class="px-4 py-3">Edit the selected issue.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">y</span></td><td class="px-4 py-3">Change the selected backlog item type in a modal, without leaving the TUI.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">M</span></td><td class="px-4 py-3">Move the selected backlog item to another project in a modal, using Jira native move semantics.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">t</span></td><td class="px-4 py-3">Change issue status (transition).</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">C</span></td><td class="px-4 py-3">Choose which table columns stay visible and persist that preference.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add worklog to the issue.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">v</span></td><td class="px-4 py-3">Edit fix versions.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">s</span></td><td class="px-4 py-3">Assign the issue to a sprint.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">u</span></td><td class="px-4 py-3">Upload an attachment to the issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">?</span></td><td class="px-4 py-3">Show shortcut help.</td></tr>
           </tbody>

@@ -393,7 +393,7 @@ pub(super) fn render_modal(f: &mut Frame, modal: &mut Modal, palette: Palette, a
 
 fn render_mention_overlay(f: &mut Frame, modal: &mut Modal, palette: Palette, area: Rect) {
     let count = modal.mention_options.len() as u16;
-    let height = (count + 2).max(3).min(10);
+    let height = (count + 2).clamp(3, 10);
     let y = area.y + area.height.saturating_sub(height + 2);
     let overlay = Rect {
         x: area.x,

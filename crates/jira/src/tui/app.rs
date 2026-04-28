@@ -1190,36 +1190,33 @@ pub async fn run_tui(client: JiraClient, project: Option<String>) -> Result<()> 
                         continue;
                     }
 
-                    match client.search_users(&query).await {
-                        Ok(users) => {
-                            let options: Vec<PickerOption> = users
-                                .iter()
-                                .filter_map(|u| {
-                                    let display =
-                                        u.get("displayName").and_then(|v| v.as_str())?.to_string();
-                                    let account_id =
-                                        u.get("accountId").and_then(|v| v.as_str())?.to_string();
-                                    Some(PickerOption {
-                                        value: account_id,
-                                        label: display,
-                                    })
+                    if let Ok(users) = client.search_users(&query).await {
+                        let options: Vec<PickerOption> = users
+                            .iter()
+                            .filter_map(|u| {
+                                let display =
+                                    u.get("displayName").and_then(|v| v.as_str())?.to_string();
+                                let account_id =
+                                    u.get("accountId").and_then(|v| v.as_str())?.to_string();
+                                Some(PickerOption {
+                                    value: account_id,
+                                    label: display,
                                 })
-                                .take(10)
-                                .collect();
+                            })
+                            .take(10)
+                            .collect();
 
-                            if let Some(modal) = app.modal.as_mut() {
-                                if modal.mention_query.trim() != query {
-                                    continue;
-                                }
-                                modal.mention_cache.insert(query, options.clone());
-                                modal.mention_options = options;
-                                modal.mention_state = ListState::default();
-                                if !modal.mention_options.is_empty() {
-                                    modal.mention_state.select(Some(0));
-                                }
+                        if let Some(modal) = app.modal.as_mut() {
+                            if modal.mention_query.trim() != query {
+                                continue;
+                            }
+                            modal.mention_cache.insert(query, options.clone());
+                            modal.mention_options = options;
+                            modal.mention_state = ListState::default();
+                            if !modal.mention_options.is_empty() {
+                                modal.mention_state.select(Some(0));
                             }
                         }
-                        Err(_) => {}
                     }
                 }
             }

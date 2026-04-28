@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.23.0](https://github.com/mulhamna/jira-commands/compare/v0.22.0...v0.23.0) (2026-04-28)
+
+
+### Features
+
+* add native backlog move and type change flows ([#148](https://github.com/mulhamna/jira-commands/issues/148)) ([5d9b687](https://github.com/mulhamna/jira-commands/commit/5d9b687830fa40e01afdb63c942983001d0e551c))
+
 ## [0.22.0](https://github.com/mulhamna/jira-commands/compare/v0.21.2...v0.22.0) (2026-04-28)
 
 

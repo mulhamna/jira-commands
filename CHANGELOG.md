@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.21.2](https://github.com/mulhamna/jira-commands/compare/v0.21.1...v0.21.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* align homebrew + MCP install and release flow ([#141](https://github.com/mulhamna/jira-commands/issues/141)) ([82fa15d](https://github.com/mulhamna/jira-commands/commit/82fa15db50b823b63632e612bc23ee31616465a2))
+* **ci:** repair clawhub setup-node pin ([#143](https://github.com/mulhamna/jira-commands/issues/143)) ([32c134a](https://github.com/mulhamna/jira-commands/commit/32c134a6a17f3dfc3cc712dec2ffa0023a2832b2))
+
 ## [0.21.1](https://github.com/mulhamna/jira-commands/compare/v0.21.0...v0.21.1) (2026-04-27)
 
 

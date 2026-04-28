@@ -32,9 +32,7 @@ impl ModalKind {
             ModalKind::EditIssue { .. } => " Tab: next field   Ctrl+S: save   Esc: cancel ",
             ModalKind::AddComment { .. } => " Ctrl+S: send   Esc: cancel ",
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
-            ModalKind::AddWorklog { .. } => {
-                " Tab: next field   Ctrl+S: log   Esc: cancel "
-            }
+            ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
         }
     }
 }

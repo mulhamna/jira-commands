@@ -10,7 +10,6 @@ use ratatui::Terminal;
 
 use super::prefs::SavedJql;
 
-
 use super::picker::prompt_assignee_selection;
 
 pub(super) fn suspend_tui<B>(terminal: &mut Terminal<B>) -> Result<()>
@@ -158,7 +157,6 @@ pub(super) fn tui_confirm_delete_saved_jql(saved: &SavedJql) -> Result<bool> {
         .prompt()
         .map_err(Into::into)
 }
-
 
 pub(super) async fn tui_edit_labels(client: &JiraClient, key: &str) -> Result<bool> {
     use inquire::Text;

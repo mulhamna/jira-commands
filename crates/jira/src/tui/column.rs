@@ -145,7 +145,6 @@ pub(super) fn default_column_ids() -> Vec<String> {
     BUILTIN_COLUMNS.iter().map(|b| b.id.to_string()).collect()
 }
 
-
 pub(super) fn format_column_summary(columns: &[ColumnSpec]) -> String {
     columns
         .iter()

@@ -946,14 +946,13 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
             Style::default().fg(palette.accent),
         )
     };
-    let search_bar = Paragraph::new(Line::from(search_display))
-        .block(
-            Block::default()
-                .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
-                .border_style(Style::default().fg(palette.focus_border))
-                .title(" Search ")
-                .style(Style::default().bg(Color::Black)),
-        );
+    let search_bar = Paragraph::new(Line::from(search_display)).block(
+        Block::default()
+            .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+            .border_style(Style::default().fg(palette.focus_border))
+            .title(" Search ")
+            .style(Style::default().bg(Color::Black)),
+    );
 
     let list = List::new(items)
         .block(

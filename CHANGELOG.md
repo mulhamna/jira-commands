@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.24.0](https://github.com/mulhamna/jira-commands/compare/v0.23.0...v0.24.0) (2026-04-29)
+
+
+### Features
+
+* **release:** add Scoop install lane and release README refresh ([#153](https://github.com/mulhamna/jira-commands/issues/153)) ([6e6a980](https://github.com/mulhamna/jira-commands/commit/6e6a98045d33465da3369af193dcea69ddd614ee))
+
 ## [0.23.0](https://github.com/mulhamna/jira-commands/compare/v0.22.0...v0.23.0) (2026-04-28)
 
 

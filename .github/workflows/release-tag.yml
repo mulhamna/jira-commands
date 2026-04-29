@@ -648,17 +648,18 @@ jobs:
           path: bucket
 
       - name: Verify Scoop manifest exists
-        run: test -f bucket/jirac.json
+        run: test -f bucket/bucket/jirac.json
 
       - name: Update Scoop manifest
-        run: python3 .github/scripts/update_scoop_manifest.py
+        working-directory: bucket
+        run: python3 ../.github/scripts/update_scoop_manifest.py
 
       - name: Commit and push Scoop manifest
         run: |
           cd bucket
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add jirac.json
+          git add bucket/jirac.json
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump jirac to v${VERSION}"
           git push

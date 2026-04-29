@@ -1,6 +1,6 @@
 [package]
 name = "jira-commands"
-version = "0.24.3" # x-release-please-version
+version = "0.24.4" # x-release-please-version
 edition = "2021"
 description = "Jira CLI — fast terminal client for Atlassian Jira with TUI, Homebrew support, and Claude Code plugin"
 readme = "README.md"

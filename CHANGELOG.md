@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.24.4](https://github.com/mulhamna/jira-commands/compare/v0.24.3...v0.24.4) (2026-04-29)
+
+
+### Bug Fixes
+
+* **release:** inline scoop manifest update ([#164](https://github.com/mulhamna/jira-commands/issues/164)) ([33dcc65](https://github.com/mulhamna/jira-commands/commit/33dcc6518f3c31b6ff9d2588458cc0e1e1b39fff))
+
 ## [0.24.3](https://github.com/mulhamna/jira-commands/compare/v0.24.2...v0.24.3) (2026-04-29)
 
 

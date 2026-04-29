@@ -653,7 +653,27 @@ jobs:
       - name: Update Scoop manifest
         env:
           SCOOP_MANIFEST_PATH: bucket/bucket/jirac.json
-        run: python3 .github/scripts/update_scoop_manifest.py
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+          sha = os.environ["SHA_WINDOWS_X86"]
+          repo = os.environ.get("REPOSITORY", "mulhamna/jira-commands")
+          manifest_path = Path(os.environ["SCOOP_MANIFEST_PATH"])
+
+          manifest = json.loads(manifest_path.read_text())
+          manifest["version"] = version
+          manifest["url"] = f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-x86_64.zip"
+          manifest["hash"] = sha
+          manifest.setdefault("checkver", {})
+          manifest.setdefault("autoupdate", {})
+          manifest["autoupdate"]["url"] = f"https://github.com/{repo}/releases/download/v$version/jirac-windows-x86_64.zip"
+          manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+          print(f"updated {manifest_path} -> v{version}")
+          PY
 
       - name: Commit and push Scoop manifest
         run: |

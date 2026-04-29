@@ -651,8 +651,9 @@ jobs:
         run: test -f bucket/bucket/jirac.json
 
       - name: Update Scoop manifest
-        working-directory: bucket
-        run: python3 ../.github/scripts/update_scoop_manifest.py
+        env:
+          SCOOP_MANIFEST_PATH: bucket/bucket/jirac.json
+        run: python3 .github/scripts/update_scoop_manifest.py
 
       - name: Commit and push Scoop manifest
         run: |

@@ -49,11 +49,36 @@ def fetch_contributors(limit: int = 18):
 
 
 def replace_install_block(text: str) -> str:
-    old = """### Quick install commands\n\n#### Homebrew (macOS / Linux)\n\n```bash\nbrew tap mulhamna/tap\nbrew install jira-commands\n\n# Optional MCP server\nbrew install jira-mcp\n```\n\n#### Install script (macOS / Linux)\n\n```bash\ncurl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash\n```\n\n#### PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstalls `jirac.exe` to `%LOCALAPPDATA%\\Programs\\jirac\\bin` and adds that directory to your user `PATH`.\n\n#### Cargo\n\n```bash\ncargo install jira-commands\n```\n\n#### Winget (Windows)\n\n```powershell\nwinget install mulhamna.jirac\n```\n\n#### Chocolatey (Windows)\n\n```powershell\nchoco install jirac\n```\n\nChocolatey packages are published automatically from official GitHub releases.\n\n#### GitHub Releases\n"""
-    new = f"""### Quick install commands\n\n#### Homebrew (macOS / Linux)\n\n```bash\nbrew tap mulhamna/tap\nbrew install jira-commands\n\n# Optional MCP server\nbrew install jira-mcp\n```\n\n#### Install script (macOS / Linux)\n\n```bash\ncurl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash\n```\n\n#### PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstalls `jirac.exe` to `%LOCALAPPDATA%\\Programs\\jirac\\bin` and adds that directory to your user `PATH`.\n\n#### Scoop (Windows)\n\n```powershell\nscoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}\nscoop install mulhamna/jirac\n```\n\n#### Cargo\n\n```bash\ncargo install jira-commands\n```\n\n#### Winget (Windows)\n\n```powershell\nwinget install mulhamna.jirac\n```\n\n#### Chocolatey (Windows)\n\n```powershell\nchoco install jirac\n```\n\nChocolatey packages are published automatically from official GitHub releases.\n\n#### GitHub Releases\n"""
-    if old not in text:
-        raise SystemExit("expected quick install block not found in README.md")
-    return text.replace(old, new, 1)
+    start = text.find("## Install\n")
+    end = text.find("\n## Quick start\n", start)
+    if start == -1 or end == -1:
+        raise SystemExit("expected install section not found in README.md")
+    new = f"""## Install
+
+```bash
+# Homebrew (macOS / Linux)
+brew tap mulhamna/tap
+brew install jira-commands
+
+# Optional MCP server
+brew install jira-mcp
+
+# Cargo
+cargo install jira-commands
+
+# Windows (Scoop)
+scoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}
+scoop install mulhamna/jirac
+
+# Windows (winget)
+winget install mulhamna.jirac
+
+# Windows (Chocolatey)
+choco install jirac
+```
+
+More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL.md)"""
+    return text[:start] + new + text[end:]
 
 
 def replace_footer(text: str, contributors: list[str]) -> str:
@@ -74,17 +99,22 @@ def replace_footer(text: str, contributors: list[str]) -> str:
 
 
 def refresh_install_md(text: str) -> str:
-    text = re.sub(
-        r"\| Winget\s+\| ❌\s+\| ❌\s+\| ✅\s+\| Windows package manager\s+\|\n\| Chocolatey",
-        "| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket` |\n| Winget               | ❌     | ❌     | ✅       | Windows package manager                |\n| Chocolatey",
-        text,
-        count=1,
+    if "Custom bucket `mulhamna/scoop-bucket`" not in text:
+        text = re.sub(
+            r"\| Winget\s+\| ❌\s+\| ❌\s+\| ✅\s+\| Windows package manager\s+\|\n\| Chocolatey",
+            "| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |\n| Winget               | ❌     | ❌     | ✅       | Windows package manager                |\n| Chocolatey",
+            text,
+            count=1,
+        )
+
+    pattern = re.compile(
+        r"## PowerShell installer \(Windows\)\n.*?## Cargo\n",
+        flags=re.S,
     )
-    old = """## PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstall `jirac-mcp` instead:\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\" -Binary jirac-mcp\n```\n\n## Cargo\n"""
     new = f"""## PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstall `jirac-mcp` instead:\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\" -Binary jirac-mcp\n```\n\n## Scoop (Windows)\n\n```powershell\nscoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}\nscoop install mulhamna/jirac\n```\n\n## Cargo\n"""
-    if old not in text:
-        raise SystemExit("expected INSTALL.md section not found")
-    return text.replace(old, new, 1)
+    if not pattern.search(text):
+        raise SystemExit("expected PowerShell/Cargo section not found in INSTALL.md")
+    return pattern.sub(new, text, count=1)
 
 
 def main() -> int:

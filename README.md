@@ -44,7 +44,7 @@ Jira on the command line.
 | Raw API passthrough               |          ✅          |                             ❌                             |                             ❌                              |
 | Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
 | MCP server                        |          ✅          |                             ❌                             |                             ❌                              |
-| Scoop install                     |          ✅          |                             ❌                             |                             ❌                              |
+| Scoop                             |          ✅          |                             ❌                             |                             ❌                              |
 | Multi login / saved profiles      |          ✅          |                             ❌                             |                             ❌                              |
 | macOS / Linux / Windows           |      ✅ / ✅ / ✅      |                      ✅ / ✅ / Partial                      |                         ✅ / ✅ / ✅                          |
 | Jira Data Center / self-managed   | Cloud + Data Center |                   Cloud + self-managed                    |                    Cloud + self-managed                    |

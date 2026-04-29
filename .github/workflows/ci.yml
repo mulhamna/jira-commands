@@ -148,7 +148,7 @@ jobs:
           fi
 
       - name: Check Claude plugin release lane files
-        if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.plugin_release == 'true' || needs.changes.outputs.workflows == 'true'
+        if: needs.changes.outputs.plugin == 'true' || needs.changes.outputs.plugin_release == 'true'
         run: |
           test -f plugin/VERSION
           test -f plugin/CHANGELOG.md

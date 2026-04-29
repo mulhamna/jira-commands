@@ -16,6 +16,8 @@
 - [ ] `cargo clippy --all-targets --all-features -- -D warnings` passes
 - [ ] `cargo test --all` passes
 - [ ] `cargo audit` passes (no new CVEs introduced)
+- [ ] Crate changes include added or updated tests, or this PR explains why not
+- [ ] For bug fixes in `crates/`, I added or updated a regression test when feasible
 - [ ] No new dependency added without justification in PR description
 - [ ] New dependencies use permissive licenses (MIT / Apache-2.0 / BSD)
 

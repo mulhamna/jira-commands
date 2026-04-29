@@ -1,12 +1,8 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use jira_commands::{cli, tui, version_check};
 use jira_core::{config::JiraConfig, JiraClient};
 use tracing_subscriber::{fmt, EnvFilter};
-
-mod cli;
-mod datetime;
-mod tui;
-mod version_check;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -26,34 +22,25 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Create, list, view, update, delete, transition, attach, and bulk-operate on issues
     Issue {
         #[command(subcommand)]
         command: Box<cli::issue::IssueCommand>,
     },
-    /// Manage credentials — login, logout, status, update
     Auth {
         #[command(subcommand)]
         command: cli::auth::AuthCommand,
     },
-
-    /// Launch the interactive TUI — browse, search, and transition issues
     #[command(
         long_about = "Launch the interactive TUI to browse, search, update, and transition issues.\n\nKeyboard shortcuts:\n  j / k or ↑ / ↓   Navigate the issue list\n  Enter            Open split detail view\n  p                Open saved JQL queries\n  T                Open theme picker\n  S                Show server summary\n  g                Show config summary\n  t                Transition the selected issue\n  C                Pick visible table columns and save preference\n  c                Create a new issue\n  e                Edit summary / description\n  y                Change issue type in a modal (native Jira move semantics)\n  M                Move issue to another project in a modal (native move, not clone+delete)\n  a                Open native assignee popup with searchable picker\n  ;                Add a comment\n  w                Add a worklog\n  l                Set labels\n  m                Open native component popup with searchable multi-select\n  v                Open native fix version popup with searchable multi-select\n  s                Open sprint picker\n  u                Upload an attachment\n  o                Open the selected issue in your browser\n  r                Refresh the issue list\n  /                Enter search mode and run JQL\n  ?                Show keyboard help overlay\n  Esc              Cancel search / go back\n  q                Quit\n\nThe TUI keeps these actions inside overlays and modals. It does not exit to the shell for type changes or project moves.\n\nExamples:\n  jirac tui\n      Uses the default project from config, or your assigned issues\n\n  jirac tui -p PROJ\n      Start filtered to a specific project"
     )]
     Tui {
-        /// Project key to filter issues (e.g. PROJ). Falls back to config default, then assignee = currentUser()
         #[arg(short, long, value_name = "PROJECT")]
         project: Option<String>,
     },
-
-    /// Execute raw Jira REST API calls — GET, POST, PUT, PATCH, DELETE
     Api {
         #[command(subcommand)]
         command: cli::api::ApiCommand,
     },
-
-    /// Manage Jira Plans / Advanced Roadmaps (requires Jira Premium)
     Plan {
         #[command(subcommand)]
         command: cli::plan::PlanCommand,
@@ -62,7 +49,6 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Detect if invoked via the legacy 'jira' binary name and warn the user.
     if std::env::args().next().is_some_and(|a| {
         let name = std::path::Path::new(&a)
             .file_stem()
@@ -80,7 +66,6 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let update_notice = version_check::check_for_update().await;
 
-    // Initialize tracing
     let filter = if cli.verbose {
         EnvFilter::new("debug")
     } else {

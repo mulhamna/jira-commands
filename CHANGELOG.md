@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.24.2](https://github.com/mulhamna/jira-commands/compare/v0.24.1...v0.24.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* **release:** correct scoop workflow paths ([#158](https://github.com/mulhamna/jira-commands/issues/158)) ([028fe92](https://github.com/mulhamna/jira-commands/commit/028fe92ecb6c48e245148a3cf2ba8f86b4080d92))
+
 ## [0.24.1](https://github.com/mulhamna/jira-commands/compare/v0.24.0...v0.24.1) (2026-04-29)
 
 

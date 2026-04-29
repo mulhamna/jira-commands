@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.24.3](https://github.com/mulhamna/jira-commands/compare/v0.24.2...v0.24.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* **release:** align scoop lane with bucket layout ([#161](https://github.com/mulhamna/jira-commands/issues/161)) ([bb6abcf](https://github.com/mulhamna/jira-commands/commit/bb6abcf49f4589dfdbd7e78dc987f63a15fc0912))
+
 ## [0.24.2](https://github.com/mulhamna/jira-commands/compare/v0.24.1...v0.24.2) (2026-04-29)
 
 

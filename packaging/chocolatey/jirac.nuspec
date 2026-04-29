@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>jirac</id>
-    <version>0.23.0</version>
+    <version>0.24.4</version>
     <packageSourceUrl>https://github.com/mulhamna/jira-commands</packageSourceUrl>
     <owners>mulhamna</owners>
     <title>jirac</title>
@@ -16,7 +16,7 @@
     <tags>jira atlassian cli tui rust mcp</tags>
     <summary>Jira terminal client with TUI, MCP support, and native release archives.</summary>
     <description>jirac is a fast Jira CLI and TUI built in Rust. It supports interactive issue browsing, transitions, comments, worklogs, attachments, and jirac-mcp for editor and agent integrations.</description>
-    <releaseNotes>https://github.com/mulhamna/jira-commands/releases/tag/v0.23.0</releaseNotes>
+    <releaseNotes>https://github.com/mulhamna/jira-commands/releases/tag/v0.24.4</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />

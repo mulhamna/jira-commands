@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
-PackageVersion: 0.23.0
+PackageVersion: 0.24.4
 PackageLocale: en-US
 Publisher: mulhamna
 PublisherUrl: https://github.com/mulhamna

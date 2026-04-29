@@ -74,7 +74,6 @@ choco install jirac
 ```
 
 More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL.md)
-
 ## Quick start
 
 ```bash
@@ -294,6 +293,13 @@ packaging/     # release/install packaging
 Thanks to everyone helping shape `jirac`. This footer is refreshed automatically during the release lane.
 
 <p align="left">
-_Contributor avatars will appear after the first successful release refresh._
+<a href="https://github.com/mulhamna" title="@mulhamna"><img src="https://avatars.githubusercontent.com/u/97831705?v=4&s=72" width="36" height="36" alt="mulhamna" /></a>
+<a href="https://github.com/apps/github-actions" title="@github-actions[bot]"><img src="https://avatars.githubusercontent.com/in/15368?v=4&s=72" width="36" height="36" alt="github-actions[bot]" /></a>
+<a href="https://github.com/badrus123" title="@badrus123"><img src="https://avatars.githubusercontent.com/u/21188155?v=4&s=72" width="36" height="36" alt="badrus123" /></a>
+<a href="https://github.com/chmdznr" title="@chmdznr"><img src="https://avatars.githubusercontent.com/u/6890365?v=4&s=72" width="36" height="36" alt="chmdznr" /></a>
+<a href="https://github.com/apps/dependabot" title="@dependabot[bot]"><img src="https://avatars.githubusercontent.com/in/29110?v=4&s=72" width="36" height="36" alt="dependabot[bot]" /></a>
+<a href="https://github.com/resincode" title="@resincode"><img src="https://avatars.githubusercontent.com/u/5574999?v=4&s=72" width="36" height="36" alt="resincode" /></a>
+<a href="https://github.com/EnrikoAviyantoPutra" title="@EnrikoAviyantoPutra"><img src="https://avatars.githubusercontent.com/u/71826526?v=4&s=72" width="36" height="36" alt="EnrikoAviyantoPutra" /></a>
+<a href="https://github.com/wahyuakbarwibowo" title="@wahyuakbarwibowo"><img src="https://avatars.githubusercontent.com/u/25057573?v=4&s=72" width="36" height="36" alt="wahyuakbarwibowo" /></a>
 </p>
 <!-- contributors:end -->

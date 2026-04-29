@@ -5,7 +5,7 @@ Jira on the command line.
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
 [![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License: MIT + Apache-2.0](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 `jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
@@ -44,6 +44,7 @@ Jira on the command line.
 | Raw API passthrough               |          ✅          |                             ❌                             |                             ❌                              |
 | Cursor-based pagination           |          ✅          |                        ❌ (offset)                         |                         ❌ (offset)                         |
 | MCP server                        |          ✅          |                             ❌                             |                             ❌                              |
+| Scoop install                     |          ✅          |                             ❌                             |                             ❌                              |
 | Multi login / saved profiles      |          ✅          |                             ❌                             |                             ❌                              |
 | macOS / Linux / Windows           |      ✅ / ✅ / ✅      |                      ✅ / ✅ / Partial                      |                         ✅ / ✅ / ✅                          |
 | Jira Data Center / self-managed   | Cloud + Data Center |                   Cloud + self-managed                    |                    Cloud + self-managed                    |
@@ -60,6 +61,10 @@ brew install jira-mcp
 
 # Cargo
 cargo install jira-commands
+
+# Windows (Scoop)
+scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
+scoop install mulhamna/jirac
 
 # Windows (winget)
 winget install mulhamna.jirac
@@ -282,3 +287,13 @@ crates/
 assets/        # screenshots and images
 packaging/     # release/install packaging
 ```
+
+<!-- contributors:start -->
+## Contributors
+
+Thanks to everyone helping shape `jirac`. This footer is refreshed automatically during the release lane.
+
+<p align="left">
+_Contributor avatars will appear after the first successful release refresh._
+</p>
+<!-- contributors:end -->

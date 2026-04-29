@@ -24,6 +24,26 @@
         {
           "type": "generic",
           "path": "/crates/jira-mcp/Cargo.toml"
+        },
+        {
+          "type": "generic",
+          "path": "/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "/INSTALL.md"
+        },
+        {
+          "type": "generic",
+          "path": "/packaging/winget/jirac.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/packaging/winget/jirac.locale.en-US.yaml"
+        },
+        {
+          "type": "generic",
+          "path": "/packaging/winget/jirac.installer.yaml"
         }
       ]
     }

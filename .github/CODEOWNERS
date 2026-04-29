@@ -12,14 +12,27 @@
 # Default owner for everything
 * @mulhamna
 
-# CI/CD workflows — extra sensitive, must always be reviewed by owner
+# CI/CD, release automation, and repo policy
 .github/ @mulhamna
+CODEOWNERS @mulhamna
+CLAUDE.md @mulhamna
+AGENTS.md @mulhamna
 
 # Core library and binary source
 crates/ @mulhamna
 
+# Docs and packaging metadata that ship to users
+README.md @mulhamna
+INSTALL.md @mulhamna
+packaging/ @mulhamna
+install.sh @mulhamna
+install.ps1 @mulhamna
+
 # Release configuration — version bumps and publish rules
 release-please-config.json @mulhamna
 .release-please-manifest.json @mulhamna
+VERSION @mulhamna
+CHANGELOG.md @mulhamna
 deny.toml @mulhamna
 Cargo.toml @mulhamna
+LICENSE* @mulhamna

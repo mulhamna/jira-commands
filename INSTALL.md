@@ -11,6 +11,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | PowerShell installer | ❌     | ❌     | ✅       | Installs `jirac.exe` to user-local bin |
 | Cargo                | ✅     | ✅     | ✅       | Best for Rust users                    |
 | GitHub Releases      | ✅     | ✅     | ✅       | Manual download of archives/binaries   |
+| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |
 | Winget               | ❌     | ❌     | ✅       | Windows package manager                |
 | Chocolatey           | ❌     | ❌     | ✅       | Windows package manager                |
 
@@ -55,6 +56,13 @@ Install `jirac-mcp` instead:
 powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))" -Binary jirac-mcp
 ```
 
+## Scoop (Windows)
+
+```powershell
+scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
+scoop install mulhamna/jirac
+```
+
 ## Cargo
 
 ```bash
@@ -84,6 +92,14 @@ Preferred archives:
 | Windows x86_64      | `jirac-windows-x86_64.zip`   |
 
 ## Winget (Windows)
+
+If you prefer Scoop, use the custom bucket instead:
+
+```powershell
+scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
+scoop install mulhamna/jirac
+```
+
 
 ```powershell
 winget install mulhamna.jirac

@@ -179,8 +179,8 @@ jobs:
           mkdir -p dist/jirac dist/jirac-mcp
           cp ${{ matrix.artifact }} dist/jirac/
           cp ${{ matrix.mcp_artifact }} dist/jirac-mcp/
-          cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac/
-          cp README.md LICENSE LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
+          cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac/
+          cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
           tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
           tar -czf ${{ matrix.mcp_archive_artifact }} -C dist/jirac-mcp .
 
@@ -191,8 +191,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp | Out-Null
           Copy-Item ${{ matrix.artifact }} dist/jirac/
           Copy-Item ${{ matrix.mcp_artifact }} dist/jirac-mcp/
-          Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac/
-          Copy-Item README.md, LICENSE, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
+          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac/
+          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
           Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
           Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.mcp_archive_artifact }}
 
@@ -435,6 +435,14 @@ jobs:
         with:
           ref: main
 
+      - name: Refresh release README and install docs
+        run: python3 .github/scripts/refresh_release_readme.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SCOOP_BUCKET: mulhamna/scoop-bucket
+
       - name: Refresh Winget source manifests
         run: |
           python3 - <<'EOF'
@@ -511,13 +519,15 @@ jobs:
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(packaging): refresh manifests for v${{ needs.collect-release-metadata.outputs.version }}"
+          commit-message: "chore(packaging): refresh release docs and manifests for v${{ needs.collect-release-metadata.outputs.version }}"
           branch: chore/package-manifests-v${{ needs.collect-release-metadata.outputs.version }}
           delete-branch: true
-          title: "chore(packaging): refresh manifests for v${{ needs.collect-release-metadata.outputs.version }}"
+          title: "chore(packaging): refresh release docs and manifests for v${{ needs.collect-release-metadata.outputs.version }}"
           body: |
             ## Summary
 
+            - refresh root README.md and INSTALL.md for the released version
+            - refresh contributor avatars in the README footer
             - refresh in-repo Winget source manifests for v${{ needs.collect-release-metadata.outputs.version }}
             - refresh in-repo Chocolatey package source for v${{ needs.collect-release-metadata.outputs.version }}
             - update Windows installer URL and SHA256 from the published release
@@ -528,6 +538,8 @@ jobs:
             - Winget community submission remains a separate follow-up workflow
             - Chocolatey publish uses the refreshed source package metadata
           add-paths: |
+            README.md
+            INSTALL.md
             packaging/winget/jirac.yaml
             packaging/winget/jirac.locale.en-US.yaml
             packaging/winget/jirac.installer.yaml
@@ -616,6 +628,41 @@ jobs:
           git commit -m "chore: bump jira-commands to v${VERSION}"
           git push
 
+  update-scoop-bucket:
+    name: Update Scoop bucket manifest
+    runs-on: ubuntu-latest
+    needs: collect-release-metadata
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+      SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Checkout scoop bucket
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: mulhamna/scoop-bucket
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          path: bucket
+
+      - name: Verify Scoop manifest exists
+        run: test -f bucket/jirac.json
+
+      - name: Update Scoop manifest
+        run: python3 .github/scripts/update_scoop_manifest.py
+
+      - name: Commit and push Scoop manifest
+        run: |
+          cd bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add jirac.json
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: bump jirac to v${VERSION}"
+          git push
+
   publish-chocolatey:
     name: Publish Chocolatey package
     runs-on: windows-latest
@@ -660,7 +707,6 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item README.md packaging/chocolatey/README.md -Force
-          Copy-Item LICENSE packaging/chocolatey/LICENSE -Force
           Copy-Item LICENSE-MIT packaging/chocolatey/LICENSE-MIT -Force
           Copy-Item LICENSE-APACHE packaging/chocolatey/LICENSE-APACHE -Force
 

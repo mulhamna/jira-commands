@@ -73,6 +73,7 @@ jobs:
               - 'clawhub/**'
             docs:
               - 'README.md'
+              - 'INSTALL.md'
               - 'docs/**'
               - '.github/PULL_REQUEST_TEMPLATE.md'
               - 'plugin/README.md'
@@ -80,6 +81,7 @@ jobs:
               - 'crates/jira-core/README.md'
               - 'crates/jira-mcp/README.md'
               - 'packaging/winget/**'
+              - 'packaging/scoop/**'
               - 'install.ps1'
             release:
               - 'release-please-config.json'
@@ -90,7 +92,11 @@ jobs:
               - '.github/CODEOWNERS'
               - '.github/dependabot.yml'
               - 'install.sh'
+              - 'install.ps1'
               - 'SECURITY.md'
+              - 'LICENSE'
+              - 'LICENSE-MIT'
+              - 'LICENSE-APACHE'
           predicate-quantifier: 'some'
 
       - id: any_code
@@ -200,6 +206,18 @@ jobs:
           fi
           if [ -f install.ps1 ] && ! grep -qF "install.ps1" README.md; then
             echo "WARNING: install.ps1 exists but root README.md does not mention it."
+          fi
+          if ! grep -qF "scoop install mulhamna/jirac" README.md; then
+            echo "ERROR: README.md must document Scoop installation."
+            exit 1
+          fi
+          if ! grep -qF "scoop install mulhamna/jirac" INSTALL.md; then
+            echo "ERROR: INSTALL.md must document Scoop installation."
+            exit 1
+          fi
+          if ! grep -qF "<!-- contributors:start -->" README.md || ! grep -qF "<!-- contributors:end -->" README.md; then
+            echo "ERROR: README.md contributors markers are missing."
+            exit 1
           fi
 
       - name: Install Rust stable (for dry-run publish check)

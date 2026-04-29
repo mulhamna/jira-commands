@@ -49,6 +49,34 @@ cargo run -p jira-commands -- issue list
 cargo run -p jira-commands -- tui -p PROJ
 ```
 
+## Testing approach
+
+We want a pragmatic TDD workflow for the Rust crates under `crates/`.
+
+Baseline expectation:
+- for bug fixes, add or update a failing test first when feasible, then fix the code
+- for new crate behavior, add tests that lock the expected behavior before or alongside the implementation
+- for refactors in `crates/`, keep existing tests green and add coverage if behavior could regress
+- if a crate change ships without a test, explain why in the PR
+
+This is intentionally practical, not dogmatic:
+- docs, packaging, release metadata, and other non-crate changes do not need forced TDD ceremony
+- tiny wiring changes may reuse existing test coverage when that is honestly sufficient
+- we do not require 100% coverage
+
+Priority for new tests:
+- `crates/jira-core/`: parsing, auth/config behavior, request construction, response handling, regression coverage
+- `crates/jira/`: CLI command behavior, argument validation, output shaping, version/update logic
+- `crates/jira-mcp/`: tool contract behavior, request routing, error mapping, regression coverage
+
+Before opening a PR with crate changes, run:
+
+```bash
+cargo fmt --all
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace
+```
+
 ## Repo layout
 
 - `crates/jira-core/`: shared Jira client and models

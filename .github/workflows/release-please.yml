@@ -39,8 +39,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  sync-npm-version:
+    name: Sync npm package version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Sync npm version from VERSION
+        id: sync
+        run: |
+          node scripts/sync-npm-version.mjs
+          if git diff --quiet -- packaging/npm/package.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit synced npm package version
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packaging/npm/package.json
+          git commit -m "chore(npm): sync package version with VERSION"
+          git push
+
   release-please:
     name: Release Please
+    needs: sync-npm-version
+    if: needs.sync-npm-version.outputs.changed != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -26,6 +26,9 @@ pub(super) enum ModalKind {
     AddWorklog {
         key: String,
     },
+    AddBulkWorklog {
+        key: String,
+    },
     ChangeIssueType {
         key: String,
         current_project: String,
@@ -43,6 +46,7 @@ impl ModalKind {
             ModalKind::AddComment { key } => format!(" Comment on {key} "),
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
             ModalKind::AddWorklog { key } => format!(" Log Work on {key} "),
+            ModalKind::AddBulkWorklog { key } => format!(" Bulk Worklog on {key} "),
             ModalKind::ChangeIssueType { key, .. } => format!(" Change Type: {key} "),
             ModalKind::MoveIssue { key, .. } => format!(" Move Issue: {key} "),
         }
@@ -54,6 +58,9 @@ impl ModalKind {
             ModalKind::AddComment { .. } => " Ctrl+S: send   Esc: cancel ",
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
             ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
+            ModalKind::AddBulkWorklog { .. } => {
+                " Tab: next field   Ctrl+S: log range   Esc: cancel "
+            }
             ModalKind::ChangeIssueType { .. } => {
                 " Tab: next field   Ctrl+S: change type   Esc: cancel "
             }
@@ -73,6 +80,8 @@ pub(super) struct Modal {
     pub fields: Vec<ModalField>,
     pub focus: usize,
     pub error: Option<String>,
+    pub notice: Option<String>,
+    pub confirm_token: Option<String>,
     pub busy: bool,
     pub mention_active: bool,
     pub mention_query: String,
@@ -110,6 +119,8 @@ impl Modal {
             ],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -132,6 +143,8 @@ impl Modal {
             }],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -154,6 +167,8 @@ impl Modal {
             }],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -197,6 +212,63 @@ impl Modal {
             ],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn add_bulk_worklog(key: String) -> Self {
+        let make = |placeholder: &'static str| {
+            let mut a = TextArea::default();
+            a.set_cursor_line_style(Style::default());
+            a.set_placeholder_text(placeholder);
+            a
+        };
+        Self {
+            kind: ModalKind::AddBulkWorklog { key },
+            fields: vec![
+                ModalField {
+                    label: "Time spent  (e.g. 2h, 30m, 1d, 1h 30m)",
+                    area: make("required"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "From date  (YYYY-MM-DD)",
+                    area: make("required"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "To date  (YYYY-MM-DD)",
+                    area: make("required"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Start time  (HH:MM, optional)",
+                    area: make("blank = now"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Exclude weekends  (y/N)",
+                    area: make("n"),
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Comment  (optional)",
+                    area: make(""),
+                    multiline: true,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -227,6 +299,8 @@ impl Modal {
             }],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -269,6 +343,8 @@ impl Modal {
             ],
             focus: 0,
             error: None,
+            notice: None,
+            confirm_token: None,
             busy: false,
             mention_active: false,
             mention_query: String::new(),
@@ -302,7 +378,21 @@ impl Modal {
 
     pub(super) fn set_error(&mut self, msg: impl Into<String>) {
         self.error = Some(msg.into());
+        self.notice = None;
+        self.confirm_token = None;
         self.busy = false;
+    }
+
+    pub(super) fn set_notice(&mut self, msg: impl Into<String>, token: Option<String>) {
+        self.notice = Some(msg.into());
+        self.error = None;
+        self.confirm_token = token;
+        self.busy = false;
+    }
+
+    pub(super) fn clear_notice(&mut self) {
+        self.notice = None;
+        self.confirm_token = None;
     }
 }
 
@@ -335,10 +425,12 @@ pub(super) fn handle_modal_key(modal: &mut Modal, key: KeyEvent) -> ModalOutcome
         (KeyCode::Char('s'), KeyModifiers::CONTROL)
         | (KeyCode::Char('S'), KeyModifiers::CONTROL) => ModalOutcome::Submit,
         (KeyCode::Tab, _) => {
+            modal.clear_notice();
             modal.next_field();
             ModalOutcome::Continue
         }
         (KeyCode::BackTab, _) => {
+            modal.clear_notice();
             modal.prev_field();
             ModalOutcome::Continue
         }
@@ -351,10 +443,12 @@ pub(super) fn handle_modal_key(modal: &mut Modal, key: KeyEvent) -> ModalOutcome
             if !multiline {
                 return ModalOutcome::Submit;
             }
+            modal.clear_notice();
             forward_to_focus(modal, key);
             ModalOutcome::Continue
         }
         _ => {
+            modal.clear_notice();
             forward_to_focus(modal, key);
             ModalOutcome::Continue
         }
@@ -469,11 +563,15 @@ pub(super) fn render_modal(f: &mut Frame, modal: &mut Modal, palette: Palette, a
         "Working...".to_string()
     } else if let Some(err) = &modal.error {
         format!("⚠ {err}")
+    } else if let Some(notice) = &modal.notice {
+        format!("! {notice}")
     } else {
         String::new()
     };
     let status_style = if modal.error.is_some() {
         Style::default().fg(Color::Red)
+    } else if modal.notice.is_some() {
+        Style::default().fg(Color::Yellow)
     } else {
         Style::default().fg(palette.muted)
     };

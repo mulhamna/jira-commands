@@ -124,11 +124,11 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
-            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
+            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -1153,6 +1153,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  a         Assign selected issue"),
         Line::from("  ;         Add comment"),
         Line::from("  w         Add worklog"),
+        Line::from("  b         Add bulk worklog"),
         Line::from("  l         Set labels"),
         Line::from("  m         Edit components"),
         Line::from("  v         Edit fix versions"),
@@ -1171,7 +1172,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
         Line::from("  Summary / Comments / Worklog / Attachments / Subtasks / Links"),
-        Line::from("  e,y,M,a,;,w,m,v,s,u,t,o also work from detail view"),
+        Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
         Line::from(""),
         Line::from(Span::styled(
             "Press any key to close",

@@ -161,6 +161,7 @@ pub(super) enum AppAction {
     RefreshAssigneeOptions,
     AddComment(String),
     AddWorklog(String),
+    AddBulkWorklog(String),
     EditLabels(String),
     EditComponents(String),
     OpenComponentPicker(String),
@@ -1328,6 +1329,10 @@ pub async fn run_tui(
                 app.open_modal(Modal::add_worklog(key));
             }
 
+            AppAction::AddBulkWorklog(key) => {
+                app.open_modal(Modal::add_bulk_worklog(key));
+            }
+
             AppAction::EditLabels(key) => {
                 suspend_tui(&mut terminal)?;
                 let result = tui_edit_labels(&client, &key).await;
@@ -1552,6 +1557,189 @@ pub async fn run_tui(
                                 }
                             }
                         }
+                    }
+                    ModalKind::AddBulkWorklog { key } => {
+                        let time_spent = modal.field_text(0);
+                        let time_spent = time_spent.trim();
+                        if time_spent.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Time spent is required (e.g. 2h, 30m)");
+                            }
+                            continue;
+                        }
+
+                        let from_raw = modal.field_text(1);
+                        let from = from_raw.trim();
+                        if from.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("From date is required (YYYY-MM-DD)");
+                            }
+                            continue;
+                        }
+
+                        let to_raw = modal.field_text(2);
+                        let to = to_raw.trim();
+                        if to.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("To date is required (YYYY-MM-DD)");
+                            }
+                            continue;
+                        }
+
+                        let start_raw = modal.field_text(3);
+                        let start = start_raw.trim();
+                        let start = if start.is_empty() { None } else { Some(start) };
+
+                        let exclude_raw = modal.field_text(4);
+                        let exclude_weekends = match parse_yes_no_field(&exclude_raw) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        let comment_raw = modal.field_text(5);
+                        let comment = comment_raw.trim();
+                        let comment = if comment.is_empty() {
+                            None
+                        } else {
+                            Some(comment)
+                        };
+
+                        let dates = match crate::datetime::build_worklog_range_dates(
+                            from,
+                            to,
+                            exclude_weekends,
+                        ) {
+                            Ok(dates) => dates,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        if dates.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("No worklog dates remain after weekend filtering");
+                            }
+                            continue;
+                        }
+
+                        let total = dates.len();
+                        let confirm_token = format!(
+                            "{}|{}|{}|{}|{}|{}|{}",
+                            key,
+                            time_spent,
+                            from,
+                            to,
+                            start.unwrap_or(""),
+                            exclude_weekends,
+                            comment.unwrap_or("")
+                        );
+                        let confirmed = app
+                            .modal
+                            .as_ref()
+                            .and_then(|m| m.confirm_token.as_ref())
+                            .map(|token| token == &confirm_token)
+                            .unwrap_or(false);
+                        if !confirmed {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_notice(
+                                    format!(
+                                        "Press Ctrl+S again to create {} worklogs for {}{}",
+                                        total,
+                                        key,
+                                        if exclude_weekends {
+                                            " (excluding weekends)"
+                                        } else {
+                                            ""
+                                        }
+                                    ),
+                                    Some(confirm_token),
+                                );
+                            }
+                            continue;
+                        }
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                            m.notice = None;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+
+                        let mut created = Vec::with_capacity(total);
+                        let mut failure: Option<String> = None;
+
+                        for date in dates {
+                            let date_label = date.format("%Y-%m-%d").to_string();
+                            let started = match crate::datetime::build_worklog_started_for_date(
+                                date, start,
+                            ) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    failure = Some(format!(
+                                        "Failed to build started timestamp for {date_label}: {e}"
+                                    ));
+                                    break;
+                                }
+                            };
+
+                            match client
+                                .add_worklog(&key, time_spent, comment, Some(&started))
+                                .await
+                            {
+                                Ok(log) => created.push((date_label, log.id)),
+                                Err(e) => {
+                                    let partial = if created.is_empty() {
+                                        String::new()
+                                    } else {
+                                        format!(
+                                            " Partial success: {}",
+                                            created
+                                                .iter()
+                                                .map(|(date, id)| format!("{} -> {}", date, id))
+                                                .collect::<Vec<_>>()
+                                                .join(", ")
+                                        )
+                                    };
+                                    failure = Some(format!(
+                                        "Bulk worklog failed on {}: {}.{}",
+                                        date_label, e, partial
+                                    ));
+                                    break;
+                                }
+                            }
+                        }
+
+                        if let Some(err) = failure {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error(err);
+                            }
+                            continue;
+                        }
+
+                        app.close_modal();
+                        app.detail.worklogs = None;
+                        app.warm_active_tab(&client).await;
+                        app.set_status(
+                            format!(
+                                "✓ Logged {} on {} across {} day(s){}",
+                                time_spent,
+                                key,
+                                total,
+                                if exclude_weekends {
+                                    " (excluding weekends)"
+                                } else {
+                                    ""
+                                }
+                            ),
+                            false,
+                        );
                     }
                     ModalKind::ChangeIssueType {
                         key,
@@ -1875,6 +2063,22 @@ async fn resolve_issue_type(
     client
         .get_issue_type_by_name(project_key, issue_type_name)
         .await
+}
+
+fn parse_yes_no_field(raw: &str) -> Result<bool> {
+    let value = raw.trim().to_ascii_lowercase();
+    if value.is_empty() {
+        return Ok(false);
+    }
+
+    match value.as_str() {
+        "y" | "yes" | "true" | "1" => Ok(true),
+        "n" | "no" | "false" | "0" => Ok(false),
+        _ => anyhow::bail!(
+            "Invalid Exclude weekends value '{}'. Use y/n, yes/no, true/false, or 1/0",
+            raw.trim()
+        ),
+    }
 }
 
 fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {

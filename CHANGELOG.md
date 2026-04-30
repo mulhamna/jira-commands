@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.26.1](https://github.com/mulhamna/jira-commands/compare/v0.26.0...v0.26.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **tui:** render mentions and separate comments ([#176](https://github.com/mulhamna/jira-commands/issues/176)) ([f939899](https://github.com/mulhamna/jira-commands/commit/f939899f36ac6aad36e97614e6ead81afdc08d18))
+
 ## [0.26.0](https://github.com/mulhamna/jira-commands/compare/v0.25.0...v0.26.0) (2026-04-30)
 
 

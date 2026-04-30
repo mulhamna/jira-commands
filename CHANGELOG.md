@@ -6,6 +6,20 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.26.0](https://github.com/mulhamna/jira-commands/compare/v0.25.0...v0.26.0) (2026-04-30)
+
+
+### Features
+
+* **packaging:** add npm installer wrapper and fix Linux release compatibility ([#172](https://github.com/mulhamna/jira-commands/issues/172)) ([677aef7](https://github.com/mulhamna/jira-commands/commit/677aef72371a405fc345dea9049156110886b905))
+
+
+### Bug Fixes
+
+* **release:** sync npm package version during publish ([#174](https://github.com/mulhamna/jira-commands/issues/174)) ([b27e5df](https://github.com/mulhamna/jira-commands/commit/b27e5df1ababc895d8dba9796eb2a94dfdbdcc35))
+* **release:** sync npm package version with release-please ([#173](https://github.com/mulhamna/jira-commands/issues/173)) ([3e6380e](https://github.com/mulhamna/jira-commands/commit/3e6380e7b8b569472cb0f9c02499a517828c8e79))
+* **worklog:** respect Jira user timezone for started timestamps ([#170](https://github.com/mulhamna/jira-commands/issues/170)) ([ddbbaae](https://github.com/mulhamna/jira-commands/commit/ddbbaaedbd3acad7c8505427f5f0cdc0ebb184bc))
+
 ## [0.25.0](https://github.com/mulhamna/jira-commands/compare/v0.24.4...v0.25.0) (2026-04-30)
 
 

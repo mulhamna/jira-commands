@@ -6,6 +6,15 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.26.2](https://github.com/mulhamna/jira-commands/compare/v0.26.1...v0.26.2) (2026-04-30)
+
+
+### Bug Fixes
+
+* **ci:** allow release-please npm version lag ([#184](https://github.com/mulhamna/jira-commands/issues/184)) ([a7a9f91](https://github.com/mulhamna/jira-commands/commit/a7a9f91deadc5d27fbbe7ca9cb440c8fe88c06c5))
+* **npm:** publish package under @mulham28/jirac ([#179](https://github.com/mulhamna/jira-commands/issues/179)) ([ebc544d](https://github.com/mulhamna/jira-commands/commit/ebc544d48f6e820cc1646bf806edab1075b5b309))
+* **release:** sync npm version before release-please ([#181](https://github.com/mulhamna/jira-commands/issues/181)) ([a424276](https://github.com/mulhamna/jira-commands/commit/a424276eac45313215093182aa67b7c16242ba33))
+
 ## [0.26.1](https://github.com/mulhamna/jira-commands/compare/v0.26.0...v0.26.1) (2026-04-30)
 
 

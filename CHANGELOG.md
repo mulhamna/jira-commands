@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.25.0](https://github.com/mulhamna/jira-commands/compare/v0.24.4...v0.25.0) (2026-04-30)
+
+
+### Features
+
+* add range worklog support for CLI and TUI ([#167](https://github.com/mulhamna/jira-commands/issues/167)) ([f01ab9b](https://github.com/mulhamna/jira-commands/commit/f01ab9bcd7852f385ead35761b37407a3378afe3))
+
 ## [0.24.4](https://github.com/mulhamna/jira-commands/compare/v0.24.3...v0.24.4) (2026-04-29)
 
 

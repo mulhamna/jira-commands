@@ -1956,11 +1956,21 @@ async fn worklog_add(client: JiraClient, key: String, options: WorklogAddOptions
         range,
     } = options;
 
+    let jira_timezone = if date.is_some() || start.is_some() || range.is_some() {
+        client
+            .get_myself_timezone()
+            .await
+            .context("Failed to fetch Jira user timezone")?
+    } else {
+        None
+    };
+
     if let Some(range) = range {
-        return worklog_add_range(client, key, time, comment, start, range).await;
+        return worklog_add_range(client, key, time, comment, start, range, jira_timezone).await;
     }
 
-    let started = build_worklog_started(date.as_deref(), start.as_deref())?;
+    let started =
+        build_worklog_started(date.as_deref(), start.as_deref(), jira_timezone.as_deref())?;
 
     let spinner = spinner_new(format!("Logging {time} on {key}..."));
     let log = client
@@ -1982,6 +1992,7 @@ async fn worklog_add_range(
     comment: Option<String>,
     start: Option<String>,
     range: WorklogRangeOptions,
+    jira_timezone: Option<String>,
 ) -> Result<()> {
     let WorklogRangeOptions {
         from,
@@ -2006,7 +2017,8 @@ async fn worklog_add_range(
         let date_label = date.format("%Y-%m-%d").to_string();
         pb.set_message(format!("{} ({})", key, date_label));
 
-        let started = build_worklog_started_for_date(date, start.as_deref())?;
+        let started =
+            build_worklog_started_for_date(date, start.as_deref(), jira_timezone.as_deref())?;
         match client
             .add_worklog(&key, &time, comment.as_deref(), Some(&started))
             .await

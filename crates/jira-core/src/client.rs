@@ -113,15 +113,18 @@ impl JiraClient {
         Ok(headers)
     }
 
-    /// Get the current authenticated user's accountId.
-    pub async fn get_myself(&self) -> Result<String> {
+    async fn get_myself_value(&self) -> Result<Value> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/myself");
 
         let http = &self.http;
-        let user: serde_json::Value = self
-            .request(|| http.get(&url).headers(headers.clone()))
-            .await?;
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
+    }
+
+    /// Get the current authenticated user's accountId.
+    pub async fn get_myself(&self) -> Result<String> {
+        let user = self.get_myself_value().await?;
 
         user.get("accountId")
             .and_then(|v| v.as_str())
@@ -130,6 +133,15 @@ impl JiraClient {
                 status: 0,
                 message: "Could not get accountId from /myself".into(),
             })
+    }
+
+    /// Get the current authenticated user's Jira timezone (IANA name), if available.
+    pub async fn get_myself_timezone(&self) -> Result<Option<String>> {
+        let user = self.get_myself_value().await?;
+        Ok(user
+            .get("timeZone")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()))
     }
 
     /// Resolve an assignee string to a Jira accountId.

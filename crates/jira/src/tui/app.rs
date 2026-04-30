@@ -1527,7 +1527,21 @@ pub async fn run_tui(
                             Some(comment)
                         };
 
-                        let started = match crate::datetime::build_worklog_started(date, start) {
+                        let jira_timezone = match client.get_myself_timezone().await {
+                            Ok(timezone) => timezone,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Failed to fetch Jira timezone: {e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        let started = match crate::datetime::build_worklog_started(
+                            date,
+                            start,
+                            jira_timezone.as_deref(),
+                        ) {
                             Ok(s) => s,
                             Err(e) => {
                                 if let Some(m) = app.modal.as_mut() {
@@ -1630,6 +1644,16 @@ pub async fn run_tui(
                             continue;
                         }
 
+                        let jira_timezone = match client.get_myself_timezone().await {
+                            Ok(timezone) => timezone,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Failed to fetch Jira timezone: {e}"));
+                                }
+                                continue;
+                            }
+                        };
+
                         let total = dates.len();
                         let confirm_token = format!(
                             "{}|{}|{}|{}|{}|{}|{}",
@@ -1678,7 +1702,9 @@ pub async fn run_tui(
                         for date in dates {
                             let date_label = date.format("%Y-%m-%d").to_string();
                             let started = match crate::datetime::build_worklog_started_for_date(
-                                date, start,
+                                date,
+                                start,
+                                jira_timezone.as_deref(),
                             ) {
                                 Ok(s) => s,
                                 Err(e) => {

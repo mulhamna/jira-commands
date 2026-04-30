@@ -362,7 +362,7 @@ fn build_comment_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
                 if idx > 0 {
                     lines.push(Line::from(Span::styled(
                         "─".repeat(48),
-                        Style::default().fg(palette.border),
+                        Style::default().fg(palette.muted),
                     )));
                     lines.push(Line::from(""));
                 }

@@ -96,3 +96,38 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync npm package version on release PR branch
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH=$(gh pr list             --repo "$GITHUB_REPOSITORY"             --state open             --base main             --head release-please--branches--main--components--jira-commands             --json headRefName             --jq '.[0].headRefName')
+
+          if [ -z "${BRANCH:-}" ] || [ "$BRANCH" = "null" ]; then
+            echo "No open release-please branch found; skipping npm sync."
+            exit 0
+          fi
+
+          git fetch origin "$BRANCH"
+          git checkout -B "$BRANCH" "origin/$BRANCH"
+          node scripts/sync-npm-version.mjs
+
+          if git diff --quiet -- packaging/npm/package.json; then
+            echo "packaging/npm/package.json already matches VERSION"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packaging/npm/package.json
+          git commit -m "chore(npm): sync package version with VERSION"
+          git push origin "HEAD:$BRANCH"

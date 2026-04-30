@@ -21,6 +21,19 @@ fn render_node(node: &Value, out: &mut String, depth: usize) {
                 out.push_str(text);
             }
         }
+        "mention" => {
+            let mention_text = node
+                .get("attrs")
+                .and_then(|a| a.get("text"))
+                .and_then(|v| v.as_str())
+                .or_else(|| {
+                    node.get("attrs")
+                        .and_then(|a| a.get("id"))
+                        .and_then(|v| v.as_str())
+                })
+                .unwrap_or("@unknown");
+            out.push_str(mention_text);
+        }
         "hardBreak" => {
             out.push('\n');
         }

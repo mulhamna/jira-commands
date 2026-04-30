@@ -358,7 +358,14 @@ fn build_comment_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
                 Line::from(format!("{} comment(s)", comments.len())),
                 Line::from(""),
             ];
-            for comment in comments {
+            for (idx, comment) in comments.iter().enumerate() {
+                if idx > 0 {
+                    lines.push(Line::from(Span::styled(
+                        "─".repeat(48),
+                        Style::default().fg(palette.muted),
+                    )));
+                    lines.push(Line::from(""));
+                }
                 let author = comment.author.clone().unwrap_or_else(|| "Unknown".into());
                 let created = comment.created.get(..10).unwrap_or(&comment.created);
                 lines.push(Line::from(vec![

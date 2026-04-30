@@ -364,10 +364,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Verify npm package metadata is readable
+      - name: Verify npm package version matches workspace version
         run: |
-          node -e "const pkg=require('./packaging/npm/package.json'); if(!pkg.name||!pkg.version||!pkg.bin?.jirac){throw new Error('invalid npm package metadata')}"
-          echo "npm package metadata looks valid"
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+
+          echo "workspace: $VERSION"
+          echo "npm:       $NPM_VERSION"
+
+          if [ "$VERSION" != "$NPM_VERSION" ]; then
+            echo "ERROR: packaging/npm/package.json version is out of sync."
+            echo "Run: node scripts/sync-npm-version.mjs"
+            exit 1
+          fi
 
       - name: npm pack smoke test
         run: |

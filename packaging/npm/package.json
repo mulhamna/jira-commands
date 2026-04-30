@@ -1,6 +1,6 @@
 {
   "name": "@mulham28/jirac",
-  "version": "0.25.0",
+  "version": "0.26.1",
   "description": "Install the jirac Jira CLI from GitHub Releases",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -26,7 +26,8 @@
     "README.md"
   ],
   "scripts": {
-    "postinstall": "node ./lib/install.js"
+    "postinstall": "node ./lib/install.js",
+    "release:check": "node ../../scripts/sync-npm-version.mjs && git diff --exit-code -- packaging/npm/package.json"
   },
   "engines": {
     "node": ">=18"

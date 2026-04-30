@@ -379,8 +379,11 @@ jobs:
 
       - name: npm pack smoke test
         run: |
+          rm -f jira-commands-*.tgz
           npm pack ./packaging/npm
-          tar -tzf jira-commands-*.tgz >/dev/null
+          PACKAGE_TGZ=$(ls -1 jira-commands-*.tgz | head -n 1)
+          test -n "$PACKAGE_TGZ"
+          tar -tzf "$PACKAGE_TGZ" >/dev/null
 
   security:
     name: Security audit

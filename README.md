@@ -62,6 +62,9 @@ brew install jira-mcp
 # Cargo
 cargo install jira-commands
 
+# npm
+npm install -g jira-commands
+
 # Windows (Scoop)
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac

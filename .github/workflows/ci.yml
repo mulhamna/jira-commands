@@ -82,6 +82,7 @@ jobs:
               - 'crates/jira-mcp/README.md'
               - 'packaging/winget/**'
               - 'packaging/scoop/**'
+              - 'packaging/npm/**'
               - 'install.ps1'
             release:
               - 'release-please-config.json'
@@ -348,6 +349,41 @@ jobs:
             grep -q '^---' "$file" || { echo "Missing frontmatter: $file"; exit 1; }
             grep -q '^description:' "$file" || { echo "Missing description in $file"; exit 1; }
           done
+
+  npm-check:
+    name: npm package check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.workflows == 'true' || needs.changes.outputs.release == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Verify npm package version matches workspace version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+
+          echo "workspace: $VERSION"
+          echo "npm:       $NPM_VERSION"
+
+          if [ "$VERSION" != "$NPM_VERSION" ]; then
+            echo "ERROR: packaging/npm/package.json version is out of sync."
+            exit 1
+          fi
+
+      - name: npm pack smoke test
+        run: |
+          rm -f jira-commands-*.tgz
+          npm pack ./packaging/npm
+          PACKAGE_TGZ=$(ls -1 jira-commands-*.tgz | head -n 1)
+          test -n "$PACKAGE_TGZ"
+          tar -tzf "$PACKAGE_TGZ" >/dev/null
 
   security:
     name: Security audit

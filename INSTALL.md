@@ -10,6 +10,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | Install script       | ✅     | ✅     | No      | Downloads latest release asset         |
 | PowerShell installer | ❌     | ❌     | ✅       | Installs `jirac.exe` to user-local bin |
 | Cargo                | ✅     | ✅     | ✅       | Best for Rust users                    |
+| npm                  | ✅     | ✅     | ✅       | Downloads prebuilt release binary      |
 | GitHub Releases      | ✅     | ✅     | ✅       | Manual download of archives/binaries   |
 | Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |
 | Winget               | ❌     | ❌     | ✅       | Windows package manager                |
@@ -68,6 +69,14 @@ scoop install mulhamna/jirac
 ```bash
 cargo install jira-commands
 ```
+
+## npm
+
+```bash
+npm install -g jira-commands
+```
+
+The npm package downloads the matching prebuilt `jirac` release binary during install. Linux support depends on the release binary's glibc compatibility.
 
 Install MCP binary:
 

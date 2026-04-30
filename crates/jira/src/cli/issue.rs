@@ -668,6 +668,7 @@ pub enum WorklogCommand {
     ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented login"
     ///   jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30
     ///   jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends
+    /// Range mode creates one worklog per included date.
     Add {
         /// Time spent in Jira duration format (e.g. "2h", "30m", "1d", "1h 30m")
         #[arg(short, long, value_name = "DURATION")]

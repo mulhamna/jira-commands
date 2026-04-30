@@ -301,8 +301,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION=$(node -p "require('./packaging/npm/package.json').version")
-          if npm view jira-commands@"$VERSION" version >/dev/null 2>&1; then
-            echo "✓ jira-commands npm v$VERSION already published, skipping"
+          if npm view @mulham28/jirac@"$VERSION" version >/dev/null 2>&1; then
+            echo "✓ @mulham28/jirac npm v$VERSION already published, skipping"
           else
             npm publish ./packaging/npm --access public
           fi

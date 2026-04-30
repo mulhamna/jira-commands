@@ -1,9 +1,9 @@
-# jira-commands npm package
+# @mulham28/jirac npm package
 
 Install `jirac` from GitHub Releases using npm.
 
 ```bash
-npm install -g jira-commands
+npm install -g @mulham28/jirac
 jirac --help
 ```
 

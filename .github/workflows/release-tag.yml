@@ -143,8 +143,8 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
-      - name: Install Zig + cargo-zigbuild (Linux aarch64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - name: Install Zig + cargo-zigbuild (Linux)
+        if: startsWith(matrix.target, 'x86_64-unknown-linux-gnu') || startsWith(matrix.target, 'aarch64-unknown-linux-gnu')
         run: |
           pip3 install ziglang==0.14.0 --break-system-packages
           cargo install cargo-zigbuild --locked
@@ -152,12 +152,16 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
+      - name: Build (zigbuild — Linux x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+
       - name: Build (zigbuild — Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
 
       - name: Build (native)
-        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-gnu'
         run: cargo build --release --target ${{ matrix.target }} -p jira-commands -p jira-mcp
 
       - name: Copy binaries (Unix)

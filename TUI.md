@@ -28,7 +28,8 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `a`         | Open native assignee popup and assign issue                   |
 | `t`         | Transition issue                                              |
 | `;`         | Add comment                                                   |
-| `w`         | Add worklog                                                   |
+| `w`         | Add a single worklog                                          |
+| `b`         | Add a bulk/range worklog                                      |
 | `l`         | Manage labels                                                 |
 | `m`         | Open native component popup and set project-scoped components |
 | `u`         | Upload attachment                                             |
@@ -53,6 +54,12 @@ Detail tabs:
 - Attachments
 - Subtasks
 - Links
+
+## Worklog flows
+
+- `w` opens the single-worklog modal with time spent, optional date, optional start time, and comment.
+- `b` opens the bulk-worklog modal with time spent, from/to date, optional start time, optional weekend exclusion, and comment.
+- Bulk submission requires confirmation: press `Ctrl+S` once to review the summary, then `Ctrl+S` again to create the worklogs. Editing any field resets the confirmation state.
 
 ### Column settings
 

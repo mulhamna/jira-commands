@@ -351,6 +351,7 @@ $ jirac issue transition CORE-183 --to Done
               <tr><td class="px-4 py-3">Transition issue</td><td class="px-4 py-3 command-cell"><code>jirac issue transition MYPROJ-123 --to Done</code></td></tr>
               <tr><td class="px-4 py-3">Add worklog</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --comment "Worked on API"</code></td></tr>
               <tr><td class="px-4 py-3">Add worklog with custom started time</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"</code></td></tr>
+              <tr><td class="px-4 py-3">Backfill worklog across a date range</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"</code></td></tr>
               <tr><td class="px-4 py-3">Upload attachment</td><td class="px-4 py-3 command-cell"><code>jirac issue attach MYPROJ-123 ./screenshot.png</code></td></tr>
               <tr><td class="px-4 py-3">Change backlog type natively</td><td class="px-4 py-3 command-cell"><code>jirac issue change-type MYPROJ-123 Story</code></td></tr>
               <tr><td class="px-4 py-3">Move backlog to another project natively</td><td class="px-4 py-3 command-cell"><code>jirac issue move MYPROJ-123 OTHER</code></td></tr>
@@ -369,7 +370,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including modal-based backlog type changes, direct project moves, and optional worklog date/start-time prompts.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including modal-based backlog type changes, direct project moves, single worklog entry via <code>w</code>, and bulk date-range worklogs via <code>b</code> with confirmation.</p>
       <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
           <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -388,7 +389,8 @@ $ jirac issue transition CORE-183 --to Done
             <tr><td class="px-4 py-3"><span class="keycap">M</span></td><td class="px-4 py-3">Move the selected backlog item to another project in a modal, using Jira native move semantics.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">t</span></td><td class="px-4 py-3">Change issue status (transition).</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">C</span></td><td class="px-4 py-3">Choose which table columns stay visible and persist that preference.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add worklog to the issue.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add a single worklog to the issue.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">b</span></td><td class="px-4 py-3">Add bulk worklogs across a date range, with confirmation before submit.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">v</span></td><td class="px-4 py-3">Edit fix versions.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">s</span></td><td class="px-4 py-3">Assign the issue to a sprint.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">u</span></td><td class="px-4 py-3">Upload an attachment to the issue.</td></tr>

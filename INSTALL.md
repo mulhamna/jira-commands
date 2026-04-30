@@ -73,7 +73,7 @@ cargo install jira-commands
 ## npm
 
 ```bash
-npm install -g jira-commands
+npm install -g @mulham28/jirac
 ```
 
 The npm package downloads the matching prebuilt `jirac` release binary during install. Linux support depends on the release binary's glibc compatibility.

@@ -373,7 +373,7 @@ jobs:
         run: |
           rm -f jira-commands-*.tgz
           npm pack ./packaging/npm
-          PACKAGE_TGZ=$(ls -1 jira-commands-*.tgz | head -n 1)
+          PACKAGE_TGZ=$(ls -1 mulham28-jirac-*.tgz | head -n 1)
           test -n "$PACKAGE_TGZ"
           tar -tzf "$PACKAGE_TGZ" >/dev/null
 

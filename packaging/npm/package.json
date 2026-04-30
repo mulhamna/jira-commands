@@ -1,5 +1,5 @@
 {
-  "name": "jira-commands",
+  "name": "@mulham28/jirac",
   "version": "0.25.0",
   "description": "Install the jirac Jira CLI from GitHub Releases",
   "license": "MIT OR Apache-2.0",

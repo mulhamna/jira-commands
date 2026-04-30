@@ -1,0 +1,34 @@
+{
+  "name": "jira-commands",
+  "version": "0.25.0",
+  "description": "Install the jirac Jira CLI from GitHub Releases",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mulhamna/jira-commands.git"
+  },
+  "homepage": "https://github.com/mulhamna/jira-commands",
+  "bugs": {
+    "url": "https://github.com/mulhamna/jira-commands/issues"
+  },
+  "keywords": [
+    "jira",
+    "atlassian",
+    "cli",
+    "tui"
+  ],
+  "bin": {
+    "jirac": "bin/jirac.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node ./lib/install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

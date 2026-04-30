@@ -371,6 +371,18 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Sync npm package version from release version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          node - <<'EOF'
+          const fs = require('fs');
+          const path = 'packaging/npm/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.version = process.env.VERSION;
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
+          EOF
+          echo "synced npm package.json version to $VERSION"
+
       - name: Verify npm package version matches release tag
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')

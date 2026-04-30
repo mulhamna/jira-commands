@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::datetime::build_worklog_started;
+use crate::datetime::{
+    build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date,
+};
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -665,6 +667,7 @@ pub enum WorklogCommand {
     ///   jirac issue worklog add PROJ-123 --time "2h 30m"
     ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented login"
     ///   jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30
+    ///   jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends
     Add {
         /// Time spent in Jira duration format (e.g. "2h", "30m", "1d", "1h 30m")
         #[arg(short, long, value_name = "DURATION")]
@@ -672,12 +675,21 @@ pub enum WorklogCommand {
         /// Optional comment describing the work done
         #[arg(short, long, value_name = "TEXT")]
         comment: Option<String>,
-        /// Optional work date in local time (YYYY-MM-DD)
-        #[arg(long, value_name = "DATE")]
+        /// Optional single work date in local time (YYYY-MM-DD)
+        #[arg(long, value_name = "DATE", conflicts_with_all = ["from", "to"])]
         date: Option<String>,
         /// Optional start time in local time (HH:MM or HH:MM:SS)
         #[arg(long, value_name = "TIME")]
         start: Option<String>,
+        /// Start date for inclusive range logging (YYYY-MM-DD)
+        #[arg(long, value_name = "DATE", requires = "to", conflicts_with = "date")]
+        from: Option<String>,
+        /// End date for inclusive range logging (YYYY-MM-DD)
+        #[arg(long, value_name = "DATE", requires = "from", conflicts_with = "date")]
+        to: Option<String>,
+        /// Skip Saturday/Sunday entries when using --from/--to
+        #[arg(long)]
+        exclude_weekends: bool,
     },
 
     /// Delete a worklog entry
@@ -1866,7 +1878,23 @@ async fn worklog(client: JiraClient, key: String, cmd: WorklogCommand) -> Result
             comment,
             date,
             start,
-        } => worklog_add(client, key, time, comment, date, start).await,
+            from,
+            to,
+            exclude_weekends,
+        } => {
+            worklog_add(
+                client,
+                key,
+                time,
+                comment,
+                date,
+                start,
+                from,
+                to,
+                exclude_weekends,
+            )
+            .await
+        }
         WorklogCommand::Delete { id, force } => worklog_delete(client, key, id, force).await,
     }
 }
@@ -1908,7 +1936,24 @@ async fn worklog_add(
     comment: Option<String>,
     date: Option<String>,
     start: Option<String>,
+    from: Option<String>,
+    to: Option<String>,
+    exclude_weekends: bool,
 ) -> Result<()> {
+    if let (Some(from), Some(to)) = (from, to) {
+        return worklog_add_range(
+            client,
+            key,
+            time,
+            comment,
+            start,
+            from,
+            to,
+            exclude_weekends,
+        )
+        .await;
+    }
+
     let started = build_worklog_started(date.as_deref(), start.as_deref())?;
 
     let spinner = spinner_new(format!("Logging {time} on {key}..."));
@@ -1921,6 +1966,88 @@ async fn worklog_add(
         "✓ Logged {} on {} (worklog id: {})",
         log.time_spent, key, log.id
     );
+    Ok(())
+}
+
+async fn worklog_add_range(
+    client: JiraClient,
+    key: String,
+    time: String,
+    comment: Option<String>,
+    start: Option<String>,
+    from: String,
+    to: String,
+    exclude_weekends: bool,
+) -> Result<()> {
+    let dates = build_worklog_range_dates(&from, &to, exclude_weekends)?;
+
+    if dates.is_empty() {
+        anyhow::bail!(
+            "No worklog dates remain in range {}..{} after applying weekend filtering.",
+            from,
+            to
+        );
+    }
+
+    let pb = progress_bar(dates.len() as u64);
+    let mut created = Vec::with_capacity(dates.len());
+
+    for date in dates {
+        let date_label = date.format("%Y-%m-%d").to_string();
+        pb.set_message(format!("{} ({})", key, date_label));
+
+        let started = build_worklog_started_for_date(date, start.as_deref())?;
+        match client
+            .add_worklog(&key, &time, comment.as_deref(), Some(&started))
+            .await
+        {
+            Ok(log) => {
+                created.push((date_label, log.id));
+                pb.inc(1);
+            }
+            Err(err) => {
+                pb.finish_and_clear();
+                let partial = if created.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        " Partial success: {}.",
+                        created
+                            .iter()
+                            .map(|(date, id)| format!("{} -> {}", date, id))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                };
+
+                anyhow::bail!(
+                    "Failed to add worklog for {} on {}: {}.{}",
+                    key,
+                    date_label,
+                    err,
+                    partial
+                );
+            }
+        }
+    }
+
+    pb.finish_and_clear();
+
+    println!(
+        "✓ Logged {} on {} across {} day(s){}",
+        time,
+        key,
+        created.len(),
+        if exclude_weekends {
+            " (excluding weekends)"
+        } else {
+            ""
+        }
+    );
+    for (date, id) in created {
+        println!("  - {} -> worklog id {}", date, id);
+    }
+
     Ok(())
 }
 

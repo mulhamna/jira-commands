@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
-use chrono::{Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
+use chrono::{
+    Datelike, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Weekday,
+};
 
 /// Build a Jira worklog `started` timestamp.
 ///
@@ -27,7 +29,64 @@ pub fn build_worklog_started(date: Option<&str>, start: Option<&str>) -> Result<
         None => Some(now.time()),
     };
 
-    let naive = NaiveDateTime::new(date.expect("date set"), time.expect("time set"));
+    let local = resolve_local_datetime(date.expect("date set"), time.expect("time set"))?;
+
+    Ok(Some(format_started(local)))
+}
+
+/// Build a Jira worklog `started` timestamp for a specific date.
+///
+/// When `start` is omitted, the current local time is used.
+pub fn build_worklog_started_for_date(date: NaiveDate, start: Option<&str>) -> Result<String> {
+    let time = match start {
+        Some(value) => parse_time(value)?,
+        None => Local::now().time(),
+    };
+
+    let local = resolve_local_datetime(date, time)?;
+    Ok(format_started(local))
+}
+
+/// Build an inclusive list of dates for a worklog range.
+pub fn build_worklog_range_dates(
+    from: &str,
+    to: &str,
+    exclude_weekends: bool,
+) -> Result<Vec<NaiveDate>> {
+    let start_date = parse_date(from)?;
+    let end_date = parse_date(to)?;
+
+    if end_date < start_date {
+        return Err(anyhow!(
+            "Invalid range: end date '{}' is before start date '{}'",
+            to.trim(),
+            from.trim()
+        ));
+    }
+
+    let mut dates = Vec::new();
+    let mut current = start_date;
+
+    loop {
+        let is_weekend = matches!(current.weekday(), Weekday::Sat | Weekday::Sun);
+        if !exclude_weekends || !is_weekend {
+            dates.push(current);
+        }
+
+        if current == end_date {
+            break;
+        }
+
+        current = current
+            .succ_opt()
+            .ok_or_else(|| anyhow!("Could not advance date range beyond {}", current))?;
+    }
+
+    Ok(dates)
+}
+
+fn resolve_local_datetime(date: NaiveDate, time: NaiveTime) -> Result<chrono::DateTime<Local>> {
+    let naive = NaiveDateTime::new(date, time);
     let local = match Local.from_local_datetime(&naive) {
         LocalResult::Single(dt) => dt,
         LocalResult::Ambiguous(first, _) => first,
@@ -40,7 +99,11 @@ pub fn build_worklog_started(date: Option<&str>, start: Option<&str>) -> Result<
         }
     };
 
-    Ok(Some(local.format("%Y-%m-%dT%H:%M:%S.000%z").to_string()))
+    Ok(local)
+}
+
+fn format_started(local: chrono::DateTime<Local>) -> String {
+    local.format("%Y-%m-%dT%H:%M:%S.000%z").to_string()
 }
 
 fn parse_date(value: &str) -> Result<NaiveDate> {
@@ -94,5 +157,27 @@ mod tests {
     fn rejects_invalid_time() {
         let err = build_worklog_started(Some("2026-04-21"), Some("9.30")).unwrap_err();
         assert!(err.to_string().contains("Invalid start time"));
+    }
+
+    #[test]
+    fn builds_inclusive_range_dates() {
+        let dates = build_worklog_range_dates("2026-04-21", "2026-04-23", false).unwrap();
+        let rendered: Vec<String> = dates.iter().map(|d| d.to_string()).collect();
+
+        assert_eq!(rendered, vec!["2026-04-21", "2026-04-22", "2026-04-23"]);
+    }
+
+    #[test]
+    fn excludes_weekends_from_range_when_requested() {
+        let dates = build_worklog_range_dates("2026-04-24", "2026-04-27", true).unwrap();
+        let rendered: Vec<String> = dates.iter().map(|d| d.to_string()).collect();
+
+        assert_eq!(rendered, vec!["2026-04-24", "2026-04-27"]);
+    }
+
+    #[test]
+    fn rejects_reversed_ranges() {
+        let err = build_worklog_range_dates("2026-04-27", "2026-04-24", false).unwrap_err();
+        assert!(err.to_string().contains("Invalid range"));
     }
 }

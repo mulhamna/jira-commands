@@ -132,10 +132,11 @@ jirac issue bulk-create --manifest issues.json
 jirac issue worklog list PROJ-123
 jirac issue worklog add PROJ-123 --time 2h --comment "Fixed auth bug"
 jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
+jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
 jirac issue worklog delete PROJ-123 --id 10234
 ```
 
-`jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. In the TUI, pressing `w` now prompts for the same optional date and start time fields.
+`jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` now prompts for the same optional date and start time fields.
 
 ### Bulk operations
 

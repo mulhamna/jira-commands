@@ -265,7 +265,7 @@ jobs:
           ref: ${{ inputs.release_tag }}
 
       - name: Set up Node
-        uses: actions/setup-node@0d540e7a200b8b8a187754f366c8f81e7f35435f # v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'

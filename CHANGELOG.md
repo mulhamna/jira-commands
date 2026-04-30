@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.27.1](https://github.com/mulhamna/jira-commands/compare/v0.27.0...v0.27.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **release:** sync npm package version on release PR branches ([#187](https://github.com/mulhamna/jira-commands/issues/187)) ([2432f7b](https://github.com/mulhamna/jira-commands/commit/2432f7be67ae43cba0b006b245b8c4338f8707ee))
+
 ## [0.27.0](https://github.com/mulhamna/jira-commands/compare/v0.26.2...v0.27.0) (2026-04-30)
 
 

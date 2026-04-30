@@ -252,11 +252,53 @@ jobs:
           files: |
             artifacts/**/*
             checksums.txt
+  publish-npm:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    needs: create-release
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.release_tag }}
+
+      - name: Set up Node
+        uses: actions/setup-node@0d540e7a200b8b8a187754f366c8f81e7f35435f # v4.4.0
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify npm package version matches release tag
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+          EXPECTED_TAG="v${VERSION}"
+
+          echo "tag:       ${{ inputs.release_tag }}"
+          echo "workspace: $VERSION"
+          echo "npm:       $NPM_VERSION"
+
+          test "${{ inputs.release_tag }}" = "$EXPECTED_TAG"
+          test "$NPM_VERSION" = "$VERSION"
+
+      - name: Publish npm package (skip if already published)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./packaging/npm/package.json').version")
+          if npm view jira-commands@"$VERSION" version >/dev/null 2>&1; then
+            echo "✓ jira-commands npm v$VERSION already published, skipping"
+          else
+            npm publish ./packaging/npm --access public
+          fi
+
 
   refresh-package-manifests:
     name: Refresh package manifests
     runs-on: ubuntu-latest
-    needs: create-release
+    needs: [create-release, publish-npm]
     timeout-minutes: 10
     permissions:
       contents: write

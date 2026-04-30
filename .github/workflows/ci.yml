@@ -368,11 +368,20 @@ jobs:
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+          HEAD_REF="${GITHUB_HEAD_REF:-}"
 
           echo "workspace: $VERSION"
           echo "npm:       $NPM_VERSION"
+          echo "head_ref:  $HEAD_REF"
 
           if [ "$VERSION" != "$NPM_VERSION" ]; then
+            if [[ "$HEAD_REF" == release-please--branches--* ]]; then
+              echo "Release Please branch version mismatch detected."
+              echo "This branch is expected to lag because release-please does not rewrite packaging/npm/package.json in this repo's current setup."
+              echo "The publish workflows still resync packaging/npm/package.json from VERSION before npm publish."
+              exit 0
+            fi
+
             echo "ERROR: packaging/npm/package.json version is out of sync."
             echo "Run: node scripts/sync-npm-version.mjs"
             exit 1

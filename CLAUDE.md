@@ -70,7 +70,7 @@ plugin/
 ### Crate responsibilities
 
 - **`jira-core`** — public API: `JiraClient`, model types (split under `model/`), ADF parser, auth (Cloud + Data Center multi-profile), `FieldCache` for custom-field resolution, error types. Library dependency.
-- **`jira/`** — clap commands (`cli/{api,auth,issue,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`.
+- **`jira/`** — clap commands (`cli/{api,auth,issue,mcp,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`. `mcp` subcommand: `jirac mcp doctor` + `jirac mcp install --client <target>` to register `jirac-mcp` into supported clients (claude-code, claude-desktop, cursor, gemini-cli, codex, generic-json).
 - **`jira-mcp/`** — MCP server via `rmcp`, split into `app.rs` (wiring) + `server.rs` (impl) + `models.rs` (I/O types). Exposes `jira-core` as MCP tools for LLM clients. Binary: `jirac-mcp`.
 
 ---

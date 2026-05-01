@@ -144,3 +144,44 @@ jirac auth profiles
 jirac --help
 jirac tui --help
 ```
+
+## MCP client install helper
+
+If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then use:
+
+```bash
+jirac mcp install --client claude-code
+jirac mcp install --client claude-desktop
+jirac mcp install --client cursor
+jirac mcp install --client gemini-cli
+jirac mcp install --client codex
+jirac mcp install --client generic-json
+```
+
+Supported targets now:
+- `claude-code` (`.mcp.json`, project-style JSON)
+- `claude-desktop` (`~/.claude.json`, user-level JSON)
+- `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
+- `gemini-cli` (delegates to `gemini mcp add -s user ...`)
+- `codex` (delegates to `codex mcp add ...`)
+- `generic-json` (prints a portable JSON snippet instead of writing a file)
+
+Helpful flags:
+- `--print` prints the JSON snippet or delegated client command first
+- `--dry-run` previews without writing
+- `--force` overwrites an existing MCP entry with the same name, or runs remove+add for delegated clients
+- `--name jira` changes the MCP server name
+- `--command jirac-mcp` changes the launched binary
+- `--transport stdio` changes the transport args
+
+Recommended check:
+
+```bash
+jirac mcp doctor
+```
+
+Local verification notes:
+- Claude Code project scope writes `.mcp.json`
+- Claude Desktop user scope writes `~/.claude.json`
+- Gemini CLI currently stores user MCP config in `~/.gemini/settings.json`; this helper delegates to the Gemini CLI directly
+- Codex stores MCP entries under `~/.codex/config.toml`; this helper delegates to the Codex CLI directly

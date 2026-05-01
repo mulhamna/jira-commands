@@ -8,7 +8,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 #[command(
     name = "jirac",
     about = "jirac — terminal client for the Jira ecosystem",
-    long_about = "A fast Jira terminal client built in Rust.\n\nQuick start:\n  jirac auth login                      Set up credentials\n  jirac auth profiles                   List saved profiles\n  jirac issue list                      List your assigned issues\n  jirac issue list -p MYPROJ            List issues by project\n  jirac issue view PROJ-123             View issue detail\n  jirac issue create -p MYPROJ          Create an issue (interactive)\n  jirac issue transition PROJ-123       Transition an issue (interactive)\n  jirac issue comment add PROJ-123      Add a comment to an issue\n  jirac issue attach PROJ-123 file.png  Upload attachment\n  jirac issue worklog list PROJ-123     List worklogs on an issue\n  jirac issue bulk-transition PROJ -q 'status = \"To Do\"'\n  jirac plan list                       List Jira Plans (Premium)\n  jirac api get /rest/api/3/serverInfo  Raw API passthrough\n  jirac tui -p MYPROJ                   Launch interactive TUI with split detail, popups, and worklog shortcuts\n\nInstall options:\n  Homebrew:  brew tap mulhamna/tap && brew install jira-commands\n  Scoop:     scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket\n             scoop install mulhamna/jirac\n  Winget:    winget install mulhamna.jirac\n  Cargo:     cargo install jira-commands\n\nDocs:\n  README.md  Install matrix, usage, examples, contributors\n  INSTALL.md Detailed install instructions for all supported package managers\n\nConfig file: ~/.config/jira/config.toml\nEnv vars:    JIRA_PROFILE, JIRA_URL, JIRA_EMAIL, JIRA_TOKEN",
+    long_about = "A fast Jira terminal client built in Rust.\n\nQuick start:\n  jirac auth login                      Set up credentials\n  jirac issue list                      List your assigned issues\n  jirac tui -p MYPROJ                   Launch the interactive TUI\n  jirac mcp doctor                      Check MCP prerequisites and client readiness\n  jirac mcp install --client claude-code Register jirac-mcp with Claude Code\n\nInstall options:\n  Homebrew:  brew tap mulhamna/tap && brew install jira-commands\n  Scoop:     scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket\n             scoop install mulhamna/jirac\n  Winget:    winget install mulhamna.jirac\n  Cargo:     cargo install jira-commands\n\nDocs:\n  README.md  Usage overview and examples\n  INSTALL.md Detailed install instructions, including MCP helper targets\n\nConfig file: ~/.config/jira/config.toml\nEnv vars:    JIRA_PROFILE, JIRA_URL, JIRA_EMAIL, JIRA_TOKEN",
     version
 )]
 struct Cli {
@@ -44,6 +44,11 @@ enum Commands {
     Plan {
         #[command(subcommand)]
         command: cli::plan::PlanCommand,
+    },
+    /// Register jirac-mcp with supported MCP clients like Claude, Cursor, Gemini CLI, or Codex
+    Mcp {
+        #[command(subcommand)]
+        command: cli::mcp::McpCommand,
     },
 }
 
@@ -107,6 +112,12 @@ async fn main() -> Result<()> {
         Commands::Plan { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             cli::plan::handle(command, client).await?;
+            if let Some(notice) = &update_notice {
+                eprintln!("{}", version_check::cli_message(notice));
+            }
+        }
+        Commands::Mcp { command } => {
+            cli::mcp::handle(command)?;
             if let Some(notice) = &update_notice {
                 eprintln!("{}", version_check::cli_message(notice));
             }

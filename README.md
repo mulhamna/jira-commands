@@ -242,6 +242,12 @@ export JIRA_TOKEN=your_api_token
 
 `jirac-mcp` exposes Jira as typed [Model Context Protocol](https://modelcontextprotocol.io) tools for editors, agents, and desktop apps. See the [jirac-mcp README](crates/jira-mcp/README.md) for setup and available tools.
 
+### MCP install helpers
+
+Use `jirac mcp install --client <target>` to register `jirac-mcp` with supported clients, or `jirac mcp doctor` to check prerequisites.
+
+See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
+
 ## Using jira-core as a library
 
 The `jira-core` crate can be used independently:

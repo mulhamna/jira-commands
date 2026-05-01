@@ -40,6 +40,8 @@ jirac issue view MYPROJ-123
 jirac issue create -p MYPROJ
 jirac issue render --input desc.md
 jirac tui -p MYPROJ
+jirac mcp doctor
+jirac mcp install --client claude-code
 ```
 
 ## Config and auth
@@ -91,6 +93,25 @@ Useful skills include:
 - `/jira:jql`
 - `/jira:api`
 
+## MCP helper
+
+If you also installed `jirac-mcp`, `jirac` can register the MCP server into supported clients for you:
+
+```bash
+jirac mcp doctor
+jirac mcp install --client claude-code
+jirac mcp install --client claude-desktop
+jirac mcp install --client cursor
+jirac mcp install --client gemini-cli
+jirac mcp install --client codex
+jirac mcp install --client generic-json
+```
+
+Notes:
+- `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows
+- `generic-json` prints a portable JSON snippet instead of writing a file
+- `cursor` remains provisional until verified in a real Cursor install
+
 ## More docs
 
-See the root README for full installation, TUI shortcuts, MCP usage, release artifacts, and examples.
+See the root README and `INSTALL.md` for full installation, TUI shortcuts, MCP usage, release artifacts, and examples.

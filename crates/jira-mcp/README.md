@@ -65,6 +65,25 @@ The MCP server includes tools for:
 - Destructive operations require `confirm: true`.
 - Attachment uploads support local file paths or inline base64 payloads.
 
+## Client install helper
+
+If you already have both `jirac` and `jirac-mcp` installed, you can register the MCP server into supported clients with:
+
+```bash
+jirac mcp doctor
+jirac mcp install --client claude-code
+jirac mcp install --client claude-desktop
+jirac mcp install --client cursor
+jirac mcp install --client gemini-cli
+jirac mcp install --client codex
+jirac mcp install --client generic-json
+```
+
+Notes:
+- `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows
+- `generic-json` prints a portable JSON snippet instead of writing a file
+- `cursor` remains provisional until verified in a real Cursor install
+
 ## More docs
 
-See the root README for example client configuration and workspace-level context.
+See the root README and `INSTALL.md` for client-specific install notes, helper target details, and workspace-level context.

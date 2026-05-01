@@ -142,7 +142,7 @@ fn install_client(
 }
 
 fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
-    let mut failures = 0;
+    let mut hard_failures = 0;
 
     println!("MCP doctor");
     println!("──────────");
@@ -151,19 +151,16 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
         println!("[ok] MCP server binary found: {}", command);
     } else {
         println!("[warn] MCP server binary not found on PATH: {}", command);
-        failures += 1;
+        println!("       Install `jirac-mcp` if you want to use the MCP helper end to end.");
     }
 
     let jira = JiraConfig::load().unwrap_or_default();
     if jira.base_url.trim().is_empty() {
         println!("[warn] Jira base URL not configured. Run `jirac auth login`.");
-        failures += 1;
     } else if !jira.token_present() {
         println!("[warn] Jira token not configured. Run `jirac auth login`.");
-        failures += 1;
     } else if jira.requires_user_identity() && jira.email.trim().is_empty() {
         println!("[warn] Jira user identity not configured. Run `jirac auth login`.");
-        failures += 1;
     } else {
         println!("[ok] Jira auth config present");
     }
@@ -205,7 +202,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
                     println!("[ok] {} CLI found: {}", label, program);
                 } else {
                     println!("[warn] {} CLI missing: {}", label, program);
-                    failures += 1;
+                    hard_failures += 1;
                 }
                 if !note.is_empty() {
                     println!("       {}", note);
@@ -220,11 +217,11 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
         }
     }
 
-    if failures > 0 {
-        bail!("MCP doctor found {} issue(s)", failures);
+    if hard_failures > 0 {
+        bail!("MCP doctor found {} blocking issue(s)", hard_failures);
     }
 
-    println!("MCP doctor passed.");
+    println!("MCP doctor finished. Warnings above are setup guidance, not blocking failures.");
     Ok(())
 }
 

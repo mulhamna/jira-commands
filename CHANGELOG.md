@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.28.0](https://github.com/mulhamna/jira-commands/compare/v0.27.1...v0.28.0) (2026-05-01)
+
+
+### Features
+
+* add MCP client install helper ([#190](https://github.com/mulhamna/jira-commands/issues/190)) ([d7559ed](https://github.com/mulhamna/jira-commands/commit/d7559ed09658c18de3bffad12f07b082b424ebdf))
+
 ## [0.27.1](https://github.com/mulhamna/jira-commands/compare/v0.27.0...v0.27.1) (2026-04-30)
 
 

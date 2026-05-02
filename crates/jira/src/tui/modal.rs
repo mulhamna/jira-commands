@@ -55,7 +55,7 @@ impl ModalKind {
     pub(super) fn hint(&self) -> &'static str {
         match self {
             ModalKind::EditIssue { .. } => " Tab: next field   Ctrl+S: save   Esc: cancel ",
-            ModalKind::AddComment { .. } => " Ctrl+S: send   Esc: cancel ",
+            ModalKind::AddComment { .. } => " Tab: next field   Ctrl+S: send   Esc: cancel ",
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
             ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
             ModalKind::AddBulkWorklog { .. } => {
@@ -132,15 +132,27 @@ impl Modal {
     }
 
     pub(super) fn add_comment(key: String) -> Self {
-        let mut area = TextArea::default();
-        area.set_cursor_line_style(Style::default());
+        let mut comment_area = TextArea::default();
+        comment_area.set_cursor_line_style(Style::default());
+
+        let mut attachment_area = TextArea::default();
+        attachment_area.set_cursor_line_style(Style::default());
+        attachment_area.set_placeholder_text("optional path, e.g. ./screenshot.png");
+
         Self {
             kind: ModalKind::AddComment { key },
-            fields: vec![ModalField {
-                label: "Comment",
-                area,
-                multiline: true,
-            }],
+            fields: vec![
+                ModalField {
+                    label: "Comment",
+                    area: comment_area,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Attachment path  (optional)",
+                    area: attachment_area,
+                    multiline: false,
+                },
+            ],
             focus: 0,
             error: None,
             notice: None,

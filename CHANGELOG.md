@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.29.0](https://github.com/mulhamna/jira-commands/compare/v0.28.0...v0.29.0) (2026-05-02)
+
+
+### Features
+
+* **core:** add issue linking support ([#194](https://github.com/mulhamna/jira-commands/issues/194)) ([e337075](https://github.com/mulhamna/jira-commands/commit/e337075ea8de1e13c2e4d0c423b5beb67c3314f5))
+
 ## [0.28.0](https://github.com/mulhamna/jira-commands/compare/v0.27.1...v0.28.0) (2026-05-01)
 
 

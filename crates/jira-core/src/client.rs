@@ -19,9 +19,9 @@ use crate::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
             SearchResult, UpdateIssueRequest,
         },
+        link::{IssueLink, IssueLinkType},
         sprint::Sprint,
         worklog::Worklog,
-        link::{IssueLink, IssueLinkType},
     },
 };
 
@@ -1911,6 +1911,9 @@ mod tests {
         assert_eq!(link.link_type.name, "Blocks");
         assert!(link.outward_issue.is_some());
         assert_eq!(link.outward_issue.as_ref().unwrap().key, "TEST-2");
-        assert_eq!(link.outward_issue.as_ref().unwrap().summary, "Blocked Issue");
+        assert_eq!(
+            link.outward_issue.as_ref().unwrap().summary,
+            "Blocked Issue"
+        );
     }
 }

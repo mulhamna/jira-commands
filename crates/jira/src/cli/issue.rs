@@ -627,7 +627,7 @@ pub enum IssueCommand {
         #[arg(long)]
         json: bool,
     },
-    
+
     /// Manage issue links (blocks, relates, etc.)
     ///
     /// List link types, create a new link, or delete a link by ID.
@@ -3107,7 +3107,10 @@ async fn handle_link_command(client: JiraClient, cmd: LinkCommand) -> Result<()>
             if json {
                 println!("{}", serde_json::to_string_pretty(&types)?);
             } else {
-                println!("{:<10} {:<15} {:<20} {:<20}", "ID", "Name", "Inward", "Outward");
+                println!(
+                    "{:<10} {:<15} {:<20} {:<20}",
+                    "ID", "Name", "Inward", "Outward"
+                );
                 println!("{}", "-".repeat(65));
                 for t in types {
                     println!(

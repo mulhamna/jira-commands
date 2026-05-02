@@ -168,11 +168,15 @@ impl RawIssue {
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(Attachment::from_value).collect())
             .unwrap_or_default();
-            
+
         let links = fields
             .get("issuelinks")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(super::link::IssueLink::from_value).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(super::link::IssueLink::from_value)
+                    .collect()
+            })
             .unwrap_or_default();
 
         Issue {

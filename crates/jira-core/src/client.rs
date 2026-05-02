@@ -21,6 +21,7 @@ use crate::{
         },
         sprint::Sprint,
         worklog::Worklog,
+        link::{IssueLink, IssueLinkType},
     },
 };
 
@@ -1440,6 +1441,78 @@ impl JiraClient {
 
         Ok(resp.values)
     }
+
+    // ── Issue Links ──────────────────────────────────────────────────────────
+
+    /// List available issue link types.
+    pub async fn list_issue_link_types(&self) -> Result<Vec<IssueLinkType>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url("/issueLinkType");
+
+        #[derive(serde::Deserialize)]
+        struct LinkTypesResponse {
+            #[serde(rename = "issueLinkTypes")]
+            issue_link_types: Vec<IssueLinkType>,
+        }
+
+        let http = &self.http;
+        let resp: LinkTypesResponse = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        Ok(resp.issue_link_types)
+    }
+
+    /// Create a link between two issues.
+    /// `type_name` is the name of the link type (e.g., "Blocks").
+    /// `outward_key` is the issue that is doing the action (e.g., the blocker).
+    /// `inward_key` is the issue that is receiving the action (e.g., the blocked issue).
+    pub async fn link_issues(
+        &self,
+        outward_key: &str,
+        inward_key: &str,
+        type_name: &str,
+        comment: Option<&str>,
+    ) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url("/issueLink");
+
+        let mut payload = json!({
+            "type": { "name": type_name },
+            "inwardIssue": { "key": inward_key },
+            "outwardIssue": { "key": outward_key }
+        });
+
+        if let Some(c) = comment {
+            payload["comment"] = json!({
+                "body": crate::adf::markdown_to_adf(c)
+            });
+        }
+
+        let http = &self.http;
+        self.request_no_body(|| http.post(&url).headers(headers.clone()).json(&payload))
+            .await
+    }
+
+    /// Get a specific issue link by ID.
+    pub async fn get_issue_link(&self, link_id: &str) -> Result<IssueLink> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issueLink/{link_id}"));
+
+        let http = &self.http;
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
+    }
+
+    /// Delete an issue link by ID.
+    pub async fn delete_issue_link(&self, link_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issueLink/{link_id}"));
+
+        let http = &self.http;
+        self.request_no_body(|| http.delete(&url).headers(headers.clone()))
+            .await
+    }
 }
 
 /// Issue type metadata (id + name) returned by createmeta.
@@ -1720,5 +1793,124 @@ mod tests {
         assert_eq!(fields[0].name, "Labels (OSS)");
         assert!(fields[0].required);
         assert_eq!(fields[0].field_type, "array");
+    }
+
+    #[tokio::test]
+    async fn issue_link_integration() {
+        let server = MockServer::start().await;
+        let expected_auth = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));
+
+        // 1. Mock list_issue_link_types
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issueLinkType"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issueLinkTypes": [
+                    {
+                        "id": "10000",
+                        "name": "Blocks",
+                        "inward": "is blocked by",
+                        "outward": "blocks"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        // 2. Mock link_issues
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issueLink"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(201))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        });
+
+        // Test list
+        let link_types = client.list_issue_link_types().await.expect("list types");
+        assert_eq!(link_types.len(), 1);
+        assert_eq!(link_types[0].name, "Blocks");
+
+        // Test link
+        client
+            .link_issues("TEST-1", "TEST-2", "Blocks", Some("Adding dependency"))
+            .await
+            .expect("link issues");
+    }
+
+    #[tokio::test]
+    async fn get_issue_parses_links() {
+        let server = MockServer::start().await;
+        let expected_auth = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10001",
+                "key": "TEST-1",
+                "fields": {
+                    "summary": "Main Issue",
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "TEST" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000",
+                    "issuelinks": [
+                        {
+                            "id": "20000",
+                            "type": {
+                                "id": "10000",
+                                "name": "Blocks",
+                                "inward": "is blocked by",
+                                "outward": "blocks"
+                            },
+                            "outwardIssue": {
+                                "id": "10002",
+                                "key": "TEST-2",
+                                "fields": {
+                                    "summary": "Blocked Issue",
+                                    "status": { "name": "Open" },
+                                    "priority": { "name": "High" },
+                                    "issuetype": { "name": "Bug" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        });
+
+        let issue = client.get_issue("TEST-1").await.expect("get issue");
+        assert_eq!(issue.links.len(), 1);
+        let link = &issue.links[0];
+        assert_eq!(link.link_type.name, "Blocks");
+        assert!(link.outward_issue.is_some());
+        assert_eq!(link.outward_issue.as_ref().unwrap().key, "TEST-2");
+        assert_eq!(link.outward_issue.as_ref().unwrap().summary, "Blocked Issue");
     }
 }

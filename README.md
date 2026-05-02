@@ -122,6 +122,11 @@ jirac issue delete PROJ-123
 jirac issue change-type PROJ-123 Story
 jirac issue move PROJ-123 OTHER
 jirac issue clone PROJ-123
+
+jirac issue link list-types                          # list available link types
+jirac issue link add PROJ-123 PROJ-456 --type Blocks # link two issues
+jirac issue link delete 10000                        # delete link by ID
+
 jirac issue batch --manifest ops.json
 jirac issue bulk-create --manifest issues.json
 ```

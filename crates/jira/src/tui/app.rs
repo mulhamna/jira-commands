@@ -1438,14 +1438,31 @@ pub async fn run_tui(
                     }
                     ModalKind::AddComment { key } => {
                         let body = modal.field_text(0);
+                        let attachment_raw = modal.field_text(1);
                         let mention_map = modal.mention_map.clone();
                         let body_trim = body.trim().to_string();
+                        let attachment_trim = attachment_raw.trim().to_string();
                         if body_trim.is_empty() {
                             if let Some(m) = app.modal.as_mut() {
                                 m.set_error("Comment cannot be empty");
                             }
                             continue;
                         }
+
+                        let attachment_path = if attachment_trim.is_empty() {
+                            None
+                        } else {
+                            let expanded = shellexpand_tilde(&attachment_trim);
+                            let path = std::path::PathBuf::from(expanded.as_ref());
+                            if !path.exists() {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("File not found: {attachment_trim}"));
+                                }
+                                continue;
+                            }
+                            Some(path)
+                        };
+
                         if let Some(m) = app.modal.as_mut() {
                             m.busy = true;
                         }
@@ -1454,10 +1471,32 @@ pub async fn run_tui(
                         inject_mentions(&mut adf, &mention_map);
                         match client.add_comment_adf(&key, adf).await {
                             Ok(_) => {
-                                app.close_modal();
-                                app.detail.comments = None;
-                                app.warm_active_tab(&client).await;
-                                app.set_status(format!("✓ Comment added to {key}"), false);
+                                if let Some(path) = attachment_path {
+                                    match client.upload_attachment(&key, &path).await {
+                                        Ok(_) => {
+                                            app.close_modal();
+                                            app.detail.comments = None;
+                                            app.warm_active_tab(&client).await;
+                                            app.set_status(
+                                                format!("✓ Comment and attachment added to {key}"),
+                                                false,
+                                            );
+                                        }
+                                        Err(e) => {
+                                            if let Some(m) = app.modal.as_mut() {
+                                                m.busy = false;
+                                                m.set_error(format!(
+                                                    "Comment added, but upload failed: {e}"
+                                                ));
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    app.close_modal();
+                                    app.detail.comments = None;
+                                    app.warm_active_tab(&client).await;
+                                    app.set_status(format!("✓ Comment added to {key}"), false);
+                                }
                             }
                             Err(e) => {
                                 if let Some(m) = app.modal.as_mut() {

@@ -85,20 +85,10 @@ def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
 
     if contributors:
         avatar_row = " ".join(
-            f'<img src="{item["avatar"]}&s=72" width="36" height="36" alt="{item["login"]}" title="@{item["login"]}" />'
+            f'[![{item["login"]}]({item["avatar"]}&s=72)]({item["html"]})'
             for item in contributors
         )
-        links_row = " • ".join(
-            f'[@{item["login"]}]({item["html"]})'
-            for item in contributors
-        )
-        footer_lines = [
-            '<p align="left">',
-            avatar_row,
-            "</p>",
-            "",
-            links_row,
-        ]
+        footer_lines = [avatar_row]
     else:
         footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]
 

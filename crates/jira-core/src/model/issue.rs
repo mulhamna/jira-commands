@@ -23,6 +23,8 @@ pub struct Issue {
     pub updated: String,
     /// Attachments on this issue
     pub attachments: Vec<Attachment>,
+    /// Issue links (blocks, relates, etc.)
+    pub links: Vec<super::link::IssueLink>,
     /// Raw fields map for custom fields
     pub fields: Value,
 }
@@ -167,6 +169,16 @@ impl RawIssue {
             .map(|arr| arr.iter().filter_map(Attachment::from_value).collect())
             .unwrap_or_default();
 
+        let links = fields
+            .get("issuelinks")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(super::link::IssueLink::from_value)
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Issue {
             id: self.id,
             key: self.key,
@@ -181,6 +193,7 @@ impl RawIssue {
             created,
             updated,
             attachments,
+            links,
             fields: self.fields,
         }
     }

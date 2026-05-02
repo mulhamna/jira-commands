@@ -627,6 +627,19 @@ pub enum IssueCommand {
         #[arg(long)]
         json: bool,
     },
+
+    /// Manage issue links (blocks, relates, etc.)
+    ///
+    /// List link types, create a new link, or delete a link by ID.
+    ///
+    /// Examples:
+    ///   jirac issue link list-types
+    ///   jirac issue link add PROJ-123 PROJ-456 --type Blocks
+    ///   jirac issue link delete 10000
+    Link {
+        #[command(subcommand)]
+        command: LinkCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -703,6 +716,40 @@ pub enum WorklogCommand {
     ///   jirac issue worklog delete PROJ-123 12345 --force
     Delete {
         /// Worklog ID (see: jirac issue worklog list PROJ-123)
+        id: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum LinkCommand {
+    /// List available issue link types
+    #[command(name = "list-types")]
+    ListTypes {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Link two issues together
+    Add {
+        /// Outward issue key (the "source" of the link, e.g. the blocker)
+        outward: String,
+        /// Inward issue key (the "target" of the link, e.g. the blocked issue)
+        inward: String,
+        /// Link type name (e.g. "Blocks", "Relates", "Duplicate")
+        #[arg(short, long, value_name = "TYPE")]
+        link_type: String,
+        /// Optional comment to add to the link
+        #[arg(short, long, value_name = "TEXT")]
+        comment: Option<String>,
+    },
+
+    /// Delete an issue link by ID
+    Delete {
+        /// Issue link ID
         id: String,
         /// Skip confirmation prompt
         #[arg(short, long)]
@@ -799,6 +846,7 @@ pub async fn handle(
             transition,
             json,
         } => transition_issue(client, key, transition, json).await,
+        IssueCommand::Link { command } => handle_link_command(client, command).await,
         IssueCommand::Attach { key, files } => attach_files(client, key, files).await,
         IssueCommand::Fields {
             project,
@@ -3047,6 +3095,54 @@ async fn bulk_create(client: JiraClient, manifest: std::path::PathBuf, json: boo
             for f in &failed {
                 println!("  {f}");
             }
+        }
+    }
+    Ok(())
+}
+
+async fn handle_link_command(client: JiraClient, cmd: LinkCommand) -> Result<()> {
+    match cmd {
+        LinkCommand::ListTypes { json } => {
+            let types = client.list_issue_link_types().await?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&types)?);
+            } else {
+                println!(
+                    "{:<10} {:<15} {:<20} {:<20}",
+                    "ID", "Name", "Inward", "Outward"
+                );
+                println!("{}", "-".repeat(65));
+                for t in types {
+                    println!(
+                        "{:<10} {:<15} {:<20} {:<20}",
+                        t.id, t.name, t.inward, t.outward
+                    );
+                }
+            }
+        }
+        LinkCommand::Add {
+            outward,
+            inward,
+            link_type,
+            comment,
+        } => {
+            client
+                .link_issues(&outward, &inward, &link_type, comment.as_deref())
+                .await?;
+            println!("✓ Linked {outward} to {inward} as '{link_type}'");
+        }
+        LinkCommand::Delete { id, force } => {
+            if !force {
+                let confirmed = inquire::Confirm::new(&format!("Delete issue link {id}?"))
+                    .with_default(false)
+                    .prompt()?;
+                if !confirmed {
+                    println!("Aborted.");
+                    return Ok(());
+                }
+            }
+            client.delete_issue_link(&id).await?;
+            println!("✓ Deleted issue link {id}");
         }
     }
     Ok(())

@@ -35,17 +35,15 @@ def fetch_json(url: str):
 def fetch_contributors(limit: int = 18):
     url = f"https://api.github.com/repos/{OWNER}/{REPO}/contributors?per_page={limit}"
     data = fetch_json(url)
-    cards = []
+    contributors = []
     for item in data:
         login = item.get("login")
         avatar = item.get("avatar_url")
         html = item.get("html_url")
         if not (login and avatar and html):
             continue
-        cards.append(
-            f'<a href="{html}" title="@{login}"><img src="{avatar}&s=72" width="36" height="36" alt="{login}" /></a>'
-        )
-    return cards
+        contributors.append({"login": login, "avatar": avatar, "html": html})
+    return contributors
 
 
 def replace_install_block(text: str) -> str:
@@ -81,18 +79,33 @@ More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL
     return text[:start] + new + text[end:]
 
 
-def replace_footer(text: str, contributors: list[str]) -> str:
+def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
     if START not in text or END not in text:
         raise SystemExit("contributors markers missing from README.md")
+
+    if contributors:
+        per_row = 6
+        cells = [
+            f'<a href="{item["html"]}" title="@{item["login"]}"><img src="{item["avatar"]}&s=72" width="36" height="36" alt="{item["login"]}" /></a>'
+            for item in contributors
+        ]
+        rows = [cells[i:i + per_row] for i in range(0, len(cells), per_row)]
+        footer_lines = []
+        for index, row in enumerate(rows):
+            padded = row + ([" "] * (per_row - len(row)))
+            footer_lines.append("| " + " | ".join(padded) + " |")
+            if index == 0:
+                footer_lines.append("| " + " | ".join([":-:"] * per_row) + " |")
+    else:
+        footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]
+
     body = "\n".join([
         START,
         "## Contributors",
         "",
         "Thanks to everyone helping shape `jirac`. This footer is refreshed automatically during the release lane.",
         "",
-        '<p align="left">',
-        *(contributors or ["_Contributor avatars will appear after the first successful refresh._"]),
-        "</p>",
+        *footer_lines,
         END,
     ])
     return re.sub(re.escape(START) + r".*?" + re.escape(END), body, text, flags=re.S)

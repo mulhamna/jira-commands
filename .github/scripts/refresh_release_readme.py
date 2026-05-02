@@ -35,17 +35,15 @@ def fetch_json(url: str):
 def fetch_contributors(limit: int = 18):
     url = f"https://api.github.com/repos/{OWNER}/{REPO}/contributors?per_page={limit}"
     data = fetch_json(url)
-    cards = []
+    contributors = []
     for item in data:
         login = item.get("login")
         avatar = item.get("avatar_url")
         html = item.get("html_url")
         if not (login and avatar and html):
             continue
-        cards.append(
-            f'<span style="display:inline-block;margin:0 6px 6px 0;"><a href="{html}" title="@{login}"><img src="{avatar}&s=72" width="36" height="36" alt="{login}" /></a></span>'
-        )
-    return cards
+        contributors.append({"login": login, "avatar": avatar, "html": html})
+    return contributors
 
 
 def replace_install_block(text: str) -> str:
@@ -81,15 +79,25 @@ More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL
     return text[:start] + new + text[end:]
 
 
-def replace_footer(text: str, contributors: list[str]) -> str:
+def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
     if START not in text or END not in text:
         raise SystemExit("contributors markers missing from README.md")
 
     if contributors:
+        avatar_row = " ".join(
+            f'<img src="{item["avatar"]}&s=72" width="36" height="36" alt="{item["login"]}" title="@{item["login"]}" />'
+            for item in contributors
+        )
+        links_row = " • ".join(
+            f'[@{item["login"]}]({item["html"]})'
+            for item in contributors
+        )
         footer_lines = [
             '<p align="left">',
-            "".join(contributors),
+            avatar_row,
             "</p>",
+            "",
+            links_row,
         ]
     else:
         footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]

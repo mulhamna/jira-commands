@@ -69,7 +69,8 @@ fn install_client(
     dry_run: bool,
     force: bool,
 ) -> Result<()> {
-    let spec = server_spec(name, command, transport);
+    let resolved_command = resolve_command_for_client(&client, command, dry_run)?;
+    let spec = server_spec(name, &resolved_command, transport);
 
     if matches!(client, McpClient::GenericJson) {
         print_snippet(&spec.json_snippet)?;
@@ -77,7 +78,7 @@ fn install_client(
     }
 
     if let Some(adapter) = client_adapter(&client) {
-        let preview = adapter.preview_command(name, command, transport, force);
+        let preview = adapter.preview_command(name, &resolved_command, transport, force);
         if print || dry_run {
             println!("{}", preview);
         }
@@ -85,7 +86,7 @@ fn install_client(
             println!("Dry run, no client command executed.");
             return Ok(());
         }
-        adapter.install(name, command, transport, force)?;
+        adapter.install(name, &resolved_command, transport, force)?;
         println!("Installed MCP entry '{}' via {} CLI", name, adapter.label);
         return Ok(());
     }
@@ -147,8 +148,8 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
     println!("MCP doctor");
     println!("──────────");
 
-    if command_exists(command) {
-        println!("[ok] MCP server binary found: {}", command);
+    if let Some(path) = resolve_command_path(command) {
+        println!("[ok] MCP server binary found: {}", path.display());
     } else {
         println!("[warn] MCP server binary not found on PATH: {}", command);
         println!("       Install `jirac-mcp` if you want to use the MCP helper end to end.");
@@ -425,13 +426,41 @@ fn home_dir() -> Option<PathBuf> {
     env::var_os("HOME").map(PathBuf::from)
 }
 
-fn command_exists(command: &str) -> bool {
-    env::var_os("PATH").is_some_and(|paths| {
-        env::split_paths(&paths).any(|dir| {
+fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
+    if !matches!(client, McpClient::GeminiCli | McpClient::Codex) {
+        return Ok(command.to_string());
+    }
+
+    if let Some(path) = resolve_command_path(command) {
+        return Ok(path.display().to_string());
+    }
+
+    if dry_run {
+        return Ok(command.to_string());
+    }
+
+    bail!(
+        "MCP server command '{}' was not found on PATH. Install it first or pass --command with an absolute path.",
+        command
+    )
+}
+
+fn resolve_command_path(command: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(command);
+    if path.components().count() > 1 || path.is_absolute() {
+        return path.is_file().then_some(path);
+    }
+
+    env::var_os("PATH").and_then(|paths| {
+        env::split_paths(&paths).find_map(|dir| {
             let candidate = dir.join(command);
-            candidate.is_file()
+            candidate.is_file().then_some(candidate)
         })
     })
+}
+
+fn command_exists(command: &str) -> bool {
+    resolve_command_path(command).is_some()
 }
 
 fn load_json_object(path: &Path) -> Result<Map<String, Value>> {
@@ -562,5 +591,22 @@ mod tests {
         let adapter = client_adapter(&McpClient::GeminiCli).unwrap();
         let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
         assert!(preview.contains("gemini mcp add -s user jira jirac-mcp serve"));
+    }
+
+    #[test]
+    fn resolve_command_path_finds_absolute_path() {
+        let path = resolve_command_path("/bin/sh").unwrap();
+        assert_eq!(path, PathBuf::from("/bin/sh"));
+    }
+
+    #[test]
+    fn resolve_command_for_client_rejects_missing_binary() {
+        let err = resolve_command_for_client(
+            &McpClient::GeminiCli,
+            "definitely-not-a-real-binary",
+            false,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("was not found on PATH"));
     }
 }

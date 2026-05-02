@@ -84,11 +84,17 @@ def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
         raise SystemExit("contributors markers missing from README.md")
 
     if contributors:
-        avatar_row = " ".join(
-            f'[![{item["login"]}]({item["avatar"]}&s=72)]({item["html"]})'
+        per_row = 6
+        cells = [
+            f'<a href="{item["html"]}" title="@{item["login"]}"><img src="{item["avatar"]}&s=72" width="36" height="36" alt="{item["login"]}" /></a>'
             for item in contributors
-        )
-        footer_lines = [avatar_row]
+        ]
+        rows = [cells[i:i + per_row] for i in range(0, len(cells), per_row)]
+        footer_lines = []
+        for row in rows:
+            padded = row + ([" "] * (per_row - len(row)))
+            footer_lines.append("| " + " | ".join(padded) + " |")
+            footer_lines.append("| " + " | ".join([":-:"] * per_row) + " |")
     else:
         footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]
 

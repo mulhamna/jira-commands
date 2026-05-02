@@ -43,7 +43,7 @@ def fetch_contributors(limit: int = 18):
         if not (login and avatar and html):
             continue
         cards.append(
-            f'<a href="{html}" title="@{login}"><img src="{avatar}&s=72" width="36" height="36" alt="{login}" /></a>'
+            f'<span style="display:inline-block;margin:0 6px 6px 0;"><a href="{html}" title="@{login}"><img src="{avatar}&s=72" width="36" height="36" alt="{login}" /></a></span>'
         )
     return cards
 
@@ -84,15 +84,23 @@ More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL
 def replace_footer(text: str, contributors: list[str]) -> str:
     if START not in text or END not in text:
         raise SystemExit("contributors markers missing from README.md")
+
+    if contributors:
+        footer_lines = [
+            '<p align="left">',
+            "".join(contributors),
+            "</p>",
+        ]
+    else:
+        footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]
+
     body = "\n".join([
         START,
         "## Contributors",
         "",
         "Thanks to everyone helping shape `jirac`. This footer is refreshed automatically during the release lane.",
         "",
-        '<p align="left">',
-        *(contributors or ["_Contributor avatars will appear after the first successful refresh._"]),
-        "</p>",
+        *footer_lines,
         END,
     ])
     return re.sub(re.escape(START) + r".*?" + re.escape(END), body, text, flags=re.S)

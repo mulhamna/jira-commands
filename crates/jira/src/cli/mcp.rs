@@ -601,10 +601,12 @@ mod tests {
 
     #[test]
     fn resolve_command_for_client_rejects_missing_binary() {
-        let err = resolve_command_for_client(&McpClient::GeminiCli, "definitely-not-a-real-binary", false)
-            .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("was not found on PATH"));
+        let err = resolve_command_for_client(
+            &McpClient::GeminiCli,
+            "definitely-not-a-real-binary",
+            false,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("was not found on PATH"));
     }
 }

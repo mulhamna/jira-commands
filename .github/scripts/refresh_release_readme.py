@@ -91,10 +91,11 @@ def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
         ]
         rows = [cells[i:i + per_row] for i in range(0, len(cells), per_row)]
         footer_lines = []
-        for row in rows:
+        for index, row in enumerate(rows):
             padded = row + ([" "] * (per_row - len(row)))
             footer_lines.append("| " + " | ".join(padded) + " |")
-            footer_lines.append("| " + " | ".join([":-:"] * per_row) + " |")
+            if index == 0:
+                footer_lines.append("| " + " | ".join([":-:"] * per_row) + " |")
     else:
         footer_lines = ["_Contributor avatars will appear after the first successful refresh._"]
 

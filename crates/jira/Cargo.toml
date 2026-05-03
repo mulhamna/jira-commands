@@ -27,7 +27,7 @@ serde_json = "1"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-indicatif = "0.17"
+indicatif = "0.18"
 open = "5"
 chrono = { version = "0.4", default-features = true }
 chrono-tz = "0.10"

@@ -6,6 +6,19 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.30.0](https://github.com/mulhamna/jira-commands/compare/v0.29.0...v0.30.0) (2026-05-02)
+
+
+### Features
+
+* **tui:** allow attachment upload from comment modal ([#200](https://github.com/mulhamna/jira-commands/issues/200)) ([e5d45de](https://github.com/mulhamna/jira-commands/commit/e5d45de0105535bc07cb574af6835f0a8621c849))
+
+
+### Bug Fixes
+
+* **mcp:** validate gemini server command path ([#199](https://github.com/mulhamna/jira-commands/issues/199)) ([67a0d45](https://github.com/mulhamna/jira-commands/commit/67a0d4522725d7ce7e640c5cbee286ba986c8f47))
+* **readme:** render contributor avatars inline ([#197](https://github.com/mulhamna/jira-commands/issues/197)) ([c3dcbe2](https://github.com/mulhamna/jira-commands/commit/c3dcbe298513da0e117b134ca11574ba65792a0a))
+
 ## [0.29.0](https://github.com/mulhamna/jira-commands/compare/v0.28.0...v0.29.0) (2026-05-02)
 
 

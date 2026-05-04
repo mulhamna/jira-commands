@@ -1,0 +1,23 @@
+[package]
+name = "jira-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+jira-core = { path = "../crates/jira-core" }
+
+[[bin]]
+name = "markdown_adf"
+path = "fuzz_targets/markdown_adf.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

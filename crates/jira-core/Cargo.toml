@@ -21,7 +21,7 @@ dirs = "6"
 thiserror = "2"
 anyhow = "1"
 tracing = "0.1"
-comrak = "0.28"
+comrak = { version = "0.28", default-features = false }
 mime_guess = "2"
 
 [dev-dependencies]

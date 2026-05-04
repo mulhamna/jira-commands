@@ -1,0 +1,9 @@
+{
+  "name": "clawhub-cli-tooling",
+  "private": true,
+  "description": "Pinned ClawHub CLI for GitHub Actions",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "clawhub": "0.12.2"
+  }
+}

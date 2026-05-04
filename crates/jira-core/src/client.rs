@@ -2324,6 +2324,168 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn search_users_retries_after_429_then_succeeds() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(
+                ResponseTemplate::new(429).insert_header("Retry-After", "0")
+            )
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "displayName": "Alice Example"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client
+            .search_users("alice")
+            .await
+            .expect("request should retry and succeed");
+
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0]["accountId"], "acct-1");
+    }
+
+    #[tokio::test]
+    async fn search_users_returns_rate_limit_after_max_retries() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(
+                ResponseTemplate::new(429).insert_header("Retry-After", "0")
+            )
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .search_users("alice")
+            .await
+            .expect_err("request should fail after max retries");
+
+        match err {
+            JiraError::RateLimit { retry_after } => assert_eq!(retry_after, 0),
+            other => panic!("expected JiraError::RateLimit, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn move_issue_submits_bulk_move_and_fetches_issue_on_complete() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bulk/issues/move"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "sendBulkNotification": true,
+                "targetToSourcesMapping": {
+                    "NEW,10002": {
+                        "inferClassificationDefaults": true,
+                        "inferFieldDefaults": true,
+                        "inferStatusDefaults": true,
+                        "inferSubtaskTypeDefault": true,
+                        "issueIdsOrKeys": ["TEST-1"]
+                    }
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-1" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/bulk/queue/task-1"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10001",
+                "key": "TEST-1",
+                "fields": {
+                    "summary": "Moved issue",
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "NEW" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let issue = client
+            .move_issue("TEST-1", "NEW", "10002", None)
+            .await
+            .expect("move issue should complete");
+
+        assert_eq!(issue.key, "TEST-1");
+        assert_eq!(issue.project_key, "NEW");
+    }
+
+    #[tokio::test]
+    async fn move_issue_returns_api_error_when_bulk_task_fails() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bulk/issues/move"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-2" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/bulk/queue/task-2"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "status": "FAILED",
+                "errors": ["cannot move issue"]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .move_issue("TEST-1", "NEW", "10002", None)
+            .await
+            .expect_err("failed bulk task should return error");
+
+        match err {
+            JiraError::Api { message, .. } => assert!(message.contains("FAILED")),
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn issue_link_integration() {
         let server = MockServer::start().await;
         let expected_auth = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));

@@ -4,6 +4,10 @@ use std::{
     time::Duration,
 };
 
+use crate::notifications::{
+    build_notifications_jql, notification_issue_jql, notification_issues,
+    scan_mention_notifications,
+};
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyEventKind},
@@ -154,6 +158,7 @@ pub(super) enum AppAction {
     FetchTransitions,
     ExecuteTransition(String, String),
     OpenBrowser,
+    OpenNotifications,
     CreateIssue,
     EditIssue(String),
     AssignIssue(String),
@@ -771,6 +776,34 @@ pub async fn run_tui(
                     Err(e) => {
                         app.set_status(format!("JQL error: {e}"), true);
                     }
+                }
+            }
+
+            AppAction::OpenNotifications => {
+                let fallback_jql = build_notifications_jql(app.default_project.as_deref(), "7d");
+                app.set_status("Scanning Jira mentions...", false);
+                terminal.draw(|f| ui(f, &mut app))?;
+                match scan_mention_notifications(&client, app.default_project.as_deref(), "7d", 50)
+                    .await
+                {
+                    Ok(scan) => {
+                        let issues = notification_issues(&scan.entries);
+                        app.jql = notification_issue_jql(&scan.entries, &fallback_jql);
+                        app.set_issues(issues);
+                        if scan.entries.is_empty() {
+                            app.set_status("No Jira mentions found in the last 7d.", false);
+                        } else {
+                            app.set_status(
+                                format!(
+                                    "Notifications: {} mention(s) across {} issue(s) in the last 7d.",
+                                    scan.entries.len(),
+                                    app.issues.len()
+                                ),
+                                false,
+                            );
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Notification scan failed: {e}"), true),
                 }
             }
 

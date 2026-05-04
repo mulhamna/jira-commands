@@ -264,6 +264,33 @@ fn expand_text_mentions(text: &str, mention_map: &[(String, String)]) -> Vec<Val
     nodes
 }
 
+/// Collect all mentioned Jira account IDs found in an ADF document.
+pub fn mentioned_account_ids(value: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    collect_mentioned_account_ids(value, &mut out);
+    out
+}
+
+fn collect_mentioned_account_ids(node: &Value, out: &mut Vec<String>) {
+    if node.get("type").and_then(|v| v.as_str()) == Some("mention") {
+        if let Some(id) = node
+            .get("attrs")
+            .and_then(|attrs| attrs.get("id"))
+            .and_then(|id| id.as_str())
+        {
+            if !out.iter().any(|existing| existing == id) {
+                out.push(id.to_string());
+            }
+        }
+    }
+
+    if let Some(children) = node.get("content").and_then(|v| v.as_array()) {
+        for child in children {
+            collect_mentioned_account_ids(child, out);
+        }
+    }
+}
+
 /// Convert plain text to ADF JSON — each non-empty line becomes a paragraph.
 pub fn plain_text_to_adf(text: &str) -> Value {
     let mut content: Vec<Value> = text
@@ -682,5 +709,24 @@ mod tests {
         let text = adf_to_text(&adf);
         assert!(text.contains("| Name "));
         assert!(text.contains("| API"));
+    }
+
+    #[test]
+    fn test_mentioned_account_ids_collects_nested_mentions() {
+        let adf = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    { "type": "text", "text": "Hi " },
+                    { "type": "mention", "attrs": { "id": "acct-1", "text": "@Mulham" } },
+                    { "type": "text", "text": " and " },
+                    { "type": "mention", "attrs": { "id": "acct-2", "text": "@Team" } },
+                    { "type": "mention", "attrs": { "id": "acct-1", "text": "@Mulham" } }
+                ]
+            }]
+        });
+
+        assert_eq!(mentioned_account_ids(&adf), vec!["acct-1", "acct-2"]);
     }
 }

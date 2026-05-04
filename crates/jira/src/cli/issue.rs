@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use crate::datetime::{
-    build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date,
+use crate::{
+    datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
+    notifications::scan_mention_notifications,
 };
 use anyhow::{Context, Result};
 use clap::Subcommand;
@@ -41,6 +42,32 @@ pub enum IssueCommand {
         #[arg(short, long, default_value = "25", value_name = "N")]
         limit: u32,
         /// Output results as JSON array
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Scan recent Jira @mentions from issue descriptions and comments
+    ///
+    /// This is a notification-style inbox for direct mentions. Because Jira's
+    /// bell drawer is not exposed through the normal REST API used by jirac,
+    /// this command derives your inbox by scanning recently updated issues and
+    /// extracting ADF mention nodes that target your account.
+    ///
+    /// Examples:
+    ///   jirac issue notifications
+    ///   jirac issue notifications -p PROJ --since 3d
+    ///   jirac issue notifications --limit 100 --json
+    Notifications {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Lookback window in Jira relative date syntax (e.g. 7d, 48h)
+        #[arg(long, default_value = "7d", value_name = "WINDOW")]
+        since: String,
+        /// Maximum number of recently updated issues to inspect (default: 50, max: 100)
+        #[arg(short, long, default_value = "50", value_name = "N")]
+        limit: u32,
+        /// Output notifications as JSON array
         #[arg(long)]
         json: bool,
     },
@@ -769,6 +796,12 @@ pub async fn handle(
             limit,
             json,
         } => list_issues(client, project.or(default_project), jql, limit, json).await,
+        IssueCommand::Notifications {
+            project,
+            since,
+            limit,
+            json,
+        } => notifications(client, project.or(default_project), since, limit, json).await,
         IssueCommand::View { key, json } => view_issue(client, key, json).await,
         IssueCommand::Create {
             project,
@@ -966,6 +999,64 @@ async fn list_issues(
 
     if let Some(total) = result.total {
         println!("\nShowing {} of {} issues", result.issues.len(), total);
+    }
+
+    Ok(())
+}
+
+async fn notifications(
+    client: JiraClient,
+    project: Option<String>,
+    since: String,
+    limit: u32,
+    json: bool,
+) -> Result<()> {
+    let spinner = spinner_new("Scanning recent Jira mentions...");
+    let scan = scan_mention_notifications(&client, project.as_deref(), &since, limit).await?;
+    spinner.finish_and_clear();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&scan.entries)?);
+        return Ok(());
+    }
+
+    if scan.entries.is_empty() {
+        println!("No Jira mentions found for the last {}.", since);
+        if scan.comment_errors > 0 {
+            eprintln!(
+                "warning: failed to inspect comments on {} issue(s) during the scan",
+                scan.comment_errors
+            );
+        }
+        return Ok(());
+    }
+
+    println!(
+        "{:<12} {:<18} {:<20} {:<22} SUMMARY / EXCERPT",
+        "ISSUE", "SOURCE", "WHEN", "AUTHOR"
+    );
+    println!("{}", "─".repeat(110));
+    for entry in &scan.entries {
+        println!(
+            "{:<12} {:<18} {:<20} {:<22} {} — {}",
+            entry.issue.key,
+            truncate(&entry.source, 17),
+            truncate(&entry.created, 19),
+            truncate(entry.author.as_deref().unwrap_or("—"), 21),
+            truncate(&entry.issue.summary, 32),
+            truncate(&entry.excerpt, 48),
+        );
+    }
+
+    println!(
+        "\nScanned {} recent issue(s) with JQL: {}",
+        scan.scanned_issues, scan.jql
+    );
+    if scan.comment_errors > 0 {
+        eprintln!(
+            "warning: failed to inspect comments on {} issue(s) during the scan",
+            scan.comment_errors
+        );
     }
 
     Ok(())

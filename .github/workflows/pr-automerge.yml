@@ -17,12 +17,11 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       pull-requests: write
     steps:
       - name: Enable auto-merge (squash) for labeled PRs only
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
         run: |
           set +e

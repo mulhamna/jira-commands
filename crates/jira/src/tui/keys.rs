@@ -73,6 +73,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
         }
         KeyCode::Char('r') => AppAction::Refresh,
         KeyCode::Char('t') => AppAction::FetchTransitions,
+        KeyCode::Char('n') => AppAction::OpenNotifications,
         KeyCode::Char('o') => AppAction::OpenBrowser,
         KeyCode::Char('/') => {
             app.search_input = app.jql.clone();

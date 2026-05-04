@@ -1909,6 +1909,148 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn list_sprints_for_project_returns_empty_when_no_boards_exist() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "values": [] })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("no boards should not error");
+
+        assert!(sprints.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_dedups_sorts_and_skips_missing_board_sprints() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 1 },
+                    { "id": 2 },
+                    { "id": 3 }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/1/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 20, "name": "Future Sprint", "state": "future" },
+                    { "id": 10, "name": "Active Sprint", "state": "active" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/2/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 10, "name": "Active Sprint", "state": "active" },
+                    { "id": 30, "name": "Alpha Future", "state": "future" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/3/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("board not found"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("404 on one board should be skipped");
+
+        assert_eq!(sprints.len(), 3);
+        assert_eq!(sprints[0].id, 10);
+        assert_eq!(sprints[0].state, "active");
+        assert_eq!(sprints[1].id, 30);
+        assert_eq!(sprints[1].state, "future");
+        assert_eq!(sprints[2].id, 20);
+        assert_eq!(sprints[2].state, "future");
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_handles_large_sprint_pages() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        let sprint_values: Vec<Value> = (1..=60)
+            .map(|id| json!({
+                "id": id,
+                "name": format!("Sprint {id:02}"),
+                "state": if id == 1 { "active" } else { "future" }
+            }))
+            .collect();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 9 }]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/9/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": sprint_values
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect(">50 sprints in one response should parse");
+
+        assert_eq!(sprints.len(), 60);
+        assert_eq!(sprints[0].id, 1);
+        assert_eq!(sprints[0].state, "active");
+        assert_eq!(sprints[59].id, 60);
+    }
+
+    #[tokio::test]
     async fn issue_link_integration() {
         let server = MockServer::start().await;
         let expected_auth = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));

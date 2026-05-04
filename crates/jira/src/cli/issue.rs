@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
-use crate::datetime::{
-    build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date,
+use crate::{
+    datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
+    notifications::scan_mention_notifications,
 };
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{MultiSelect, Select, Text};
 use jira_core::{
-    adf::{adf_to_text, mentioned_account_ids},
     model::{
         field::{FieldKind, FieldValue},
         CreateIssueRequest, CreateIssueRequestV2, UpdateIssueRequest,
@@ -1005,18 +1004,6 @@ async fn list_issues(
     Ok(())
 }
 
-#[derive(Debug, serde::Serialize)]
-struct NotificationEntry {
-    issue_key: String,
-    summary: String,
-    project_key: String,
-    source: String,
-    author: Option<String>,
-    created: String,
-    excerpt: String,
-    url: String,
-}
-
 async fn notifications(
     client: JiraClient,
     project: Option<String>,
@@ -1024,91 +1011,21 @@ async fn notifications(
     limit: u32,
     json: bool,
 ) -> Result<()> {
-    let account_id = client
-        .get_myself()
-        .await
-        .context("Failed to resolve current Jira account")?;
-    let limit = limit.clamp(1, 100);
-    let jql = build_notifications_jql(project.as_deref(), &since);
-
     let spinner = spinner_new("Scanning recent Jira mentions...");
-    let result = client
-        .search_issues(&jql, None, Some(limit))
-        .await
-        .context("Failed to fetch recent issues for notification scan")?;
+    let scan = scan_mention_notifications(&client, project.as_deref(), &since, limit).await?;
     spinner.finish_and_clear();
 
-    let progress = progress_bar(result.issues.len() as u64);
-    progress.set_message("checking mentions");
-
-    let mut entries = Vec::new();
-    let mut comment_errors = 0usize;
-
-    for issue in result.issues {
-        if let Some(description) = issue.description.as_ref() {
-            if mentioned_account_ids(description)
-                .iter()
-                .any(|mentioned| mentioned == &account_id)
-            {
-                entries.push(NotificationEntry {
-                    issue_key: issue.key.clone(),
-                    summary: issue.summary.clone(),
-                    project_key: issue.project_key.clone(),
-                    source: "description-mention".to_string(),
-                    author: issue.reporter.clone(),
-                    created: issue.updated.clone(),
-                    excerpt: notification_excerpt(&adf_to_text(description)),
-                    url: format!("{}/browse/{}", client.base_url(), issue.key),
-                });
-            }
-        }
-
-        match client.get_comments(&issue.key).await {
-            Ok(comments) => {
-                for comment in comments {
-                    if comment.author_account_id.as_deref() == Some(account_id.as_str()) {
-                        continue;
-                    }
-                    if comment
-                        .mentions
-                        .iter()
-                        .any(|mentioned| mentioned == &account_id)
-                    {
-                        entries.push(NotificationEntry {
-                            issue_key: issue.key.clone(),
-                            summary: issue.summary.clone(),
-                            project_key: issue.project_key.clone(),
-                            source: "comment-mention".to_string(),
-                            author: comment.author.clone(),
-                            created: comment.created.clone(),
-                            excerpt: notification_excerpt(comment.body.as_deref().unwrap_or("")),
-                            url: format!("{}/browse/{}", client.base_url(), issue.key),
-                        });
-                    }
-                }
-            }
-            Err(_) => {
-                comment_errors += 1;
-            }
-        }
-
-        progress.inc(1);
-    }
-    progress.finish_and_clear();
-
-    entries.sort_by_key(|entry| std::cmp::Reverse(parse_jira_datetime(&entry.created)));
-
     if json {
-        println!("{}", serde_json::to_string_pretty(&entries)?);
+        println!("{}", serde_json::to_string_pretty(&scan.entries)?);
         return Ok(());
     }
 
-    if entries.is_empty() {
+    if scan.entries.is_empty() {
         println!("No Jira mentions found for the last {}.", since);
-        if comment_errors > 0 {
+        if scan.comment_errors > 0 {
             eprintln!(
                 "warning: failed to inspect comments on {} issue(s) during the scan",
-                comment_errors
+                scan.comment_errors
             );
         }
         return Ok(());
@@ -1119,51 +1036,30 @@ async fn notifications(
         "ISSUE", "SOURCE", "WHEN", "AUTHOR"
     );
     println!("{}", "─".repeat(110));
-    for entry in &entries {
+    for entry in &scan.entries {
         println!(
             "{:<12} {:<18} {:<20} {:<22} {} — {}",
-            entry.issue_key,
+            entry.issue.key,
             truncate(&entry.source, 17),
             truncate(&entry.created, 19),
             truncate(entry.author.as_deref().unwrap_or("—"), 21),
-            truncate(&entry.summary, 32),
+            truncate(&entry.issue.summary, 32),
             truncate(&entry.excerpt, 48),
         );
     }
 
-    println!("\nScanned {} recent issue(s) with JQL: {}", limit, jql);
-    if comment_errors > 0 {
+    println!(
+        "\nScanned {} recent issue(s) with JQL: {}",
+        scan.scanned_issues, scan.jql
+    );
+    if scan.comment_errors > 0 {
         eprintln!(
             "warning: failed to inspect comments on {} issue(s) during the scan",
-            comment_errors
+            scan.comment_errors
         );
     }
 
     Ok(())
-}
-
-fn build_notifications_jql(project: Option<&str>, since: &str) -> String {
-    let since = since.trim();
-    if let Some(project) = project {
-        format!("project = {project} AND updated >= -{since} ORDER BY updated DESC")
-    } else {
-        format!("updated >= -{since} ORDER BY updated DESC")
-    }
-}
-
-fn notification_excerpt(raw: &str) -> String {
-    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    if normalized.is_empty() {
-        "(no preview)".to_string()
-    } else {
-        normalized
-    }
-}
-
-fn parse_jira_datetime(value: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value)
-        .ok()
-        .map(|dt| dt.with_timezone(&Utc))
 }
 
 // ─── view ────────────────────────────────────────────────────────────────────

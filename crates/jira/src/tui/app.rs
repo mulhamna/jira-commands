@@ -4,6 +4,10 @@ use std::{
     time::Duration,
 };
 
+use crate::notifications::{
+    build_notifications_jql, notification_issue_jql, notification_issues,
+    scan_mention_notifications,
+};
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyEventKind},
@@ -83,14 +87,6 @@ pub(super) fn build_search_jql(app: &App, raw: &str) -> String {
         format!("project = {project} AND {summary_clause} ORDER BY updated DESC")
     } else {
         format!("assignee = currentUser() AND {summary_clause} ORDER BY updated DESC")
-    }
-}
-
-pub(super) fn build_notifications_jql(app: &App) -> String {
-    if let Some(project) = &app.default_project {
-        format!("project = {project} AND updated >= -7d ORDER BY updated DESC")
-    } else {
-        "updated >= -7d ORDER BY updated DESC".to_string()
     }
 }
 
@@ -784,19 +780,30 @@ pub async fn run_tui(
             }
 
             AppAction::OpenNotifications => {
-                let jql = build_notifications_jql(&app);
-                app.set_status("Opening notifications view...", false);
+                let fallback_jql = build_notifications_jql(app.default_project.as_deref(), "7d");
+                app.set_status("Scanning Jira mentions...", false);
                 terminal.draw(|f| ui(f, &mut app))?;
-                match search_visible(&client, &jql, &app).await {
-                    Ok(result) => {
-                        app.jql = jql;
-                        app.set_issues(result.issues);
-                        app.set_status(
-                            "Notifications view: recent issues updated in the last 7d. Use Comments to inspect mentions.",
-                            false,
-                        );
+                match scan_mention_notifications(&client, app.default_project.as_deref(), "7d", 50)
+                    .await
+                {
+                    Ok(scan) => {
+                        let issues = notification_issues(&scan.entries);
+                        app.jql = notification_issue_jql(&scan.entries, &fallback_jql);
+                        app.set_issues(issues);
+                        if scan.entries.is_empty() {
+                            app.set_status("No Jira mentions found in the last 7d.", false);
+                        } else {
+                            app.set_status(
+                                format!(
+                                    "Notifications: {} mention(s) across {} issue(s) in the last 7d.",
+                                    scan.entries.len(),
+                                    app.issues.len()
+                                ),
+                                false,
+                            );
+                        }
                     }
-                    Err(e) => app.set_status(format!("Notification view error: {e}"), true),
+                    Err(e) => app.set_status(format!("Notification scan failed: {e}"), true),
                 }
             }
 

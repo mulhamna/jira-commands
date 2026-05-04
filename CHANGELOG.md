@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.32.0](https://github.com/mulhamna/jira-commands/compare/v0.31.0...v0.32.0) (2026-05-04)
+
+
+### Features
+
+* track notification read state ([#217](https://github.com/mulhamna/jira-commands/issues/217)) ([712618a](https://github.com/mulhamna/jira-commands/commit/712618a2540d5c18991488e2654a8f18df712ab5))
+
 ## [0.31.0](https://github.com/mulhamna/jira-commands/compare/v0.30.0...v0.31.0) (2026-05-04)
 
 

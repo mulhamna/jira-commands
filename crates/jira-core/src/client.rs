@@ -1635,9 +1635,27 @@ mod tests {
     use super::*;
     use crate::config::{JiraAuthType, JiraDeployment};
     use wiremock::{
-        matchers::{header, method, path},
+        matchers::{body_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
+
+    fn cloud_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        })
+    }
+
+    fn cloud_auth() -> String {
+        format!("Basic {}", base64_encode("dev@example.com:cloud-token"))
+    }
 
     #[tokio::test]
     async fn data_center_pat_uses_bearer_and_api_v2() {
@@ -1793,6 +1811,101 @@ mod tests {
         assert_eq!(fields[0].name, "Labels (OSS)");
         assert!(fields[0].required);
         assert_eq!(fields[0].field_type, "array");
+    }
+
+    #[tokio::test]
+    async fn search_users_supports_empty_query_and_no_results() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", ""))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client.search_users("").await.expect("empty query should work");
+
+        assert!(users.is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_users_preserves_users_without_email() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "displayName": "Alice Example"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client.search_users("alice").await.expect("search should parse");
+
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0]["accountId"], "acct-1");
+        assert_eq!(users[0]["displayName"], "Alice Example");
+        assert!(users[0].get("emailAddress").is_none());
+    }
+
+    #[tokio::test]
+    async fn add_issue_to_sprint_posts_expected_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/agile/1.0/sprint/42/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({ "issues": ["TEST-123"] })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        client
+            .add_issue_to_sprint(42, "TEST-123")
+            .await
+            .expect("add to sprint should succeed");
+    }
+
+    #[tokio::test]
+    async fn add_issue_to_sprint_propagates_non_success_response() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/agile/1.0/sprint/42/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(400).set_body_string("bad sprint request"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .add_issue_to_sprint(42, "TEST-123")
+            .await
+            .expect_err("non-success should return error");
+
+        match err {
+            JiraError::Api { status, message } => {
+                assert_eq!(status, 400);
+                assert!(message.contains("bad sprint request"));
+            }
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
     }
 
     #[tokio::test]

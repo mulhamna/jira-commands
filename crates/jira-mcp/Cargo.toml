@@ -20,7 +20,7 @@ anyhow = "1"
 axum = "0.8"
 base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
-rmcp = { version = "1.5.0", features = [
+rmcp = { version = "1.6.0", features = [
   "client",
   "macros",
   "reqwest",

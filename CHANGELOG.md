@@ -6,6 +6,18 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.31.0](https://github.com/mulhamna/jira-commands/compare/v0.30.0...v0.31.0) (2026-05-04)
+
+
+### Features
+
+* add Jira mention notifications and tighten workflow security ([#213](https://github.com/mulhamna/jira-commands/issues/213)) ([90426b2](https://github.com/mulhamna/jira-commands/commit/90426b2f4122450f564a69e76854af7af0491186))
+
+
+### Bug Fixes
+
+* reduce security scorecard findings ([#211](https://github.com/mulhamna/jira-commands/issues/211)) ([5ec86d7](https://github.com/mulhamna/jira-commands/commit/5ec86d7c3c6b96c457bf8c5c5afc8282be7fe925))
+
 ## [0.30.0](https://github.com/mulhamna/jira-commands/compare/v0.29.0...v0.30.0) (2026-05-02)
 
 

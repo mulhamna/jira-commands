@@ -38,6 +38,8 @@ struct NotificationReadState {
     read_ids: HashSet<String>,
 }
 
+type NotificationIssueGroup = (Issue, usize, usize, Option<DateTime<Utc>>);
+
 pub fn build_notifications_jql(project: Option<&str>, since: &str) -> String {
     let since = since.trim();
     if let Some(project) = project {
@@ -185,7 +187,7 @@ pub async fn scan_mention_notifications(
 }
 
 pub fn notification_issues(entries: &[NotificationEntry]) -> Vec<Issue> {
-    let mut grouped: HashMap<String, (Issue, usize, usize, Option<DateTime<Utc>>)> = HashMap::new();
+    let mut grouped: HashMap<String, NotificationIssueGroup> = HashMap::new();
 
     for entry in entries {
         let ts = parse_jira_datetime(&entry.created);
@@ -203,8 +205,7 @@ pub fn notification_issues(entries: &[NotificationEntry]) -> Vec<Issue> {
             .or_insert_with(|| (entry.issue.clone(), 1, usize::from(!entry.read), ts));
     }
 
-    let mut items: Vec<(Issue, usize, usize, Option<DateTime<Utc>>)> =
-        grouped.into_values().collect();
+    let mut items: Vec<NotificationIssueGroup> = grouped.into_values().collect();
     items.sort_by_key(|(_, _, _, latest)| std::cmp::Reverse(*latest));
 
     items

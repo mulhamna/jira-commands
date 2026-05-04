@@ -803,7 +803,10 @@ mod tests {
             &[("Alice".to_string(), "acct-1".to_string())],
         );
 
-        assert_eq!(nodes, vec![json!({ "type": "text", "text": "hello world" })]);
+        assert_eq!(
+            nodes,
+            vec![json!({ "type": "text", "text": "hello world" })]
+        );
     }
 
     #[test]
@@ -852,12 +855,18 @@ mod tests {
             ],
         );
 
-        assert_eq!(adf["content"][0]["content"][0], json!({ "type": "text", "text": "hello " }));
+        assert_eq!(
+            adf["content"][0]["content"][0],
+            json!({ "type": "text", "text": "hello " })
+        );
         assert_eq!(
             adf["content"][0]["content"][1],
             json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } })
         );
-        assert_eq!(adf["content"][1]["content"][0]["content"][0]["content"][0], json!({ "type": "text", "text": "cc " }));
+        assert_eq!(
+            adf["content"][1]["content"][0]["content"][0]["content"][0],
+            json!({ "type": "text", "text": "cc " })
+        );
         assert_eq!(
             adf["content"][1]["content"][0]["content"][0]["content"][1],
             json!({ "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob Marley" } })

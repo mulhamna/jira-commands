@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::notifications::{
-    build_notifications_jql, mark_notifications_read, notification_issue_jql,
-    notification_issues, scan_mention_notifications, NotificationEntry,
+    build_notifications_jql, mark_notifications_read, notification_issue_jql, notification_issues,
+    scan_mention_notifications, NotificationEntry,
 };
 use anyhow::Result;
 use crossterm::{
@@ -432,7 +432,9 @@ impl App {
                         self.set_issue_list(notification_issues(&self.notification_entries));
                     }
                     Ok(_) => {}
-                    Err(err) => self.set_status(format!("Failed to mark notifications read: {err}"), true),
+                    Err(err) => {
+                        self.set_status(format!("Failed to mark notifications read: {err}"), true)
+                    }
                 }
             }
         }

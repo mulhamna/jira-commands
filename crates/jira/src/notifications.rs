@@ -76,11 +76,17 @@ fn notification_entry_id(issue_key: &str, source: &str, created: &str) -> String
     format!("{issue_key}|{source}|{created}")
 }
 
-pub fn mark_notifications_read(entries: &mut [NotificationEntry], issue_key: &str) -> Result<usize> {
+pub fn mark_notifications_read(
+    entries: &mut [NotificationEntry],
+    issue_key: &str,
+) -> Result<usize> {
     let mut state = load_notification_read_state();
     let mut changed = 0usize;
 
-    for entry in entries.iter_mut().filter(|entry| entry.issue.key == issue_key) {
+    for entry in entries
+        .iter_mut()
+        .filter(|entry| entry.issue.key == issue_key)
+    {
         if !entry.read && state.read_ids.insert(entry.id.clone()) {
             entry.read = true;
             changed += 1;
@@ -147,7 +153,8 @@ pub async fn scan_mention_notifications(
                         .iter()
                         .any(|mentioned| mentioned == &account_id)
                     {
-                        let id = notification_entry_id(&issue.key, "comment-mention", &comment.created);
+                        let id =
+                            notification_entry_id(&issue.key, "comment-mention", &comment.created);
                         entries.push(NotificationEntry {
                             id: id.clone(),
                             issue: issue.clone(),
@@ -193,17 +200,11 @@ pub fn notification_issues(entries: &[NotificationEntry]) -> Vec<Issue> {
                     *latest = ts;
                 }
             })
-            .or_insert_with(|| {
-                (
-                    entry.issue.clone(),
-                    1,
-                    usize::from(!entry.read),
-                    ts,
-                )
-            });
+            .or_insert_with(|| (entry.issue.clone(), 1, usize::from(!entry.read), ts));
     }
 
-    let mut items: Vec<(Issue, usize, usize, Option<DateTime<Utc>>)> = grouped.into_values().collect();
+    let mut items: Vec<(Issue, usize, usize, Option<DateTime<Utc>>)> =
+        grouped.into_values().collect();
     items.sort_by_key(|(_, _, _, latest)| std::cmp::Reverse(*latest));
 
     items

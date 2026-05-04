@@ -1633,7 +1633,10 @@ fn base64_encode(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::{JiraAuthType, JiraDeployment}, model::FieldValue};
+    use crate::{
+        config::{JiraAuthType, JiraDeployment},
+        model::FieldValue,
+    };
     use wiremock::{
         matchers::{body_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
@@ -1828,7 +1831,10 @@ mod tests {
             .await;
 
         let client = cloud_client(&server);
-        let users = client.search_users("").await.expect("empty query should work");
+        let users = client
+            .search_users("")
+            .await
+            .expect("empty query should work");
 
         assert!(users.is_empty());
     }
@@ -1853,7 +1859,10 @@ mod tests {
             .await;
 
         let client = cloud_client(&server);
-        let users = client.search_users("alice").await.expect("search should parse");
+        let users = client
+            .search_users("alice")
+            .await
+            .expect("search should parse");
 
         assert_eq!(users.len(), 1);
         assert_eq!(users[0]["accountId"], "acct-1");
@@ -2009,11 +2018,13 @@ mod tests {
         let expected_auth = cloud_auth();
 
         let sprint_values: Vec<Value> = (1..=60)
-            .map(|id| json!({
-                "id": id,
-                "name": format!("Sprint {id:02}"),
-                "state": if id == 1 { "active" } else { "future" }
-            }))
+            .map(|id| {
+                json!({
+                    "id": id,
+                    "name": format!("Sprint {id:02}"),
+                    "state": if id == 1 { "active" } else { "future" }
+                })
+            })
             .collect();
 
         Mock::given(method("GET"))
@@ -2123,7 +2134,10 @@ mod tests {
 
         let client = cloud_client(&server);
         let mut custom_fields = std::collections::HashMap::new();
-        custom_fields.insert("customfield_10010".to_string(), FieldValue::Text("hello".into()));
+        custom_fields.insert(
+            "customfield_10010".to_string(),
+            FieldValue::Text("hello".into()),
+        );
         custom_fields.insert(
             "customfield_10011".to_string(),
             FieldValue::SelectName("Blue".into()),
@@ -2256,7 +2270,10 @@ mod tests {
             .await;
 
         let client = cloud_client(&server);
-        let comments = client.get_comments("TEST-1").await.expect("comments should parse");
+        let comments = client
+            .get_comments("TEST-1")
+            .await
+            .expect("comments should parse");
 
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].id, "10001");
@@ -2333,9 +2350,7 @@ mod tests {
             .and(header("authorization", expected_auth.as_str()))
             .and(query_param("query", "alice"))
             .and(query_param("maxResults", "20"))
-            .respond_with(
-                ResponseTemplate::new(429).insert_header("Retry-After", "0")
-            )
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "0"))
             .up_to_n_times(1)
             .mount(&server)
             .await;
@@ -2374,9 +2389,7 @@ mod tests {
             .and(header("authorization", expected_auth.as_str()))
             .and(query_param("query", "alice"))
             .and(query_param("maxResults", "20"))
-            .respond_with(
-                ResponseTemplate::new(429).insert_header("Retry-After", "0")
-            )
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "0"))
             .mount(&server)
             .await;
 

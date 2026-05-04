@@ -109,7 +109,7 @@ jobs:
       - name: Install Zig + cargo-zigbuild (Linux)
         if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          pip3 install ziglang==0.14.0 --break-system-packages
+          pip3 install --require-hashes --break-system-packages -r .github/requirements/ziglang-release.txt
           cargo install cargo-zigbuild --locked
       - name: Cache cargo
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2

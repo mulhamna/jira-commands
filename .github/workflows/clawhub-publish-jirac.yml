@@ -35,14 +35,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install ClawHub CLI
-        run: npm install -g clawhub@latest
+      - name: Install pinned ClawHub CLI dependencies
+        run: npm ci --prefix .github/clawhub-cli
 
       - name: Validate auth
         run: |
           test -n "${{ secrets.CLAWHUB_TOKEN }}"
-          clawhub login --token "${{ secrets.CLAWHUB_TOKEN }}" --no-browser
-          clawhub whoami
+          npx --prefix .github/clawhub-cli clawhub login --token "${{ secrets.CLAWHUB_TOKEN }}" --no-browser
+          npx --prefix .github/clawhub-cli clawhub whoami
 
       - name: Validate skill path
         run: |
@@ -51,7 +51,7 @@ jobs:
           test -f "$SKILL_VERSION_FILE"
 
       - name: Dry-run sync
-        run: clawhub sync --dry-run --all --root "$SKILL_PATH/.."
+        run: npx --prefix .github/clawhub-cli clawhub sync --dry-run --all --root "$SKILL_PATH/.."
 
       - name: Resolve publish metadata
         id: publish_meta
@@ -92,7 +92,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Publish attempt $attempt/3"
 
-            if clawhub publish "$SKILL_PATH" \
+            if npx --prefix .github/clawhub-cli clawhub publish "$SKILL_PATH" \
               --slug "$SKILL_SLUG" \
               --name "$SKILL_NAME" \
               --version "${{ steps.publish_meta.outputs.version }}" \

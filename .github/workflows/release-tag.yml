@@ -146,7 +146,7 @@ jobs:
       - name: Install Zig + cargo-zigbuild (Linux)
         if: startsWith(matrix.target, 'x86_64-unknown-linux-gnu') || startsWith(matrix.target, 'aarch64-unknown-linux-gnu')
         run: |
-          pip3 install ziglang==0.14.0 --break-system-packages
+          pip3 install --require-hashes --break-system-packages -r .github/requirements/ziglang-release.txt
           cargo install cargo-zigbuild --locked
 
       - name: Cache cargo

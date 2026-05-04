@@ -1096,7 +1096,7 @@ async fn notifications(
     }
     progress.finish_and_clear();
 
-    entries.sort_by(|a, b| parse_jira_datetime(&b.created).cmp(&parse_jira_datetime(&a.created)));
+    entries.sort_by_key(|entry| std::cmp::Reverse(parse_jira_datetime(&entry.created)));
 
     if json {
         println!("{}", serde_json::to_string_pretty(&entries)?);
@@ -1115,8 +1115,8 @@ async fn notifications(
     }
 
     println!(
-        "{:<12} {:<18} {:<20} {:<22} {}",
-        "ISSUE", "SOURCE", "WHEN", "AUTHOR", "SUMMARY / EXCERPT"
+        "{:<12} {:<18} {:<20} {:<22} SUMMARY / EXCERPT",
+        "ISSUE", "SOURCE", "WHEN", "AUTHOR"
     );
     println!("{}", "─".repeat(110));
     for entry in &entries {

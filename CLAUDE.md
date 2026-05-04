@@ -12,13 +12,6 @@ Claude may:
 - Run `git` commands for read and write operations when explicitly requested by the repo owner, including `git add`, `git commit`, and `git push`
 - Do not manually bump versions, edit generated changelogs, create/push tags, or rewrite git history unless explicitly requested by the repo owner
 
-### TASK.md — work checklist
-
-`TASK.md` (gitignored) is Claude's work checklist.
-1. Read it at the start of every new session
-2. Update `[ ]` → `[x]` immediately after task is done and smoke test passes
-3. If missing, recreate from conversation context or ask repo owner
-
 ---
 
 ## Project overview

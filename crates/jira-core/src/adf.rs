@@ -729,4 +729,147 @@ mod tests {
 
         assert_eq!(mentioned_account_ids(&adf), vec!["acct-1", "acct-2"]);
     }
+
+    #[test]
+    fn test_expand_text_mentions_single_mention_mid_sentence() {
+        let nodes = expand_text_mentions(
+            "fix @Alice done",
+            &[("Alice".to_string(), "acct-1".to_string())],
+        );
+
+        assert_eq!(
+            nodes,
+            vec![
+                json!({ "type": "text", "text": "fix " }),
+                json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } }),
+                json!({ "type": "text", "text": " done" }),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_expand_text_mentions_handles_start_and_end_mentions() {
+        let start = expand_text_mentions(
+            "@Alice done",
+            &[("Alice".to_string(), "acct-1".to_string())],
+        );
+        let end = expand_text_mentions(
+            "done @Alice",
+            &[("Alice".to_string(), "acct-1".to_string())],
+        );
+
+        assert_eq!(
+            start,
+            vec![
+                json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } }),
+                json!({ "type": "text", "text": " done" }),
+            ]
+        );
+        assert_eq!(
+            end,
+            vec![
+                json!({ "type": "text", "text": "done " }),
+                json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } }),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_expand_text_mentions_handles_multiple_mentions_and_spaces() {
+        let nodes = expand_text_mentions(
+            "Ping @Alice and @Bob Marley today",
+            &[
+                ("Alice".to_string(), "acct-1".to_string()),
+                ("Bob Marley".to_string(), "acct-2".to_string()),
+            ],
+        );
+
+        assert_eq!(
+            nodes,
+            vec![
+                json!({ "type": "text", "text": "Ping " }),
+                json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } }),
+                json!({ "type": "text", "text": " and " }),
+                json!({ "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob Marley" } }),
+                json!({ "type": "text", "text": " today" }),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_expand_text_mentions_no_match_leaves_text_node_intact() {
+        let nodes = expand_text_mentions(
+            "hello world",
+            &[("Alice".to_string(), "acct-1".to_string())],
+        );
+
+        assert_eq!(
+            nodes,
+            vec![json!({ "type": "text", "text": "hello world" })]
+        );
+    }
+
+    #[test]
+    fn test_inject_mentions_empty_map_returns_early_without_changes() {
+        let mut adf = json!({
+            "type": "doc",
+            "content": [{
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "hello @Alice" }]
+            }]
+        });
+        let original = adf.clone();
+
+        inject_mentions(&mut adf, &[]);
+
+        assert_eq!(adf, original);
+    }
+
+    #[test]
+    fn test_inject_mentions_traverses_nested_adf_nodes() {
+        let mut adf = json!({
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{ "type": "text", "text": "hello @Alice" }]
+                },
+                {
+                    "type": "bulletList",
+                    "content": [{
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{ "type": "text", "text": "cc @Bob Marley" }]
+                        }]
+                    }]
+                }
+            ]
+        });
+
+        inject_mentions(
+            &mut adf,
+            &[
+                ("Alice".to_string(), "acct-1".to_string()),
+                ("Bob Marley".to_string(), "acct-2".to_string()),
+            ],
+        );
+
+        assert_eq!(
+            adf["content"][0]["content"][0],
+            json!({ "type": "text", "text": "hello " })
+        );
+        assert_eq!(
+            adf["content"][0]["content"][1],
+            json!({ "type": "mention", "attrs": { "id": "acct-1", "text": "@Alice" } })
+        );
+        assert_eq!(
+            adf["content"][1]["content"][0]["content"][0]["content"][0],
+            json!({ "type": "text", "text": "cc " })
+        );
+        assert_eq!(
+            adf["content"][1]["content"][0]["content"][0]["content"][1],
+            json!({ "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob Marley" } })
+        );
+    }
 }

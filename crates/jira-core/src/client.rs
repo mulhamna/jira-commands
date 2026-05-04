@@ -1633,11 +1633,32 @@ fn base64_encode(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{JiraAuthType, JiraDeployment};
+    use crate::{
+        config::{JiraAuthType, JiraDeployment},
+        model::FieldValue,
+    };
     use wiremock::{
-        matchers::{header, method, path},
+        matchers::{body_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
+
+    fn cloud_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            profile_name: Some("cloud-main".into()),
+            base_url: server.uri(),
+            email: "dev@example.com".into(),
+            token: Some("cloud-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::Cloud,
+            auth_type: JiraAuthType::CloudApiToken,
+            api_version: 3,
+        })
+    }
+
+    fn cloud_auth() -> String {
+        format!("Basic {}", base64_encode("dev@example.com:cloud-token"))
+    }
 
     #[tokio::test]
     async fn data_center_pat_uses_bearer_and_api_v2() {
@@ -1793,6 +1814,688 @@ mod tests {
         assert_eq!(fields[0].name, "Labels (OSS)");
         assert!(fields[0].required);
         assert_eq!(fields[0].field_type, "array");
+    }
+
+    #[tokio::test]
+    async fn search_users_supports_empty_query_and_no_results() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", ""))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client
+            .search_users("")
+            .await
+            .expect("empty query should work");
+
+        assert!(users.is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_users_preserves_users_without_email() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "displayName": "Alice Example"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client
+            .search_users("alice")
+            .await
+            .expect("search should parse");
+
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0]["accountId"], "acct-1");
+        assert_eq!(users[0]["displayName"], "Alice Example");
+        assert!(users[0].get("emailAddress").is_none());
+    }
+
+    #[tokio::test]
+    async fn add_issue_to_sprint_posts_expected_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/agile/1.0/sprint/42/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({ "issues": ["TEST-123"] })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        client
+            .add_issue_to_sprint(42, "TEST-123")
+            .await
+            .expect("add to sprint should succeed");
+    }
+
+    #[tokio::test]
+    async fn add_issue_to_sprint_propagates_non_success_response() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/agile/1.0/sprint/42/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(400).set_body_string("bad sprint request"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .add_issue_to_sprint(42, "TEST-123")
+            .await
+            .expect_err("non-success should return error");
+
+        match err {
+            JiraError::Api { status, message } => {
+                assert_eq!(status, 400);
+                assert!(message.contains("bad sprint request"));
+            }
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_returns_empty_when_no_boards_exist() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "values": [] })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("no boards should not error");
+
+        assert!(sprints.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_dedups_sorts_and_skips_missing_board_sprints() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 1 },
+                    { "id": 2 },
+                    { "id": 3 }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/1/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 20, "name": "Future Sprint", "state": "future" },
+                    { "id": 10, "name": "Active Sprint", "state": "active" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/2/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 10, "name": "Active Sprint", "state": "active" },
+                    { "id": 30, "name": "Alpha Future", "state": "future" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/3/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("board not found"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("404 on one board should be skipped");
+
+        assert_eq!(sprints.len(), 3);
+        assert_eq!(sprints[0].id, 10);
+        assert_eq!(sprints[0].state, "active");
+        assert_eq!(sprints[1].id, 30);
+        assert_eq!(sprints[1].state, "future");
+        assert_eq!(sprints[2].id, 20);
+        assert_eq!(sprints[2].state, "future");
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_handles_large_sprint_pages() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        let sprint_values: Vec<Value> = (1..=60)
+            .map(|id| {
+                json!({
+                    "id": id,
+                    "name": format!("Sprint {id:02}"),
+                    "state": if id == 1 { "active" } else { "future" }
+                })
+            })
+            .collect();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 9 }]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/9/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": sprint_values
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect(">50 sprints in one response should parse");
+
+        assert_eq!(sprints.len(), 60);
+        assert_eq!(sprints[0].id, 1);
+        assert_eq!(sprints[0].state, "active");
+        assert_eq!(sprints[59].id, 60);
+    }
+
+    #[tokio::test]
+    async fn create_issue_v2_prefers_adf_and_builds_extended_fields() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let description_adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "ADF body" }]
+            }]
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice@example.com"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "emailAddress": "alice@example.com",
+                    "displayName": "Alice"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "fields": {
+                    "project": { "key": "TEST" },
+                    "summary": "Ship feature",
+                    "issuetype": { "name": "Task" },
+                    "description": description_adf,
+                    "assignee": { "accountId": "acct-1" },
+                    "priority": { "name": "High" },
+                    "labels": ["backend", "urgent"],
+                    "components": [{ "name": "api" }, { "name": "worker" }],
+                    "parent": { "key": "TEST-1" },
+                    "fixVersions": [{ "name": "v1.0" }, { "name": "v1.1" }],
+                    "customfield_10010": "hello",
+                    "customfield_10011": { "value": "Blue" },
+                    "customfield_10012": ["triage"]
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-123" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-123"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10001",
+                "key": "TEST-123",
+                "fields": {
+                    "summary": "Ship feature",
+                    "description": description_adf,
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "TEST" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let mut custom_fields = std::collections::HashMap::new();
+        custom_fields.insert(
+            "customfield_10010".to_string(),
+            FieldValue::Text("hello".into()),
+        );
+        custom_fields.insert(
+            "customfield_10011".to_string(),
+            FieldValue::SelectName("Blue".into()),
+        );
+        custom_fields.insert(
+            "customfield_10012".to_string(),
+            FieldValue::Labels(vec!["triage".into()]),
+        );
+
+        let issue = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "TEST".into(),
+                summary: "Ship feature".into(),
+                description: Some("markdown body should be ignored".into()),
+                description_adf: Some(description_adf.clone()),
+                issue_type: "Task".into(),
+                assignee: Some("alice@example.com".into()),
+                priority: Some("High".into()),
+                labels: vec!["backend".into(), "urgent".into()],
+                components: vec!["api".into(), "worker".into()],
+                parent: Some("TEST-1".into()),
+                fix_versions: vec!["v1.0".into(), "v1.1".into()],
+                custom_fields,
+            })
+            .await
+            .expect("create issue v2 should succeed");
+
+        assert_eq!(issue.key, "TEST-123");
+        assert_eq!(issue.summary, "Ship feature");
+        assert_eq!(issue.description, Some(description_adf));
+    }
+
+    #[tokio::test]
+    async fn create_issue_v2_uses_markdown_description_when_adf_missing() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let markdown_adf = markdown_to_adf("hello world");
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "fields": {
+                    "project": { "key": "TEST" },
+                    "summary": "Plain issue",
+                    "issuetype": { "name": "Task" },
+                    "description": markdown_adf
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-124" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-124"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10002",
+                "key": "TEST-124",
+                "fields": {
+                    "summary": "Plain issue",
+                    "description": markdown_to_adf("hello world"),
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "TEST" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let issue = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "TEST".into(),
+                summary: "Plain issue".into(),
+                description: Some("hello world".into()),
+                description_adf: None,
+                issue_type: "Task".into(),
+                assignee: None,
+                priority: None,
+                labels: vec![],
+                components: vec![],
+                parent: None,
+                fix_versions: vec![],
+                custom_fields: std::collections::HashMap::new(),
+            })
+            .await
+            .expect("markdown fallback should succeed");
+
+        assert_eq!(issue.key, "TEST-124");
+        assert_eq!(issue.summary, "Plain issue");
+        assert_eq!(issue.description, Some(markdown_to_adf("hello world")));
+    }
+
+    #[tokio::test]
+    async fn get_comments_parses_comment_text_and_mentions() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/comment"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "comments": [
+                    {
+                        "id": "10001",
+                        "author": {
+                            "displayName": "Alice",
+                            "accountId": "acct-1"
+                        },
+                        "body": {
+                            "type": "doc",
+                            "version": 1,
+                            "content": [{
+                                "type": "paragraph",
+                                "content": [
+                                    { "type": "text", "text": "Hi " },
+                                    { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                                ]
+                            }]
+                        },
+                        "created": "2023-01-01T00:00:00.000+0000",
+                        "updated": "2023-01-01T00:00:00.000+0000"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let comments = client
+            .get_comments("TEST-1")
+            .await
+            .expect("comments should parse");
+
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].id, "10001");
+        assert_eq!(comments[0].author.as_deref(), Some("Alice"));
+        assert_eq!(comments[0].author_account_id.as_deref(), Some("acct-1"));
+        assert_eq!(comments[0].body.as_deref(), Some("Hi @Bob"));
+        assert_eq!(comments[0].mentions, vec!["acct-2"]);
+    }
+
+    #[tokio::test]
+    async fn add_comment_adf_posts_prebuilt_adf_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    { "type": "text", "text": "Hi " },
+                    { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                ]
+            }]
+        });
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue/TEST-1/comment"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({ "body": adf.clone() })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "10002",
+                "author": {
+                    "displayName": "Alice",
+                    "accountId": "acct-1"
+                },
+                "body": adf,
+                "created": "2023-01-01T00:00:00.000+0000",
+                "updated": "2023-01-01T00:00:00.000+0000"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let comment = client
+            .add_comment_adf(
+                "TEST-1",
+                json!({
+                    "type": "doc",
+                    "version": 1,
+                    "content": [{
+                        "type": "paragraph",
+                        "content": [
+                            { "type": "text", "text": "Hi " },
+                            { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                        ]
+                    }]
+                }),
+            )
+            .await
+            .expect("add comment adf should succeed");
+
+        assert_eq!(comment.id, "10002");
+        assert_eq!(comment.body.as_deref(), Some("Hi @Bob"));
+        assert_eq!(comment.mentions, vec!["acct-2"]);
+    }
+
+    #[tokio::test]
+    async fn search_users_retries_after_429_then_succeeds() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "0"))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "displayName": "Alice Example"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let users = client
+            .search_users("alice")
+            .await
+            .expect("request should retry and succeed");
+
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0]["accountId"], "acct-1");
+    }
+
+    #[tokio::test]
+    async fn search_users_returns_rate_limit_after_max_retries() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "0"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .search_users("alice")
+            .await
+            .expect_err("request should fail after max retries");
+
+        match err {
+            JiraError::RateLimit { retry_after } => assert_eq!(retry_after, 0),
+            other => panic!("expected JiraError::RateLimit, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn move_issue_submits_bulk_move_and_fetches_issue_on_complete() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bulk/issues/move"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "sendBulkNotification": true,
+                "targetToSourcesMapping": {
+                    "NEW,10002": {
+                        "inferClassificationDefaults": true,
+                        "inferFieldDefaults": true,
+                        "inferStatusDefaults": true,
+                        "inferSubtaskTypeDefault": true,
+                        "issueIdsOrKeys": ["TEST-1"]
+                    }
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-1" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/bulk/queue/task-1"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10001",
+                "key": "TEST-1",
+                "fields": {
+                    "summary": "Moved issue",
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "NEW" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let issue = client
+            .move_issue("TEST-1", "NEW", "10002", None)
+            .await
+            .expect("move issue should complete");
+
+        assert_eq!(issue.key, "TEST-1");
+        assert_eq!(issue.project_key, "NEW");
+    }
+
+    #[tokio::test]
+    async fn move_issue_returns_api_error_when_bulk_task_fails() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bulk/issues/move"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-2" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/bulk/queue/task-2"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "status": "FAILED",
+                "errors": ["cannot move issue"]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .move_issue("TEST-1", "NEW", "10002", None)
+            .await
+            .expect_err("failed bulk task should return error");
+
+        match err {
+            JiraError::Api { message, .. } => assert!(message.contains("FAILED")),
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
     }
 
     #[tokio::test]

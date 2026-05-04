@@ -824,3 +824,81 @@ fn picker_type_char(query: &mut String, cursor: &mut usize, c: char) {
     query.insert(byte_pos, c);
     *cursor += 1;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn picker_backspace_removes_previous_character_at_cursor() {
+        let mut query = "abcd".to_string();
+        let mut cursor = 2;
+
+        let changed = picker_backspace(&mut query, &mut cursor);
+
+        assert!(changed);
+        assert_eq!(query, "acd");
+        assert_eq!(cursor, 1);
+    }
+
+    #[test]
+    fn picker_backspace_is_noop_at_start() {
+        let mut query = "abcd".to_string();
+        let mut cursor = 0;
+
+        let changed = picker_backspace(&mut query, &mut cursor);
+
+        assert!(!changed);
+        assert_eq!(query, "abcd");
+        assert_eq!(cursor, 0);
+    }
+
+    #[test]
+    fn picker_type_char_inserts_at_cursor_position() {
+        let mut query = "acd".to_string();
+        let mut cursor = 1;
+
+        picker_type_char(&mut query, &mut cursor, 'b');
+
+        assert_eq!(query, "abcd");
+        assert_eq!(cursor, 2);
+    }
+
+    #[test]
+    fn picker_helpers_handle_unicode_boundaries() {
+        let mut query = "aéz".to_string();
+        let mut cursor = 2;
+
+        let changed = picker_backspace(&mut query, &mut cursor);
+        assert!(changed);
+        assert_eq!(query, "az");
+        assert_eq!(cursor, 1);
+
+        picker_type_char(&mut query, &mut cursor, 'é');
+        assert_eq!(query, "aéz");
+        assert_eq!(cursor, 2);
+    }
+
+    #[test]
+    fn picker_navigation_and_cursor_helpers_clamp_safely() {
+        let mut state = ListState::default();
+        picker_nav_down(&mut state, 3);
+        assert_eq!(state.selected(), Some(0));
+        picker_nav_down(&mut state, 3);
+        assert_eq!(state.selected(), Some(1));
+        picker_nav_up(&mut state);
+        assert_eq!(state.selected(), Some(0));
+        picker_nav_up(&mut state);
+        assert_eq!(state.selected(), Some(0));
+
+        let mut cursor = 0;
+        picker_cursor_left(&mut cursor);
+        assert_eq!(cursor, 0);
+        picker_cursor_right(&mut cursor, "ab");
+        picker_cursor_right(&mut cursor, "ab");
+        picker_cursor_right(&mut cursor, "ab");
+        assert_eq!(cursor, 2);
+        picker_cursor_left(&mut cursor);
+        assert_eq!(cursor, 1);
+    }
+}

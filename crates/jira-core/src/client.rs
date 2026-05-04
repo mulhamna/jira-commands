@@ -2221,6 +2221,109 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_comments_parses_comment_text_and_mentions() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/comment"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "comments": [
+                    {
+                        "id": "10001",
+                        "author": {
+                            "displayName": "Alice",
+                            "accountId": "acct-1"
+                        },
+                        "body": {
+                            "type": "doc",
+                            "version": 1,
+                            "content": [{
+                                "type": "paragraph",
+                                "content": [
+                                    { "type": "text", "text": "Hi " },
+                                    { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                                ]
+                            }]
+                        },
+                        "created": "2023-01-01T00:00:00.000+0000",
+                        "updated": "2023-01-01T00:00:00.000+0000"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let comments = client.get_comments("TEST-1").await.expect("comments should parse");
+
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].id, "10001");
+        assert_eq!(comments[0].author.as_deref(), Some("Alice"));
+        assert_eq!(comments[0].author_account_id.as_deref(), Some("acct-1"));
+        assert_eq!(comments[0].body.as_deref(), Some("Hi @Bob"));
+        assert_eq!(comments[0].mentions, vec!["acct-2"]);
+    }
+
+    #[tokio::test]
+    async fn add_comment_adf_posts_prebuilt_adf_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    { "type": "text", "text": "Hi " },
+                    { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                ]
+            }]
+        });
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue/TEST-1/comment"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({ "body": adf.clone() })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "10002",
+                "author": {
+                    "displayName": "Alice",
+                    "accountId": "acct-1"
+                },
+                "body": adf,
+                "created": "2023-01-01T00:00:00.000+0000",
+                "updated": "2023-01-01T00:00:00.000+0000"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let comment = client
+            .add_comment_adf(
+                "TEST-1",
+                json!({
+                    "type": "doc",
+                    "version": 1,
+                    "content": [{
+                        "type": "paragraph",
+                        "content": [
+                            { "type": "text", "text": "Hi " },
+                            { "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob" } }
+                        ]
+                    }]
+                }),
+            )
+            .await
+            .expect("add comment adf should succeed");
+
+        assert_eq!(comment.id, "10002");
+        assert_eq!(comment.body.as_deref(), Some("Hi @Bob"));
+        assert_eq!(comment.mentions, vec!["acct-2"]);
+    }
+
+    #[tokio::test]
     async fn issue_link_integration() {
         let server = MockServer::start().await;
         let expected_auth = format!("Basic {}", base64_encode("dev@example.com:cloud-token"));

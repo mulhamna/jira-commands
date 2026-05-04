@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::widgets::ListState;
 
 use super::app::{App, AppAction};
 use super::column::default_column_ids;
@@ -632,53 +633,27 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Down => {
-            let i = app
-                .component_state
-                .selected()
-                .map(|i| (i + 1).min(app.component_options.len().saturating_sub(1)))
-                .unwrap_or(0);
-            app.component_state.select(Some(i));
+            picker_nav_down(&mut app.component_state, app.component_options.len());
             AppAction::None
         }
         KeyCode::Up => {
-            let i = app
-                .component_state
-                .selected()
-                .map(|i| i.saturating_sub(1))
-                .unwrap_or(0);
-            app.component_state.select(Some(i));
+            picker_nav_up(&mut app.component_state);
             AppAction::None
         }
         KeyCode::Left => {
-            if app.component_cursor > 0 {
-                app.component_cursor -= 1;
-            }
+            picker_cursor_left(&mut app.component_cursor);
             AppAction::None
         }
         KeyCode::Right => {
-            if app.component_cursor < app.component_query.chars().count() {
-                app.component_cursor += 1;
-            }
+            picker_cursor_right(&mut app.component_cursor, &app.component_query);
             AppAction::None
         }
         KeyCode::Backspace => {
-            if app.component_cursor > 0 {
-                app.component_cursor -= 1;
-                let byte_pos = app
-                    .component_query
-                    .char_indices()
-                    .nth(app.component_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(app.component_query.len());
-                let char_len = app.component_query[byte_pos..]
-                    .chars()
-                    .next()
-                    .map(|c| c.len_utf8())
-                    .unwrap_or(0);
-                app.component_query.drain(byte_pos..byte_pos + char_len);
-                return AppAction::RefreshComponentOptions;
+            if picker_backspace(&mut app.component_query, &mut app.component_cursor) {
+                AppAction::RefreshComponentOptions
+            } else {
+                AppAction::None
             }
-            AppAction::None
         }
         KeyCode::Char(' ') => {
             if let Some(idx) = app.component_state.selected() {
@@ -693,14 +668,7 @@ fn handle_component_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Char(c) => {
-            let byte_pos = app
-                .component_query
-                .char_indices()
-                .nth(app.component_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.component_query.len());
-            app.component_query.insert(byte_pos, c);
-            app.component_cursor += 1;
+            picker_type_char(&mut app.component_query, &mut app.component_cursor, c);
             AppAction::RefreshComponentOptions
         }
         KeyCode::Enter => {
@@ -718,53 +686,27 @@ fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Down => {
-            let i = app
-                .fix_version_state
-                .selected()
-                .map(|i| (i + 1).min(app.fix_version_options.len().saturating_sub(1)))
-                .unwrap_or(0);
-            app.fix_version_state.select(Some(i));
+            picker_nav_down(&mut app.fix_version_state, app.fix_version_options.len());
             AppAction::None
         }
         KeyCode::Up => {
-            let i = app
-                .fix_version_state
-                .selected()
-                .map(|i| i.saturating_sub(1))
-                .unwrap_or(0);
-            app.fix_version_state.select(Some(i));
+            picker_nav_up(&mut app.fix_version_state);
             AppAction::None
         }
         KeyCode::Left => {
-            if app.fix_version_cursor > 0 {
-                app.fix_version_cursor -= 1;
-            }
+            picker_cursor_left(&mut app.fix_version_cursor);
             AppAction::None
         }
         KeyCode::Right => {
-            if app.fix_version_cursor < app.fix_version_query.chars().count() {
-                app.fix_version_cursor += 1;
-            }
+            picker_cursor_right(&mut app.fix_version_cursor, &app.fix_version_query);
             AppAction::None
         }
         KeyCode::Backspace => {
-            if app.fix_version_cursor > 0 {
-                app.fix_version_cursor -= 1;
-                let byte_pos = app
-                    .fix_version_query
-                    .char_indices()
-                    .nth(app.fix_version_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(app.fix_version_query.len());
-                let char_len = app.fix_version_query[byte_pos..]
-                    .chars()
-                    .next()
-                    .map(|c| c.len_utf8())
-                    .unwrap_or(0);
-                app.fix_version_query.drain(byte_pos..byte_pos + char_len);
-                return AppAction::RefreshFixVersionOptions;
+            if picker_backspace(&mut app.fix_version_query, &mut app.fix_version_cursor) {
+                AppAction::RefreshFixVersionOptions
+            } else {
+                AppAction::None
             }
-            AppAction::None
         }
         KeyCode::Char(' ') => {
             if let Some(idx) = app.fix_version_state.selected() {
@@ -779,14 +721,7 @@ fn handle_fix_version_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Char(c) => {
-            let byte_pos = app
-                .fix_version_query
-                .char_indices()
-                .nth(app.fix_version_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.fix_version_query.len());
-            app.fix_version_query.insert(byte_pos, c);
-            app.fix_version_cursor += 1;
+            picker_type_char(&mut app.fix_version_query, &mut app.fix_version_cursor, c);
             AppAction::RefreshFixVersionOptions
         }
         KeyCode::Enter => {
@@ -804,66 +739,88 @@ fn handle_sprint_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Down => {
-            let i = app
-                .sprint_state
-                .selected()
-                .map(|i| (i + 1).min(app.sprint_options.len().saturating_sub(1)))
-                .unwrap_or(0);
-            app.sprint_state.select(Some(i));
+            picker_nav_down(&mut app.sprint_state, app.sprint_options.len());
             AppAction::None
         }
         KeyCode::Up => {
-            let i = app
-                .sprint_state
-                .selected()
-                .map(|i| i.saturating_sub(1))
-                .unwrap_or(0);
-            app.sprint_state.select(Some(i));
+            picker_nav_up(&mut app.sprint_state);
             AppAction::None
         }
         KeyCode::Left => {
-            if app.sprint_cursor > 0 {
-                app.sprint_cursor -= 1;
-            }
+            picker_cursor_left(&mut app.sprint_cursor);
             AppAction::None
         }
         KeyCode::Right => {
-            if app.sprint_cursor < app.sprint_query.chars().count() {
-                app.sprint_cursor += 1;
-            }
+            picker_cursor_right(&mut app.sprint_cursor, &app.sprint_query);
             AppAction::None
         }
         KeyCode::Backspace => {
-            if app.sprint_cursor > 0 {
-                app.sprint_cursor -= 1;
-                let byte_pos = app
-                    .sprint_query
-                    .char_indices()
-                    .nth(app.sprint_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(app.sprint_query.len());
-                let char_len = app.sprint_query[byte_pos..]
-                    .chars()
-                    .next()
-                    .map(|c| c.len_utf8())
-                    .unwrap_or(0);
-                app.sprint_query.drain(byte_pos..byte_pos + char_len);
-                return AppAction::RefreshSprintOptions;
+            if picker_backspace(&mut app.sprint_query, &mut app.sprint_cursor) {
+                AppAction::RefreshSprintOptions
+            } else {
+                AppAction::None
             }
-            AppAction::None
         }
         KeyCode::Char(c) => {
-            let byte_pos = app
-                .sprint_query
-                .char_indices()
-                .nth(app.sprint_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.sprint_query.len());
-            app.sprint_query.insert(byte_pos, c);
-            app.sprint_cursor += 1;
+            picker_type_char(&mut app.sprint_query, &mut app.sprint_cursor, c);
             AppAction::RefreshSprintOptions
         }
         KeyCode::Enter => AppAction::ApplySprintSelection(app.sprint_issue_key.clone()),
         _ => AppAction::None,
     }
+}
+
+fn picker_nav_down(state: &mut ListState, len: usize) {
+    let i = state
+        .selected()
+        .map(|i| (i + 1).min(len.saturating_sub(1)))
+        .unwrap_or(0);
+    state.select(Some(i));
+}
+
+fn picker_nav_up(state: &mut ListState) {
+    let i = state.selected().map(|i| i.saturating_sub(1)).unwrap_or(0);
+    state.select(Some(i));
+}
+
+fn picker_cursor_left(cursor: &mut usize) {
+    if *cursor > 0 {
+        *cursor -= 1;
+    }
+}
+
+fn picker_cursor_right(cursor: &mut usize, query: &str) {
+    if *cursor < query.chars().count() {
+        *cursor += 1;
+    }
+}
+
+fn picker_backspace(query: &mut String, cursor: &mut usize) -> bool {
+    if *cursor > 0 {
+        *cursor -= 1;
+        let byte_pos = query
+            .char_indices()
+            .nth(*cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(query.len());
+        let char_len = query[byte_pos..]
+            .chars()
+            .next()
+            .map(|c| c.len_utf8())
+            .unwrap_or(0);
+        query.drain(byte_pos..byte_pos + char_len);
+        true
+    } else {
+        false
+    }
+}
+
+fn picker_type_char(query: &mut String, cursor: &mut usize, c: char) {
+    let byte_pos = query
+        .char_indices()
+        .nth(*cursor)
+        .map(|(i, _)| i)
+        .unwrap_or(query.len());
+    query.insert(byte_pos, c);
+    *cursor += 1;
 }

@@ -10,6 +10,7 @@ This crate is versioned and released from the `mulhamna/jira-commands` workspace
 [![Crates.io](https://img.shields.io/crates/v/jira-core.svg)](https://crates.io/crates/jira-core)
 [![License: MIT%20OR%20Apache--2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](../../LICENSE)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
 ## Install
 

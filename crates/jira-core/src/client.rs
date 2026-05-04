@@ -1633,7 +1633,7 @@ fn base64_encode(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{JiraAuthType, JiraDeployment};
+    use crate::{config::{JiraAuthType, JiraDeployment}, model::FieldValue};
     use wiremock::{
         matchers::{body_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
@@ -2048,6 +2048,176 @@ mod tests {
         assert_eq!(sprints[0].id, 1);
         assert_eq!(sprints[0].state, "active");
         assert_eq!(sprints[59].id, 60);
+    }
+
+    #[tokio::test]
+    async fn create_issue_v2_prefers_adf_and_builds_extended_fields() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let description_adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{ "type": "text", "text": "ADF body" }]
+            }]
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/user/search"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("query", "alice@example.com"))
+            .and(query_param("maxResults", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "accountId": "acct-1",
+                    "emailAddress": "alice@example.com",
+                    "displayName": "Alice"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "fields": {
+                    "project": { "key": "TEST" },
+                    "summary": "Ship feature",
+                    "issuetype": { "name": "Task" },
+                    "description": description_adf,
+                    "assignee": { "accountId": "acct-1" },
+                    "priority": { "name": "High" },
+                    "labels": ["backend", "urgent"],
+                    "components": [{ "name": "api" }, { "name": "worker" }],
+                    "parent": { "key": "TEST-1" },
+                    "fixVersions": [{ "name": "v1.0" }, { "name": "v1.1" }],
+                    "customfield_10010": "hello",
+                    "customfield_10011": { "value": "Blue" },
+                    "customfield_10012": ["triage"]
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-123" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-123"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10001",
+                "key": "TEST-123",
+                "fields": {
+                    "summary": "Ship feature",
+                    "description": description_adf,
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "TEST" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let mut custom_fields = std::collections::HashMap::new();
+        custom_fields.insert("customfield_10010".to_string(), FieldValue::Text("hello".into()));
+        custom_fields.insert(
+            "customfield_10011".to_string(),
+            FieldValue::SelectName("Blue".into()),
+        );
+        custom_fields.insert(
+            "customfield_10012".to_string(),
+            FieldValue::Labels(vec!["triage".into()]),
+        );
+
+        let issue = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "TEST".into(),
+                summary: "Ship feature".into(),
+                description: Some("markdown body should be ignored".into()),
+                description_adf: Some(description_adf.clone()),
+                issue_type: "Task".into(),
+                assignee: Some("alice@example.com".into()),
+                priority: Some("High".into()),
+                labels: vec!["backend".into(), "urgent".into()],
+                components: vec!["api".into(), "worker".into()],
+                parent: Some("TEST-1".into()),
+                fix_versions: vec!["v1.0".into(), "v1.1".into()],
+                custom_fields,
+            })
+            .await
+            .expect("create issue v2 should succeed");
+
+        assert_eq!(issue.key, "TEST-123");
+        assert_eq!(issue.summary, "Ship feature");
+        assert_eq!(issue.description, Some(description_adf));
+    }
+
+    #[tokio::test]
+    async fn create_issue_v2_uses_markdown_description_when_adf_missing() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+        let markdown_adf = markdown_to_adf("hello world");
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "fields": {
+                    "project": { "key": "TEST" },
+                    "summary": "Plain issue",
+                    "issuetype": { "name": "Task" },
+                    "description": markdown_adf
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-124" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-124"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "10002",
+                "key": "TEST-124",
+                "fields": {
+                    "summary": "Plain issue",
+                    "description": markdown_to_adf("hello world"),
+                    "status": { "name": "To Do" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "TEST" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let issue = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "TEST".into(),
+                summary: "Plain issue".into(),
+                description: Some("hello world".into()),
+                description_adf: None,
+                issue_type: "Task".into(),
+                assignee: None,
+                priority: None,
+                labels: vec![],
+                components: vec![],
+                parent: None,
+                fix_versions: vec![],
+                custom_fields: std::collections::HashMap::new(),
+            })
+            .await
+            .expect("markdown fallback should succeed");
+
+        assert_eq!(issue.key, "TEST-124");
+        assert_eq!(issue.summary, "Plain issue");
+        assert_eq!(issue.description, Some(markdown_to_adf("hello world")));
     }
 
     #[tokio::test]

@@ -1,4 +1,5 @@
 # jira — Claude Code Plugin
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
 
 Manage Jira issues directly from Claude Code. Create, list, view, transition, comment, log time, and run bulk operations without leaving your editor.
 

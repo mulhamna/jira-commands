@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::notifications::{
-    build_notifications_jql, notification_issue_jql, notification_issues,
-    scan_mention_notifications,
+    build_notifications_jql, mark_notifications_read, notification_issue_jql,
+    notification_issues, scan_mention_notifications, NotificationEntry,
 };
 use anyhow::Result;
 use crossterm::{
@@ -148,6 +148,7 @@ pub(super) struct App {
     pub(super) detail_scroll: u16,
     pub(super) modal: Option<Modal>,
     pub(super) prev_mode: Option<Mode>,
+    pub(super) notification_entries: Vec<NotificationEntry>,
 }
 
 pub(super) enum AppAction {
@@ -303,6 +304,7 @@ impl App {
             detail_scroll: 0,
             modal: None,
             prev_mode: None,
+            notification_entries: Vec::new(),
         }
     }
 
@@ -322,6 +324,16 @@ impl App {
     }
 
     pub(super) fn set_issues(&mut self, issues: Vec<Issue>) {
+        self.notification_entries.clear();
+        self.set_issue_list(issues);
+    }
+
+    pub(super) fn set_notification_issues(&mut self, entries: Vec<NotificationEntry>) {
+        self.notification_entries = entries;
+        self.set_issue_list(notification_issues(&self.notification_entries));
+    }
+
+    fn set_issue_list(&mut self, issues: Vec<Issue>) {
         let prev_key = self.selected_issue_key();
         self.issues = issues;
         if self.issues.is_empty() {
@@ -413,6 +425,17 @@ impl App {
     }
 
     pub(super) fn open_detail(&mut self) {
+        if let Some(key) = self.selected_issue_key() {
+            if !self.notification_entries.is_empty() {
+                match mark_notifications_read(&mut self.notification_entries, &key) {
+                    Ok(changed) if changed > 0 => {
+                        self.set_issue_list(notification_issues(&self.notification_entries));
+                    }
+                    Ok(_) => {}
+                    Err(err) => self.set_status(format!("Failed to mark notifications read: {err}"), true),
+                }
+            }
+        }
         self.focus = Focus::Detail;
         self.ensure_detail_context();
         self.reset_detail_scroll();
@@ -787,9 +810,8 @@ pub async fn run_tui(
                     .await
                 {
                     Ok(scan) => {
-                        let issues = notification_issues(&scan.entries);
                         app.jql = notification_issue_jql(&scan.entries, &fallback_jql);
-                        app.set_issues(issues);
+                        app.set_notification_issues(scan.entries.clone());
                         if scan.entries.is_empty() {
                             app.set_status("No Jira mentions found in the last 7d.", false);
                         } else {

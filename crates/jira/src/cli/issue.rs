@@ -1032,13 +1032,14 @@ async fn notifications(
     }
 
     println!(
-        "{:<12} {:<18} {:<20} {:<22} SUMMARY / EXCERPT",
-        "ISSUE", "SOURCE", "WHEN", "AUTHOR"
+        "{:<8} {:<12} {:<18} {:<20} {:<22} SUMMARY / EXCERPT",
+        "STATUS", "ISSUE", "SOURCE", "WHEN", "AUTHOR"
     );
     println!("{}", "─".repeat(110));
     for entry in &scan.entries {
         println!(
-            "{:<12} {:<18} {:<20} {:<22} {} — {}",
+            "{:<8} {:<12} {:<18} {:<20} {:<22} {} — {}",
+            if entry.read { "read" } else { "unread" },
             entry.issue.key,
             truncate(&entry.source, 17),
             truncate(&entry.created, 19),

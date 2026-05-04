@@ -86,6 +86,14 @@ pub(super) fn build_search_jql(app: &App, raw: &str) -> String {
     }
 }
 
+pub(super) fn build_notifications_jql(app: &App) -> String {
+    if let Some(project) = &app.default_project {
+        format!("project = {project} AND updated >= -7d ORDER BY updated DESC")
+    } else {
+        "updated >= -7d ORDER BY updated DESC".to_string()
+    }
+}
+
 pub(super) struct App {
     pub(super) issues: Vec<Issue>,
     pub(super) table_state: TableState,
@@ -154,6 +162,7 @@ pub(super) enum AppAction {
     FetchTransitions,
     ExecuteTransition(String, String),
     OpenBrowser,
+    OpenNotifications,
     CreateIssue,
     EditIssue(String),
     AssignIssue(String),
@@ -771,6 +780,23 @@ pub async fn run_tui(
                     Err(e) => {
                         app.set_status(format!("JQL error: {e}"), true);
                     }
+                }
+            }
+
+            AppAction::OpenNotifications => {
+                let jql = build_notifications_jql(&app);
+                app.set_status("Opening notifications view...", false);
+                terminal.draw(|f| ui(f, &mut app))?;
+                match search_visible(&client, &jql, &app).await {
+                    Ok(result) => {
+                        app.jql = jql;
+                        app.set_issues(result.issues);
+                        app.set_status(
+                            "Notifications view: recent issues updated in the last 7d. Use Comments to inspect mentions.",
+                            false,
+                        );
+                    }
+                    Err(e) => app.set_status(format!("Notification view error: {e}"), true),
                 }
             }
 

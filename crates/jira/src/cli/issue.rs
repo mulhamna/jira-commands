@@ -4,10 +4,12 @@ use crate::datetime::{
     build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date,
 };
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{MultiSelect, Select, Text};
 use jira_core::{
+    adf::{adf_to_text, mentioned_account_ids},
     model::{
         field::{FieldKind, FieldValue},
         CreateIssueRequest, CreateIssueRequestV2, UpdateIssueRequest,
@@ -41,6 +43,32 @@ pub enum IssueCommand {
         #[arg(short, long, default_value = "25", value_name = "N")]
         limit: u32,
         /// Output results as JSON array
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Scan recent Jira @mentions from issue descriptions and comments
+    ///
+    /// This is a notification-style inbox for direct mentions. Because Jira's
+    /// bell drawer is not exposed through the normal REST API used by jirac,
+    /// this command derives your inbox by scanning recently updated issues and
+    /// extracting ADF mention nodes that target your account.
+    ///
+    /// Examples:
+    ///   jirac issue notifications
+    ///   jirac issue notifications -p PROJ --since 3d
+    ///   jirac issue notifications --limit 100 --json
+    Notifications {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Lookback window in Jira relative date syntax (e.g. 7d, 48h)
+        #[arg(long, default_value = "7d", value_name = "WINDOW")]
+        since: String,
+        /// Maximum number of recently updated issues to inspect (default: 50, max: 100)
+        #[arg(short, long, default_value = "50", value_name = "N")]
+        limit: u32,
+        /// Output notifications as JSON array
         #[arg(long)]
         json: bool,
     },
@@ -769,6 +797,12 @@ pub async fn handle(
             limit,
             json,
         } => list_issues(client, project.or(default_project), jql, limit, json).await,
+        IssueCommand::Notifications {
+            project,
+            since,
+            limit,
+            json,
+        } => notifications(client, project.or(default_project), since, limit, json).await,
         IssueCommand::View { key, json } => view_issue(client, key, json).await,
         IssueCommand::Create {
             project,
@@ -969,6 +1003,167 @@ async fn list_issues(
     }
 
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+struct NotificationEntry {
+    issue_key: String,
+    summary: String,
+    project_key: String,
+    source: String,
+    author: Option<String>,
+    created: String,
+    excerpt: String,
+    url: String,
+}
+
+async fn notifications(
+    client: JiraClient,
+    project: Option<String>,
+    since: String,
+    limit: u32,
+    json: bool,
+) -> Result<()> {
+    let account_id = client
+        .get_myself()
+        .await
+        .context("Failed to resolve current Jira account")?;
+    let limit = limit.clamp(1, 100);
+    let jql = build_notifications_jql(project.as_deref(), &since);
+
+    let spinner = spinner_new("Scanning recent Jira mentions...");
+    let result = client
+        .search_issues(&jql, None, Some(limit))
+        .await
+        .context("Failed to fetch recent issues for notification scan")?;
+    spinner.finish_and_clear();
+
+    let progress = progress_bar(result.issues.len() as u64);
+    progress.set_message("checking mentions");
+
+    let mut entries = Vec::new();
+    let mut comment_errors = 0usize;
+
+    for issue in result.issues {
+        if let Some(description) = issue.description.as_ref() {
+            if mentioned_account_ids(description)
+                .iter()
+                .any(|mentioned| mentioned == &account_id)
+            {
+                entries.push(NotificationEntry {
+                    issue_key: issue.key.clone(),
+                    summary: issue.summary.clone(),
+                    project_key: issue.project_key.clone(),
+                    source: "description-mention".to_string(),
+                    author: issue.reporter.clone(),
+                    created: issue.updated.clone(),
+                    excerpt: notification_excerpt(&adf_to_text(description)),
+                    url: format!("{}/browse/{}", client.base_url(), issue.key),
+                });
+            }
+        }
+
+        match client.get_comments(&issue.key).await {
+            Ok(comments) => {
+                for comment in comments {
+                    if comment.author_account_id.as_deref() == Some(account_id.as_str()) {
+                        continue;
+                    }
+                    if comment
+                        .mentions
+                        .iter()
+                        .any(|mentioned| mentioned == &account_id)
+                    {
+                        entries.push(NotificationEntry {
+                            issue_key: issue.key.clone(),
+                            summary: issue.summary.clone(),
+                            project_key: issue.project_key.clone(),
+                            source: "comment-mention".to_string(),
+                            author: comment.author.clone(),
+                            created: comment.created.clone(),
+                            excerpt: notification_excerpt(comment.body.as_deref().unwrap_or("")),
+                            url: format!("{}/browse/{}", client.base_url(), issue.key),
+                        });
+                    }
+                }
+            }
+            Err(_) => {
+                comment_errors += 1;
+            }
+        }
+
+        progress.inc(1);
+    }
+    progress.finish_and_clear();
+
+    entries.sort_by(|a, b| parse_jira_datetime(&b.created).cmp(&parse_jira_datetime(&a.created)));
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&entries)?);
+        return Ok(());
+    }
+
+    if entries.is_empty() {
+        println!("No Jira mentions found for the last {}.", since);
+        if comment_errors > 0 {
+            eprintln!(
+                "warning: failed to inspect comments on {} issue(s) during the scan",
+                comment_errors
+            );
+        }
+        return Ok(());
+    }
+
+    println!(
+        "{:<12} {:<18} {:<20} {:<22} {}",
+        "ISSUE", "SOURCE", "WHEN", "AUTHOR", "SUMMARY / EXCERPT"
+    );
+    println!("{}", "─".repeat(110));
+    for entry in &entries {
+        println!(
+            "{:<12} {:<18} {:<20} {:<22} {} — {}",
+            entry.issue_key,
+            truncate(&entry.source, 17),
+            truncate(&entry.created, 19),
+            truncate(entry.author.as_deref().unwrap_or("—"), 21),
+            truncate(&entry.summary, 32),
+            truncate(&entry.excerpt, 48),
+        );
+    }
+
+    println!("\nScanned {} recent issue(s) with JQL: {}", limit, jql);
+    if comment_errors > 0 {
+        eprintln!(
+            "warning: failed to inspect comments on {} issue(s) during the scan",
+            comment_errors
+        );
+    }
+
+    Ok(())
+}
+
+fn build_notifications_jql(project: Option<&str>, since: &str) -> String {
+    let since = since.trim();
+    if let Some(project) = project {
+        format!("project = {project} AND updated >= -{since} ORDER BY updated DESC")
+    } else {
+        format!("updated >= -{since} ORDER BY updated DESC")
+    }
+}
+
+fn notification_excerpt(raw: &str) -> String {
+    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        "(no preview)".to_string()
+    } else {
+        normalized
+    }
+}
+
+fn parse_jira_datetime(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }
 
 // ─── view ────────────────────────────────────────────────────────────────────

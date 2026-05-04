@@ -1,4 +1,5 @@
 # @mulham28/jirac npm package
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
 
 Install `jirac` from GitHub Releases using npm.
 

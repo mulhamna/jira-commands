@@ -6,6 +6,7 @@ A fast, polished Jira CLI and TUI built in Rust.
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
 [![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
 [![License: MIT%20OR%20Apache--2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
 
 `jirac` is an opinionated Jira terminal client for people who want terminal speed without giving up modern Jira workflows. It supports custom fields discovered at runtime, native attachment uploads, cursor-based pagination, Jira Cloud, and Jira Data Center.
 

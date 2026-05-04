@@ -1,8 +1,12 @@
+use std::collections::HashSet;
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, List, ListItem, Paragraph, Row, Table, Wrap},
+    widgets::{
+        Block, Borders, Cell, Clear, List, ListItem, ListState, Paragraph, Row, Table, Wrap,
+    },
     Frame,
 };
 
@@ -11,6 +15,7 @@ use super::column::format_column_summary;
 use super::modal::render_modal;
 use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
+use super::picker::PickerOption;
 use super::theme::{Palette, ThemeName};
 
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
@@ -739,87 +744,82 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palett
 }
 
 fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let popup_area = side_panel_rect(area);
-    let [input_area, list_area, hint_area] = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(4),
-        ])
-        .areas(popup_area);
-
-    let input = Paragraph::new(app.component_query.as_str())
-        .block(
-            Block::default()
-                .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-                .border_style(Style::default().fg(palette.focus_border))
-                .title(format!(
-                    " Components: {} ({}) ",
-                    app.component_issue_key, app.component_project_key
-                ))
-                .style(Style::default().bg(Color::Black)),
-        )
-        .style(Style::default().fg(palette.header_fg));
-
-    let items: Vec<ListItem> = app
-        .component_options
-        .iter()
-        .map(|option| {
-            let checked = if app.component_selected.contains(&option.value) {
-                "[x]"
-            } else {
-                "[ ]"
-            };
-            ListItem::new(format!("{checked} {}", option.label))
-        })
-        .collect();
-
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::LEFT | Borders::RIGHT)
-                .border_style(Style::default().fg(palette.focus_border))
-                .style(Style::default().bg(Color::Black)),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(palette.highlight)
-                .fg(palette.header_fg)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("> ");
-
-    let hints = Paragraph::new(vec![
-        Line::from("Type to filter project components"),
-        Line::from("↑/↓ move   Space toggle   Enter save"),
-        Line::from("Esc cancel"),
-    ])
-    .block(
-        Block::default()
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
-            .border_style(Style::default().fg(palette.focus_border))
-            .style(Style::default().bg(Color::Black)),
-    )
-    .style(Style::default().fg(palette.muted));
-
-    f.render_widget(Clear, popup_area);
-    f.render_widget(input, input_area);
-    f.render_stateful_widget(list, list_area, &mut app.component_state);
-    f.render_widget(hints, hint_area);
-
-    let before_cursor: String = app
-        .component_query
-        .chars()
-        .take(app.component_cursor)
-        .collect();
-    f.set_cursor_position((
-        input_area.x + 1 + before_cursor.len() as u16,
-        input_area.y + 1,
-    ));
+    let title = format!(
+        " Components: {} ({}) ",
+        app.component_issue_key, app.component_project_key
+    );
+    render_multi_select_picker_popup(
+        f,
+        area,
+        palette,
+        &app.component_query,
+        app.component_cursor,
+        &app.component_options.clone(),
+        &app.component_selected,
+        &mut app.component_state,
+        &title,
+        &[
+            "Type to filter project components",
+            "↑/↓ move   Space toggle   Enter save",
+            "Esc cancel",
+        ],
+    );
 }
 
 fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let title = format!(
+        " Fix Versions: {} ({}) ",
+        app.fix_version_issue_key, app.fix_version_project_key
+    );
+    render_multi_select_picker_popup(
+        f,
+        area,
+        palette,
+        &app.fix_version_query,
+        app.fix_version_cursor,
+        &app.fix_version_options.clone(),
+        &app.fix_version_selected,
+        &mut app.fix_version_state,
+        &title,
+        &[
+            "Type to filter project fix versions",
+            "↑/↓ move   Space toggle   Enter save",
+            "Esc cancel",
+        ],
+    );
+}
+
+fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let title = format!(" Sprint: {} ", app.sprint_issue_key);
+    render_single_select_picker_popup(
+        f,
+        area,
+        palette,
+        &app.sprint_query,
+        app.sprint_cursor,
+        &app.sprint_options.clone(),
+        &mut app.sprint_state,
+        &title,
+        &[
+            "Type to filter sprints",
+            "↑/↓ move   Enter assign   Esc cancel",
+        ],
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_multi_select_picker_popup(
+    f: &mut Frame,
+    area: Rect,
+    palette: Palette,
+    query: &str,
+    cursor: usize,
+    options: &[PickerOption],
+    selected: &HashSet<String>,
+    state: &mut ListState,
+    title: &str,
+    hint_lines: &[&str],
+) {
     let popup_area = side_panel_rect(area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -830,24 +830,20 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
         ])
         .areas(popup_area);
 
-    let input = Paragraph::new(app.fix_version_query.as_str())
+    let input = Paragraph::new(query)
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
                 .border_style(Style::default().fg(palette.focus_border))
-                .title(format!(
-                    " Fix Versions: {} ({}) ",
-                    app.fix_version_issue_key, app.fix_version_project_key
-                ))
+                .title(title.to_string())
                 .style(Style::default().bg(Color::Black)),
         )
         .style(Style::default().fg(palette.header_fg));
 
-    let items: Vec<ListItem> = app
-        .fix_version_options
+    let items: Vec<ListItem> = options
         .iter()
         .map(|option| {
-            let checked = if app.fix_version_selected.contains(&option.value) {
+            let checked = if selected.contains(&option.value) {
                 "[x]"
             } else {
                 "[ ]"
@@ -871,36 +867,40 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
         )
         .highlight_symbol("> ");
 
-    let hints = Paragraph::new(vec![
-        Line::from("Type to filter project fix versions"),
-        Line::from("↑/↓ move   Space toggle   Enter save"),
-        Line::from("Esc cancel"),
-    ])
-    .block(
-        Block::default()
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
-            .border_style(Style::default().fg(palette.focus_border))
-            .style(Style::default().bg(Color::Black)),
-    )
-    .style(Style::default().fg(palette.muted));
+    let hint_text: Vec<Line> = hint_lines.iter().map(|l| Line::from(*l)).collect();
+    let hints = Paragraph::new(hint_text)
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
     f.render_widget(input, input_area);
-    f.render_stateful_widget(list, list_area, &mut app.fix_version_state);
+    f.render_stateful_widget(list, list_area, state);
     f.render_widget(hints, hint_area);
 
-    let before_cursor: String = app
-        .fix_version_query
-        .chars()
-        .take(app.fix_version_cursor)
-        .collect();
+    let before_cursor: String = query.chars().take(cursor).collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,
     ));
 }
 
-fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+#[allow(clippy::too_many_arguments)]
+fn render_single_select_picker_popup(
+    f: &mut Frame,
+    area: Rect,
+    palette: Palette,
+    query: &str,
+    cursor: usize,
+    options: &[PickerOption],
+    state: &mut ListState,
+    title: &str,
+    hint_lines: &[&str],
+) {
     let popup_area = side_panel_rect(area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -911,18 +911,17 @@ fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
         ])
         .areas(popup_area);
 
-    let input = Paragraph::new(app.sprint_query.as_str())
+    let input = Paragraph::new(query)
         .block(
             Block::default()
                 .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
                 .border_style(Style::default().fg(palette.focus_border))
-                .title(format!(" Sprint: {} ", app.sprint_issue_key))
+                .title(title.to_string())
                 .style(Style::default().bg(Color::Black)),
         )
         .style(Style::default().fg(palette.header_fg));
 
-    let items: Vec<ListItem> = app
-        .sprint_options
+    let items: Vec<ListItem> = options
         .iter()
         .map(|option| ListItem::new(option.label.clone()))
         .collect();
@@ -942,24 +941,22 @@ fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
         )
         .highlight_symbol("> ");
 
-    let hints = Paragraph::new(vec![
-        Line::from("Type to filter sprints"),
-        Line::from("↑/↓ move   Enter assign   Esc cancel"),
-    ])
-    .block(
-        Block::default()
-            .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
-            .border_style(Style::default().fg(palette.focus_border))
-            .style(Style::default().bg(Color::Black)),
-    )
-    .style(Style::default().fg(palette.muted));
+    let hint_text: Vec<Line> = hint_lines.iter().map(|l| Line::from(*l)).collect();
+    let hints = Paragraph::new(hint_text)
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+                .border_style(Style::default().fg(palette.focus_border))
+                .style(Style::default().bg(Color::Black)),
+        )
+        .style(Style::default().fg(palette.muted));
 
     f.render_widget(Clear, popup_area);
     f.render_widget(input, input_area);
-    f.render_stateful_widget(list, list_area, &mut app.sprint_state);
+    f.render_stateful_widget(list, list_area, state);
     f.render_widget(hints, hint_area);
 
-    let before_cursor: String = app.sprint_query.chars().take(app.sprint_cursor).collect();
+    let before_cursor: String = query.chars().take(cursor).collect();
     f.set_cursor_position((
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,

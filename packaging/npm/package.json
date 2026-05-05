@@ -1,6 +1,6 @@
 {
   "name": "@mulham28/jirac",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "Install the jirac Jira CLI from GitHub Releases",
   "license": "MIT OR Apache-2.0",
   "repository": {

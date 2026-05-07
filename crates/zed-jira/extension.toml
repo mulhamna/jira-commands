@@ -1,0 +1,10 @@
+id = "jira"
+name = "Jira"
+version = "0.1.0"
+schema_version = 1
+authors = ["Mulham <mulhamna@gmail.com>"]
+description = "Jira MCP server for Zed — browse issues, run JQL, transition, create, and more via the Agent Panel."
+repository = "https://github.com/mulhamna/jira-commands"
+
+[context_servers.jira]
+name = "Jira"

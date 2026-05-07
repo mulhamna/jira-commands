@@ -79,12 +79,14 @@ jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
 jirac mcp install --client codex
 jirac mcp install --client generic-json
+jirac mcp install --client zed
 ```
 
 Notes:
 - `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows
 - `generic-json` prints a portable JSON snippet instead of writing a file
 - `cursor` remains provisional until verified in a real Cursor install
+- `zed` writes `context_servers.jira.settings` for the official Zed marketplace extension
 
 ## More docs
 

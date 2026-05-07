@@ -43,6 +43,7 @@ pub enum McpClient {
     GeminiCli,
     Codex,
     GenericJson,
+    Zed,
 }
 
 pub fn handle(command: McpCommand) -> Result<()> {
@@ -69,6 +70,10 @@ fn install_client(
     dry_run: bool,
     force: bool,
 ) -> Result<()> {
+    if matches!(client, McpClient::Zed) {
+        return install_zed_client(name, print, dry_run, force);
+    }
+
     let resolved_command = resolve_command_for_client(&client, command, dry_run)?;
     let spec = server_spec(name, &resolved_command, transport);
 
@@ -175,6 +180,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::GeminiCli,
             McpClient::Codex,
             McpClient::GenericJson,
+            McpClient::Zed,
         ],
     };
 
@@ -273,26 +279,30 @@ fn server_spec(name: &str, command: &str, transport: &str) -> ServerSpec {
 fn install_target(client: &McpClient) -> Result<InstallTarget> {
     let home = home_dir().context("Could not determine home directory")?;
 
-    let (label, path) = match client {
+    let (label, path, top_level_key) = match client {
         McpClient::ClaudeCode => (
             "claude-code",
             config_path_from_env_or_default("CLAUDE_CODE_CONFIG", home.join(".mcp.json")),
+            "mcpServers",
         ),
         McpClient::ClaudeDesktop => (
             "claude-desktop",
             config_path_from_env_or_default("CLAUDE_DESKTOP_CONFIG", home.join(".claude.json")),
+            "mcpServers",
         ),
         McpClient::Cursor => (
             "cursor",
             config_path_from_env_or_default("CURSOR_CONFIG", home.join(".cursor/mcp.json")),
+            "mcpServers",
         ),
         McpClient::GeminiCli | McpClient::Codex | McpClient::GenericJson => unreachable!(),
+        McpClient::Zed => ("zed", zed_settings_path(&home), "context_servers"),
     };
 
     Ok(InstallTarget {
         label,
         path,
-        top_level_key: "mcpServers".to_string(),
+        top_level_key: top_level_key.to_string(),
     })
 }
 
@@ -333,6 +343,13 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             label: "generic-json",
             note: "Prints a portable JSON snippet instead of writing a file.",
         },
+        McpClient::Zed => ClientDescriptor::FileTarget {
+            label: "zed",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.config/zed/settings.json")),
+            note: "Writes context_servers.jira.settings for the Zed marketplace extension.",
+        },
     }
 }
 
@@ -350,6 +367,104 @@ fn client_adapter(client: &McpClient) -> Option<ClientAdapter> {
         }),
         _ => None,
     }
+}
+
+fn install_zed_client(name: &str, print: bool, dry_run: bool, force: bool) -> Result<()> {
+    if name != "jira" {
+        bail!("Zed uses the fixed context server id `jira`; omit --name or pass --name jira.");
+    }
+
+    let target = install_target(&McpClient::Zed)?;
+    let mut root = load_json_object(&target.path)?;
+    let context_servers = ensure_object_field(&mut root, &target.top_level_key)?;
+    let entry = context_servers
+        .entry("jira".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+
+    let entry_map = match entry {
+        Value::Object(map) => map,
+        _ => bail!(
+            "Zed context_servers.jira entry at {} must be a JSON object",
+            target.path.display()
+        ),
+    };
+
+    let settings_map = ensure_object_field(entry_map, "settings")?;
+    let desired = zed_settings_from_jira_config(JiraConfig::load().unwrap_or_default());
+    let changed = merge_string_values(settings_map, &desired, force);
+    let snippet = zed_json_snippet(&desired);
+
+    if print || dry_run {
+        print_snippet(&snippet)?;
+    }
+
+    if dry_run {
+        println!(
+            "Dry run, no file written. Target: {}",
+            target.path.display()
+        );
+        return Ok(());
+    }
+
+    if !changed {
+        println!(
+            "Zed context server settings already up to date at {}",
+            target.path.display()
+        );
+        return Ok(());
+    }
+
+    backup_if_exists(&target.path)?;
+    write_json_object(&target.path, &root)?;
+    println!("Updated Zed Jira MCP settings at {}", target.path.display());
+    println!("Install the Jira extension from the Zed marketplace if it is not installed yet.");
+    Ok(())
+}
+
+fn zed_settings_from_jira_config(config: JiraConfig) -> Map<String, Value> {
+    let mut settings = Map::new();
+
+    if !config.base_url.trim().is_empty() {
+        settings.insert("jira_url".into(), Value::String(config.base_url));
+    }
+    if !config.email.trim().is_empty() {
+        settings.insert("jira_email".into(), Value::String(config.email));
+    }
+    if let Some(token) = config.token.filter(|token| !token.trim().is_empty()) {
+        settings.insert("jira_token".into(), Value::String(token));
+    }
+    if let Some(project) = config.project.filter(|project| !project.trim().is_empty()) {
+        settings.insert("default_project".into(), Value::String(project));
+    }
+
+    settings
+}
+
+fn zed_json_snippet(settings: &Map<String, Value>) -> Value {
+    json!({
+        "context_servers": {
+            "jira": {
+                "settings": settings
+            }
+        }
+    })
+}
+
+fn merge_string_values(
+    target: &mut Map<String, Value>,
+    desired: &Map<String, Value>,
+    force: bool,
+) -> bool {
+    let mut changed = false;
+
+    for (key, value) in desired {
+        if force || target.get(key) != Some(value) {
+            target.insert(key.clone(), value.clone());
+            changed = true;
+        }
+    }
+
+    changed
 }
 
 struct ClientAdapter {
@@ -424,6 +539,26 @@ fn config_path_from_env_or_default(env_key: &str, default: PathBuf) -> PathBuf {
 
 fn home_dir() -> Option<PathBuf> {
     env::var_os("HOME").map(PathBuf::from)
+}
+
+fn zed_settings_path(home: &Path) -> PathBuf {
+    if let Some(path) = env::var_os("ZED_SETTINGS_PATH") {
+        return PathBuf::from(path);
+    }
+
+    if cfg!(target_os = "macos") {
+        home.join("Library/Application Support/Zed/settings.json")
+    } else if cfg!(target_os = "windows") {
+        env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join("AppData/Roaming"))
+            .join("Zed/settings.json")
+    } else {
+        env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".config"))
+            .join("zed/settings.json")
+    }
 }
 
 fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
@@ -597,6 +732,45 @@ mod tests {
     fn resolve_command_path_finds_absolute_path() {
         let path = resolve_command_path("/bin/sh").unwrap();
         assert_eq!(path, PathBuf::from("/bin/sh"));
+    }
+
+    #[test]
+    fn zed_install_snippet_uses_context_servers() {
+        let settings = zed_settings_from_jira_config(JiraConfig {
+            base_url: "https://example.atlassian.net".into(),
+            email: "dev@example.com".into(),
+            token: Some("secret".into()),
+            project: Some("PROJ".into()),
+            ..JiraConfig::default()
+        });
+        let snippet = zed_json_snippet(&settings);
+        let rendered = serde_json::to_string_pretty(&snippet).unwrap();
+        assert!(rendered.contains("\"context_servers\""));
+        assert!(rendered.contains("\"jira_url\""));
+        assert!(rendered.contains("PROJ"));
+    }
+
+    #[test]
+    fn merge_string_values_only_overwrites_requested_keys() {
+        let mut target = Map::new();
+        target.insert(
+            "jira_url".into(),
+            Value::String("https://old.example".into()),
+        );
+        target.insert("other".into(), Value::String("keep".into()));
+
+        let mut desired = Map::new();
+        desired.insert(
+            "jira_url".into(),
+            Value::String("https://new.example".into()),
+        );
+
+        assert!(merge_string_values(&mut target, &desired, false));
+        assert_eq!(
+            target.get("jira_url").and_then(Value::as_str),
+            Some("https://new.example")
+        );
+        assert_eq!(target.get("other").and_then(Value::as_str), Some("keep"));
     }
 
     #[test]

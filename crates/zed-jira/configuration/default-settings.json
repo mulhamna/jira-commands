@@ -1,0 +1,6 @@
+{
+  "jira_url": "https://yourcompany.atlassian.net",
+  "jira_email": "you@example.com",
+  "jira_token": "<JIRA_API_TOKEN>",
+  "default_project": "MYPROJ"
+}

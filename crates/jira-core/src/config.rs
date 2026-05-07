@@ -470,6 +470,27 @@ timeout_secs = 55
     }
 
     #[test]
+    fn loads_from_env_without_config_file() {
+        let _guard = env_lock().lock().expect("env lock");
+        let temp_dir = TempDir::new().expect("tempdir");
+        clear_config_home();
+        set_config_home(&temp_dir);
+
+        std::env::set_var("JIRA_URL", "https://env-only.atlassian.net");
+        std::env::set_var("JIRA_EMAIL", "env@example.com");
+        std::env::set_var("JIRA_TOKEN", "env-secret");
+        std::env::set_var("JIRA_PROJECT", "ENV");
+
+        let config = JiraConfig::load().expect("load env-only");
+        assert_eq!(config.base_url, "https://env-only.atlassian.net");
+        assert_eq!(config.email, "env@example.com");
+        assert_eq!(config.token.as_deref(), Some("env-secret"));
+        assert_eq!(config.project.as_deref(), Some("ENV"));
+
+        clear_config_home();
+    }
+
+    #[test]
     fn loads_named_profile_and_applies_env_overrides() {
         let _guard = env_lock().lock().expect("env lock");
         let temp_dir = TempDir::new().expect("tempdir");

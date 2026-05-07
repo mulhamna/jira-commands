@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.33.0](https://github.com/mulhamna/jira-commands/compare/v0.32.0...v0.33.0) (2026-05-07)
+
+
+### Features
+
+* **tui:** improve notifications and scorecard refresh ([#221](https://github.com/mulhamna/jira-commands/issues/221)) ([5915bb6](https://github.com/mulhamna/jira-commands/commit/5915bb683e9b84302a95fd71a014a17ff09b37c4))
+
 ## [0.32.0](https://github.com/mulhamna/jira-commands/compare/v0.31.0...v0.32.0) (2026-05-04)
 
 

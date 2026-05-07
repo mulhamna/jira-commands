@@ -4,17 +4,17 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 
 ## Supported install paths
 
-| Method               | macOS | Linux | Windows | Notes                                  |
-| -------------------- | ----- | ----- | ------- | -------------------------------------- |
-| Homebrew             | ✅     | ✅     | No      | `jira-commands` and `jira-mcp` via `mulhamna/tap` |
-| Install script       | ✅     | ✅     | No      | Downloads latest release asset         |
-| PowerShell installer | ❌     | ❌     | ✅       | Installs `jirac.exe` to user-local bin |
-| Cargo                | ✅     | ✅     | ✅       | Best for Rust users                    |
-| npm                  | ✅     | ✅     | ✅       | Downloads prebuilt release binary      |
-| GitHub Releases      | ✅     | ✅     | ✅       | Manual download of archives/binaries   |
-| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |
-| Winget               | ❌     | ❌     | ✅       | Windows package manager                |
-| Chocolatey           | ❌     | ❌     | ✅       | Windows package manager                |
+| Method               | macOS | Linux | Windows | Notes                                           |
+| -------------------- | ----- | ----- | ------- | ----------------------------------------------- |
+| Homebrew             | ✅    | ✅    | ❌      | `jira-commands` and `jira-mcp` via `mulhamna/tap` |
+| Install script       | ✅    | ✅    | ❌      | Downloads latest release asset                  |
+| PowerShell installer | ❌    | ❌    | ✅      | Installs `jirac.exe` to user-local bin          |
+| Cargo                | ✅    | ✅    | ✅      | Best for Rust users                             |
+| npm                  | ✅    | ✅    | ✅      | Downloads prebuilt release binary               |
+| GitHub Releases      | ✅    | ✅    | ✅      | Manual download of archives/binaries            |
+| Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket`           |
+| Winget               | ❌    | ❌    | ✅      | Windows package manager                         |
+| Chocolatey           | ❌    | ❌    | ✅      | Windows package manager                         |
 
 ## Homebrew (macOS / Linux)
 
@@ -102,16 +102,15 @@ Preferred archives:
 
 ## Winget (Windows)
 
+```powershell
+winget install mulhamna.jirac
+```
+
 If you prefer Scoop, use the custom bucket instead:
 
 ```powershell
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac
-```
-
-
-```powershell
-winget install mulhamna.jirac
 ```
 
 ## Chocolatey (Windows)

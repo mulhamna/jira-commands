@@ -11,8 +11,25 @@ Jira on the command line.
 
 `jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
-![jirac TUI preview](assets/readme/sample_tui.jpeg)
-![jirac TUI Split preview](assets/readme/sample_tui_split.jpeg)
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <img src="assets/readme/sample_tui.jpeg" alt="jirac TUI issue list preview" />
+      <br />
+      <sub><strong>TUI issue list</strong></sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="assets/readme/sample_tui_split.jpeg" alt="jirac split master-detail TUI preview" />
+      <br />
+      <sub><strong>Split master-detail</strong></sub>
+    </td>
+    <td width="33%" align="center">
+      <img src="assets/readme/sample-jql.jpeg" alt="jirac interactive JQL builder preview" />
+      <br />
+      <sub><strong>Interactive JQL builder</strong></sub>
+    </td>
+  </tr>
+</table>
 
 ## Highlights
 

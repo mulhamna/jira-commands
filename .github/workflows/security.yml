@@ -86,9 +86,10 @@ jobs:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only run on push to main — scorecard needs write access not available to
-    # fork PRs, and the results are repo-level, not per-PR.
-    if: github.event_name == 'push' || github.event_name == 'schedule'
+    # Only run on trusted repo events — scorecard needs write access not available to
+    # fork PRs, and the results are repo-level, not per-PR. Include manual
+    # workflow_dispatch so maintainers can refresh Scorecard after settings changes.
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       security-events: write  # upload SARIF to Security tab

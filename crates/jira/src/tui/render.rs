@@ -133,7 +133,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  n:mentions  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -1166,6 +1166,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  o         Open issue in browser"),
         Line::from("  r         Refresh list"),
         Line::from("  n         Scan and open Jira mention notifications"),
+        Line::from("  R         Mark selected notification issue as read"),
         Line::from("  /         Search with JQL"),
         Line::from("  ?         Show help"),
         Line::from("  q         Quit the TUI"),

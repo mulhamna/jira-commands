@@ -14,6 +14,7 @@ pub(super) enum ThemeName {
     Monokai,
     Ayu,
     RosePine,
+    Kanagawa,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,10 +44,11 @@ impl ThemeName {
             ThemeName::Monokai => "Monokai",
             ThemeName::Ayu => "Ayu Dark",
             ThemeName::RosePine => "Rosé Pine",
+            ThemeName::Kanagawa => "Kanagawa Wave",
         }
     }
 
-    pub(super) const ALL: [ThemeName; 11] = [
+    pub(super) const ALL: [ThemeName; 12] = [
         ThemeName::Default,
         ThemeName::Dracula,
         ThemeName::Nord,
@@ -58,6 +60,7 @@ impl ThemeName {
         ThemeName::Monokai,
         ThemeName::Ayu,
         ThemeName::RosePine,
+        ThemeName::Kanagawa,
     ];
 
     pub(super) fn palette(self) -> Palette {
@@ -182,6 +185,17 @@ impl ThemeName {
                 highlight: Color::Rgb(38, 35, 58),
                 tab_active: Color::Rgb(246, 193, 119),
                 tab_inactive: Color::Rgb(110, 106, 134),
+            },
+            ThemeName::Kanagawa => Palette {
+                header_fg: Color::Rgb(220, 215, 186),
+                header_bg: Color::Rgb(31, 31, 40),
+                accent: Color::Rgb(126, 156, 216),
+                muted: Color::Rgb(114, 115, 126),
+                focus_border: Color::Rgb(149, 127, 184),
+                blur_border: Color::Rgb(54, 54, 68),
+                highlight: Color::Rgb(42, 42, 55),
+                tab_active: Color::Rgb(230, 195, 132),
+                tab_inactive: Color::Rgb(114, 115, 126),
             },
         }
     }

@@ -75,6 +75,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('r') => AppAction::Refresh,
         KeyCode::Char('t') => AppAction::FetchTransitions,
         KeyCode::Char('n') => AppAction::OpenNotifications,
+        KeyCode::Char('R') => AppAction::MarkNotificationsRead,
         KeyCode::Char('o') => AppAction::OpenBrowser,
         KeyCode::Char('/') => {
             app.search_input = app.jql.clone();
@@ -200,6 +201,7 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Char('t') => AppAction::FetchTransitions,
+        KeyCode::Char('R') => AppAction::MarkNotificationsRead,
         KeyCode::Char('o') => AppAction::OpenBrowser,
         KeyCode::Char('?') => {
             app.mode = Mode::Help;

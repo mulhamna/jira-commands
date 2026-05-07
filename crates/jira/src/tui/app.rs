@@ -160,6 +160,7 @@ pub(super) enum AppAction {
     ExecuteTransition(String, String),
     OpenBrowser,
     OpenNotifications,
+    MarkNotificationsRead,
     CreateIssue,
     EditIssue(String),
     AssignIssue(String),
@@ -424,19 +425,28 @@ impl App {
         }
     }
 
+    pub(super) fn mark_selected_notifications_read(&mut self) -> Result<usize> {
+        let Some(key) = self.selected_issue_key() else {
+            return Ok(0);
+        };
+        if self.notification_entries.is_empty() {
+            return Ok(0);
+        }
+
+        let changed = mark_notifications_read(&mut self.notification_entries, &key)?;
+        if changed > 0 {
+            self.set_issue_list(notification_issues(&self.notification_entries));
+        }
+        Ok(changed)
+    }
+
     pub(super) fn open_detail(&mut self) {
-        if let Some(key) = self.selected_issue_key() {
-            if !self.notification_entries.is_empty() {
-                match mark_notifications_read(&mut self.notification_entries, &key) {
-                    Ok(changed) if changed > 0 => {
-                        self.set_issue_list(notification_issues(&self.notification_entries));
-                    }
-                    Ok(_) => {}
-                    Err(err) => {
-                        self.set_status(format!("Failed to mark notifications read: {err}"), true)
-                    }
-                }
+        match self.mark_selected_notifications_read() {
+            Ok(changed) if changed > 0 => {
+                self.set_status(format!("✓ Marked {changed} notification(s) read"), false);
             }
+            Ok(_) => {}
+            Err(err) => self.set_status(format!("Failed to mark notifications read: {err}"), true),
         }
         self.focus = Focus::Detail;
         self.ensure_detail_context();
@@ -804,6 +814,16 @@ pub async fn run_tui(
                 }
             }
 
+            AppAction::MarkNotificationsRead => match app.mark_selected_notifications_read() {
+                Ok(changed) if changed > 0 => {
+                    app.set_status(format!("✓ Marked {changed} notification(s) read"), false)
+                }
+                Ok(_) => app.set_status("No unread notifications on selected issue", false),
+                Err(err) => {
+                    app.set_status(format!("Failed to mark notifications read: {err}"), true)
+                }
+            },
+
             AppAction::OpenNotifications => {
                 let fallback_jql = build_notifications_jql(app.default_project.as_deref(), "7d");
                 app.set_status("Scanning Jira mentions...", false);
@@ -882,9 +902,20 @@ pub async fn run_tui(
 
             AppAction::OpenBrowser => {
                 if let Some(issue) = app.selected_issue() {
-                    let url = format!("{}/browse/{}", app.base_url, issue.key);
+                    let issue_key = issue.key.clone();
+                    let url = format!("{}/browse/{}", app.base_url, issue_key);
                     let _ = open::that(&url);
-                    app.set_status(format!("Opened {}", issue.key), false);
+                    match app.mark_selected_notifications_read() {
+                        Ok(changed) if changed > 0 => app.set_status(
+                            format!("Opened {issue_key}; marked {changed} notification(s) read"),
+                            false,
+                        ),
+                        Ok(_) => app.set_status(format!("Opened {issue_key}"), false),
+                        Err(err) => app.set_status(
+                            format!("Opened {issue_key}; failed to mark read: {err}"),
+                            true,
+                        ),
+                    }
                 }
             }
 

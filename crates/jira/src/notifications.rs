@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
+    sync::Arc,
 };
 
 use anyhow::{Context, Result};
@@ -123,6 +124,9 @@ pub async fn scan_mention_notifications(
     let mut entries = Vec::new();
     let mut comment_errors = 0usize;
     let scanned_issues = result.issues.len();
+    let base_url = client.base_url().to_string();
+    let mut comment_tasks = tokio::task::JoinSet::new();
+    let comment_scan_limit = Arc::new(tokio::sync::Semaphore::new(8));
 
     for issue in result.issues {
         if let Some(description) = issue.description.as_ref() {
@@ -138,13 +142,31 @@ pub async fn scan_mention_notifications(
                     author: issue.reporter.clone(),
                     created: issue.updated.clone(),
                     excerpt: notification_excerpt(&adf_to_text(description)),
-                    url: format!("{}/browse/{}", client.base_url(), issue.key),
+                    url: format!("{base_url}/browse/{}", issue.key),
                     read: read_state.read_ids.contains(&id),
                 });
             }
         }
 
-        match client.get_comments(&issue.key).await {
+        let issue_for_comments = issue.clone();
+        let client_for_comments = client.clone();
+        let comment_scan_limit = Arc::clone(&comment_scan_limit);
+        comment_tasks.spawn(async move {
+            let _permit = comment_scan_limit.acquire_owned().await.ok();
+            let comments = client_for_comments
+                .get_comments(&issue_for_comments.key)
+                .await;
+            (issue_for_comments, comments)
+        });
+    }
+
+    while let Some(joined) = comment_tasks.join_next().await {
+        let Ok((issue, comments)) = joined else {
+            comment_errors += 1;
+            continue;
+        };
+
+        match comments {
             Ok(comments) => {
                 for comment in comments {
                     if comment.author_account_id.as_deref() == Some(account_id.as_str()) {
@@ -164,7 +186,7 @@ pub async fn scan_mention_notifications(
                             author: comment.author.clone(),
                             created: comment.created.clone(),
                             excerpt: notification_excerpt(comment.body.as_deref().unwrap_or("")),
-                            url: format!("{}/browse/{}", client.base_url(), issue.key),
+                            url: format!("{base_url}/browse/{}", issue.key),
                             read: read_state.read_ids.contains(&id),
                         });
                     }

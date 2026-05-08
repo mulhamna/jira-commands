@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
     notifications::scan_mention_notifications,
-    version_insights::load_issue_version_insight,
+    version_insights::{extract_fix_versions, load_issue_version_insight},
 };
 use anyhow::{Context, Result};
 use clap::Subcommand;
@@ -78,12 +78,48 @@ pub enum IssueCommand {
     /// Displays: type, status, project, priority, assignee, reporter,
     /// created/updated timestamps, attachment list, and rendered description.
     ///
+    /// Use --versions when you also want fix-version backlog preview for the
+    /// issue's current project/version assignment.
+    ///
     /// Examples:
     ///   jirac issue view PROJ-123
+    ///   jirac issue view PROJ-123 --versions
+    ///   jirac issue view PROJ-123 --versions --version-limit 10
     ///   jirac issue view PROJ-123 --json
     View {
         /// Issue key (e.g. PROJ-123)
         key: String,
+        /// Include fix-version backlog preview for this issue
+        #[arg(long)]
+        versions: bool,
+        /// Maximum number of backlog issues to preview per fix version
+        #[arg(long, default_value = "5", value_name = "N")]
+        version_limit: u32,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Browse project fix versions and optionally preview backlog items
+    ///
+    /// Without --version, lists fix versions for the project.
+    /// With --version, shows open backlog items assigned to that fix version.
+    ///
+    /// Examples:
+    ///   jirac issue versions -p PROJ
+    ///   jirac issue versions -p PROJ --version "v1.2.0"
+    ///   jirac issue versions -p PROJ --version "v1.2.0" --limit 15
+    #[command(name = "versions")]
+    Versions {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Specific fix version name to inspect
+        #[arg(long, value_name = "VERSION")]
+        version: Option<String>,
+        /// Maximum number of backlog issues to preview (default: 10)
+        #[arg(short, long, default_value = "10", value_name = "N")]
+        limit: u32,
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -803,7 +839,18 @@ pub async fn handle(
             limit,
             json,
         } => notifications(client, project.or(default_project), since, limit, json).await,
-        IssueCommand::View { key, json } => view_issue(client, key, json).await,
+        IssueCommand::View {
+            key,
+            versions,
+            version_limit,
+            json,
+        } => view_issue(client, key, versions, version_limit, json).await,
+        IssueCommand::Versions {
+            project,
+            version,
+            limit,
+            json,
+        } => view_project_versions(client, project.or(default_project), version, limit, json).await,
         IssueCommand::Create {
             project,
             summary,
@@ -1066,7 +1113,13 @@ async fn notifications(
 
 // ─── view ────────────────────────────────────────────────────────────────────
 
-async fn view_issue(client: JiraClient, key: String, json: bool) -> Result<()> {
+async fn view_issue(
+    client: JiraClient,
+    key: String,
+    versions: bool,
+    version_limit: u32,
+    json: bool,
+) -> Result<()> {
     let spinner = spinner_new(format!("Fetching {key}..."));
     let issue = client
         .get_issue(&key)
@@ -1104,61 +1157,22 @@ async fn view_issue(client: JiraClient, key: String, json: bool) -> Result<()> {
         &issue.updated[..10.min(issue.updated.len())]
     );
 
-    let version_insight = load_issue_version_insight(&client, &key, 5).await.ok();
-    if let Some(insight) = &version_insight {
-        if !insight.issue_fix_versions.is_empty() {
-            println!();
-            println!("  Fix Versions:");
-            for version_name in &insight.issue_fix_versions {
-                if let Some(version) = insight
-                    .project_versions
-                    .iter()
-                    .find(|version| version.name == *version_name)
-                {
-                    let mut badges = Vec::new();
-                    if version.archived {
-                        badges.push("archived".to_string());
-                    } else if version.released {
-                        badges.push("released".to_string());
-                    } else {
-                        badges.push("unreleased".to_string());
-                    }
-                    if let Some(date) = version.release_date.as_deref() {
-                        badges.push(format!("release {}", &date[..10.min(date.len())]));
-                    }
-                    if badges.is_empty() {
-                        println!("    • {}", version.name);
-                    } else {
-                        println!("    • {} ({})", version.name, badges.join(", "));
-                    }
-                } else {
-                    println!("    • {version_name}");
-                }
+    let fix_versions = extract_fix_versions(&issue.fields);
+    if !fix_versions.is_empty() {
+        println!();
+        println!("  Fix Versions: {}", fix_versions.join(", "));
+    }
 
-                if let Some(preview) = insight
-                    .previews
-                    .iter()
-                    .find(|preview| preview.version.name == *version_name)
-                {
-                    println!("      Open backlog: {}", preview.total_open);
-                    if preview.issues.is_empty() {
-                        println!("        ✓ No open backlog items");
-                    } else {
-                        for backlog_issue in &preview.issues {
-                            println!(
-                                "        - {} [{}] {}",
-                                backlog_issue.key, backlog_issue.status, backlog_issue.summary
-                            );
-                        }
-                        if preview.total_open > preview.issues.len() as u64 {
-                            println!(
-                                "        … {} more",
-                                preview
-                                    .total_open
-                                    .saturating_sub(preview.issues.len() as u64)
-                            );
-                        }
-                    }
+    if versions {
+        let version_insight = load_issue_version_insight(&client, &key, version_limit)
+            .await
+            .ok();
+        if let Some(insight) = &version_insight {
+            if !insight.issue_fix_versions.is_empty() {
+                println!();
+                println!("  Fix Version Backlog Preview:");
+                for version_name in &insight.issue_fix_versions {
+                    print_version_summary(version_name, insight);
                 }
             }
         }
@@ -1184,6 +1198,175 @@ async fn view_issue(client: JiraClient, key: String, json: bool) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn print_version_summary(
+    version_name: &str,
+    insight: &crate::version_insights::IssueVersionInsight,
+) {
+    if let Some(version) = insight
+        .project_versions
+        .iter()
+        .find(|version| version.name == *version_name)
+    {
+        let mut badges = Vec::new();
+        if version.archived {
+            badges.push("archived".to_string());
+        } else if version.released {
+            badges.push("released".to_string());
+        } else {
+            badges.push("unreleased".to_string());
+        }
+        if let Some(date) = version.release_date.as_deref() {
+            badges.push(format!("release {}", &date[..10.min(date.len())]));
+        }
+        if badges.is_empty() {
+            println!("    • {}", version.name);
+        } else {
+            println!("    • {} ({})", version.name, badges.join(", "));
+        }
+    } else {
+        println!("    • {version_name}");
+    }
+
+    if let Some(preview) = insight
+        .previews
+        .iter()
+        .find(|preview| preview.version.name == *version_name)
+    {
+        println!("      Open backlog: {}", preview.total_open);
+        if preview.issues.is_empty() {
+            println!("        ✓ No open backlog items");
+        } else {
+            for backlog_issue in &preview.issues {
+                println!(
+                    "        - {} [{}] {}",
+                    backlog_issue.key, backlog_issue.status, backlog_issue.summary
+                );
+            }
+            if preview.total_open > preview.issues.len() as u64 {
+                println!(
+                    "        … {} more",
+                    preview
+                        .total_open
+                        .saturating_sub(preview.issues.len() as u64)
+                );
+            }
+        }
+    }
+}
+
+async fn view_project_versions(
+    client: JiraClient,
+    project: Option<String>,
+    version: Option<String>,
+    limit: u32,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let mut versions = client.get_project_versions(&project_key).await?;
+    versions.sort_by_key(|version| {
+        (
+            if version.archived {
+                2
+            } else if version.released {
+                1
+            } else {
+                0
+            },
+            version.release_date.clone().unwrap_or_default(),
+            version.name.to_lowercase(),
+        )
+    });
+
+    if let Some(version_name) = version {
+        let jql = format!(
+            "project = \"{}\" AND fixVersion = \"{}\" AND statusCategory != Done ORDER BY updated DESC",
+            project_key.replace('\\', "\\\\").replace('"', "\\\""),
+            version_name.replace('\\', "\\\\").replace('"', "\\\""),
+        );
+        let backlog = client.search_issues(&jql, None, Some(limit)).await?;
+        let version_meta = versions
+            .iter()
+            .find(|item| item.name == version_name)
+            .cloned();
+
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "project": project_key,
+                    "version": version_name,
+                    "meta": version_meta,
+                    "total_open": backlog.total.unwrap_or(backlog.issues.len() as u64),
+                    "issues": backlog.issues,
+                }))?
+            );
+            return Ok(());
+        }
+
+        println!("Fix version backlog — {} / {}", project_key, version_name);
+        if let Some(meta) = version_meta {
+            let status = if meta.archived {
+                "archived"
+            } else if meta.released {
+                "released"
+            } else {
+                "unreleased"
+            };
+            println!("  Status: {status}");
+            if let Some(date) = meta.release_date {
+                println!("  Release: {}", &date[..10.min(date.len())]);
+            }
+        }
+        println!(
+            "  Open backlog: {}",
+            backlog.total.unwrap_or(backlog.issues.len() as u64)
+        );
+        println!();
+        if backlog.issues.is_empty() {
+            println!("  ✓ No open backlog items");
+        } else {
+            for issue in backlog.issues {
+                println!("  - {} [{}] {}", issue.key, issue.status, issue.summary);
+            }
+        }
+        return Ok(());
+    }
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&versions)?);
+        return Ok(());
+    }
+
+    println!("Project fix versions — {}", project_key);
+    println!();
+    for version in &versions {
+        let status = if version.archived {
+            "archived"
+        } else if version.released {
+            "released"
+        } else {
+            "unreleased"
+        };
+        if let Some(date) = version.release_date.as_deref() {
+            println!(
+                "  • {} [{} | release {}]",
+                version.name,
+                status,
+                &date[..10.min(date.len())]
+            );
+        } else {
+            println!("  • {} [{}]", version.name, status);
+        }
+    }
+    println!();
+    println!(
+        "Tip: run `jirac issue versions -p {} --version \"<name>\"` to preview backlog for one fix version.",
+        project_key
+    );
     Ok(())
 }
 

@@ -165,7 +165,7 @@ Supported targets now:
 - `gemini-cli` (delegates to `gemini mcp add -s user ...`)
 - `codex` (delegates to `codex mcp add ...`)
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
-- `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension)
+- `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension published from <https://github.com/mulhamna/jirac-ext>)
 
 Helpful flags:
 - `--print` prints the JSON snippet or delegated client command first

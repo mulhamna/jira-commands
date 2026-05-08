@@ -104,6 +104,10 @@ jirac issue list
 
 # View an issue
 jirac issue view PROJ-123
+jirac issue view PROJ-123 --versions
+
+# Browse project fix versions
+jirac issue versions -p PROJ --version "v1.2.0"
 
 # Create an issue (interactive)
 jirac issue create -p PROJ
@@ -125,6 +129,9 @@ jirac issue list -p PROJ                            # by project
 jirac issue list --jql "status = 'In Progress'"     # custom JQL
 
 jirac issue view PROJ-123                           # view detail
+jirac issue view PROJ-123 --versions                # include fix-version backlog preview
+jirac issue versions -p PROJ                        # list project fix versions
+jirac issue versions -p PROJ --version "v1.2.0"    # preview backlog for one fix version
 jirac issue create -p PROJ                          # create (interactive)
 jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
 jirac issue render --input desc.md                  # preview Markdown -> ADF JSON

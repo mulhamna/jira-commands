@@ -1243,7 +1243,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         )),
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
-        Line::from("  Summary / Comments / Worklog / Attachments / Subtasks / Links"),
+        Line::from("  Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links"),
         Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
         Line::from(""),
         Line::from(Span::styled(

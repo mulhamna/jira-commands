@@ -1,0 +1,48 @@
+name: Zed extension compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'crates/zed-jira/**'
+      - 'crates/jira-mcp/**'
+      - '.github/workflows/release-tag.yml'
+      - '.github/workflows/release-recover.yml'
+      - '.github/workflows/zed-extension-compat.yml'
+      - '.github/workflows/zed-extension-mirror.yml'
+      - 'scripts/check-zed-compat.sh'
+      - 'scripts/sync-jirac-ext.sh'
+      - 'docs/zed-extension-compat.md'
+      - 'README.md'
+      - 'INSTALL.md'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/zed-jira/**'
+      - 'crates/jira-mcp/**'
+      - '.github/workflows/release-tag.yml'
+      - '.github/workflows/release-recover.yml'
+      - '.github/workflows/zed-extension-compat.yml'
+      - '.github/workflows/zed-extension-mirror.yml'
+      - 'scripts/check-zed-compat.sh'
+      - 'scripts/sync-jirac-ext.sh'
+      - 'docs/zed-extension-compat.md'
+      - 'README.md'
+      - 'INSTALL.md'
+  workflow_dispatch:
+
+concurrency:
+  group: zed-extension-compat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compat-check:
+    name: Check Zed wrapper compatibility contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run compatibility checks
+        run: ./scripts/check-zed-compat.sh

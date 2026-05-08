@@ -783,12 +783,15 @@ impl JiraClient {
     }
 
     /// List fix versions available within a project.
-    pub async fn get_project_versions(&self, project_key: &str) -> Result<Vec<Value>> {
+    pub async fn get_project_versions(
+        &self,
+        project_key: &str,
+    ) -> Result<Vec<crate::model::ProjectVersion>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/project/{project_key}/versions"));
 
         let http = &self.http;
-        let versions: Vec<Value> = self
+        let versions: Vec<crate::model::ProjectVersion> = self
             .request(|| http.get(&url).headers(headers.clone()))
             .await?;
 

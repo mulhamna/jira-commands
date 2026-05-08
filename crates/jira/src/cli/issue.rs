@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
     notifications::scan_mention_notifications,
+    version_insights::load_issue_version_insight,
 };
 use anyhow::{Context, Result};
 use clap::Subcommand;
@@ -1102,6 +1103,66 @@ async fn view_issue(client: JiraClient, key: String, json: bool) -> Result<()> {
         "  Updated:    {}",
         &issue.updated[..10.min(issue.updated.len())]
     );
+
+    let version_insight = load_issue_version_insight(&client, &key, 5).await.ok();
+    if let Some(insight) = &version_insight {
+        if !insight.issue_fix_versions.is_empty() {
+            println!();
+            println!("  Fix Versions:");
+            for version_name in &insight.issue_fix_versions {
+                if let Some(version) = insight
+                    .project_versions
+                    .iter()
+                    .find(|version| version.name == *version_name)
+                {
+                    let mut badges = Vec::new();
+                    if version.archived {
+                        badges.push("archived".to_string());
+                    } else if version.released {
+                        badges.push("released".to_string());
+                    } else {
+                        badges.push("unreleased".to_string());
+                    }
+                    if let Some(date) = version.release_date.as_deref() {
+                        badges.push(format!("release {}", &date[..10.min(date.len())]));
+                    }
+                    if badges.is_empty() {
+                        println!("    • {}", version.name);
+                    } else {
+                        println!("    • {} ({})", version.name, badges.join(", "));
+                    }
+                } else {
+                    println!("    • {version_name}");
+                }
+
+                if let Some(preview) = insight
+                    .previews
+                    .iter()
+                    .find(|preview| preview.version.name == *version_name)
+                {
+                    println!("      Open backlog: {}", preview.total_open);
+                    if preview.issues.is_empty() {
+                        println!("        ✓ No open backlog items");
+                    } else {
+                        for backlog_issue in &preview.issues {
+                            println!(
+                                "        - {} [{}] {}",
+                                backlog_issue.key, backlog_issue.status, backlog_issue.summary
+                            );
+                        }
+                        if preview.total_open > preview.issues.len() as u64 {
+                            println!(
+                                "        … {} more",
+                                preview
+                                    .total_open
+                                    .saturating_sub(preview.issues.len() as u64)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if !issue.attachments.is_empty() {
         println!();

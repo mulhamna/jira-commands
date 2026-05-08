@@ -3,3 +3,4 @@ pub mod datetime;
 pub mod notifications;
 pub mod tui;
 pub mod version_check;
+pub mod version_insights;

@@ -39,6 +39,8 @@ jirac auth login
 jirac auth profiles
 jirac issue list
 jirac issue view MYPROJ-123
+jirac issue view MYPROJ-123 --versions
+jirac issue versions -p MYPROJ --version "v1.2.0"
 jirac issue create -p MYPROJ
 jirac issue render --input desc.md
 jirac tui -p MYPROJ

@@ -104,6 +104,10 @@ jirac issue list
 
 # View an issue
 jirac issue view PROJ-123
+jirac issue view PROJ-123 --versions
+
+# Browse project fix versions
+jirac issue versions -p PROJ --version "v1.2.0"
 
 # Create an issue (interactive)
 jirac issue create -p PROJ
@@ -125,6 +129,9 @@ jirac issue list -p PROJ                            # by project
 jirac issue list --jql "status = 'In Progress'"     # custom JQL
 
 jirac issue view PROJ-123                           # view detail
+jirac issue view PROJ-123 --versions                # include fix-version backlog preview
+jirac issue versions -p PROJ                        # list project fix versions
+jirac issue versions -p PROJ --version "v1.2.0"    # preview backlog for one fix version
 jirac issue create -p PROJ                          # create (interactive)
 jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
 jirac issue render --input desc.md                  # preview Markdown -> ADF JSON
@@ -270,7 +277,7 @@ export JIRA_TOKEN=your_api_token
 
 Use `jirac mcp install --client <target>` to register `jirac-mcp` with supported clients, or `jirac mcp doctor` to check prerequisites.
 
-Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, generic JSON snippets, and Zed. Zed uses the official `Jira` marketplace extension and `jirac mcp install --client zed` seeds `context_servers.jira.settings` in `settings.json`.
+Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, generic JSON snippets, and Zed. Zed uses the official `Jira` marketplace extension from <https://github.com/mulhamna/jirac-ext>, while `jirac mcp install --client zed` seeds `context_servers.jira.settings` in `settings.json`.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 
@@ -319,7 +326,7 @@ crates/
   jira-core/   # shared client, models, config, auth
   jira/        # CLI app
   jira-mcp/    # MCP server
-  zed-jira/    # Zed extension wrapper for jirac-mcp
+  zed-jira/    # Source-of-truth wrapper code mirrored into github.com/mulhamna/jirac-ext
 assets/        # screenshots and images
 packaging/     # release/install packaging
 ```

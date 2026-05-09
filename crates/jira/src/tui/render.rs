@@ -17,6 +17,7 @@ use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
 use super::picker::PickerOption;
 use super::theme::{Palette, ThemeName};
+use super::version_format::{backlog_preview_lines, project_versions_preview};
 
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
@@ -280,6 +281,7 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
 
     let body = match app.active_tab {
         DetailTab::Summary => build_summary_lines(issue, palette),
+        DetailTab::Versions => build_version_lines(app, palette),
         DetailTab::Comments => build_comment_lines(app, palette),
         DetailTab::Worklog => build_worklog_lines(app, palette),
         DetailTab::Attachments => build_attachment_lines(issue),
@@ -348,6 +350,70 @@ fn build_summary_lines(issue: &jira_core::model::Issue, palette: Palette) -> Vec
                 lines.push(Line::from(format!("  {line}")));
             }
         }
+    }
+
+    lines
+}
+
+fn build_version_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
+    let Some(insight) = &app.detail.version_insight else {
+        return build_placeholder_lines("Versions", "Loading fix version insight...");
+    };
+
+    let mut lines: Vec<Line<'static>> = vec![
+        owned_field_line("Issue", insight.issue_key.clone(), palette),
+        owned_field_line("Project", insight.project_key.clone(), palette),
+    ];
+
+    let current = if insight.issue_fix_versions.is_empty() {
+        "—".to_string()
+    } else {
+        insight.issue_fix_versions.join(", ")
+    };
+    lines.push(owned_field_line("Current", current, palette));
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Project versions:",
+        Style::default().add_modifier(Modifier::UNDERLINED),
+    )));
+    lines.push(Line::from(""));
+    for line in project_versions_preview(insight, 12) {
+        lines.push(Line::from(format!("  {line}")));
+    }
+    if insight.project_versions.len() > 12 {
+        lines.push(Line::from(format!(
+            "  … {} more version(s)",
+            insight.project_versions.len() - 12
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "Open backlog preview:",
+        Style::default().add_modifier(Modifier::UNDERLINED),
+    )));
+    lines.push(Line::from(""));
+
+    if insight.previews.is_empty() {
+        if insight.issue_fix_versions.is_empty() {
+            lines.push(Line::from("  No fix version is set on this issue yet."));
+        } else {
+            lines.push(Line::from(
+                "  No open backlog items found for this issue's fix version(s).",
+            ));
+        }
+        return lines;
+    }
+
+    for preview in &insight.previews {
+        for line in backlog_preview_lines(preview, 6) {
+            lines.push(Line::from(format!("  {line}")));
+        }
+        lines.push(Line::from(""));
+    }
+    if matches!(lines.last(), Some(line) if line.spans.is_empty()) {
+        lines.pop();
     }
 
     lines
@@ -1177,7 +1243,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         )),
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
-        Line::from("  Summary / Comments / Worklog / Attachments / Subtasks / Links"),
+        Line::from("  Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links"),
         Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
         Line::from(""),
         Line::from(Span::styled(

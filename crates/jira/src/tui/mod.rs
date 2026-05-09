@@ -9,5 +9,6 @@ mod prefs;
 mod prompts;
 mod render;
 mod theme;
+mod version_format;
 
 pub use app::run_tui;

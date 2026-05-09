@@ -4,6 +4,7 @@ pub mod field;
 pub mod issue;
 pub mod link;
 pub mod sprint;
+pub mod version;
 pub mod worklog;
 
 pub use attachment::Attachment;
@@ -14,4 +15,5 @@ pub use issue::{
 };
 pub use link::{IssueLink, IssueLinkType};
 pub use sprint::Sprint;
+pub use version::ProjectVersion;
 pub use worklog::Worklog;

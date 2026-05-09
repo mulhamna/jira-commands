@@ -41,6 +41,7 @@ use super::prompts::{
 use super::render::ui;
 use super::theme::ThemeName;
 use crate::version_check::{self, UpdateNotice};
+use crate::version_insights::load_issue_version_insight;
 
 pub(super) fn looks_like_jql(input: &str) -> bool {
     let lower = input.trim().to_lowercase();
@@ -206,6 +207,16 @@ impl App {
         self.detail.reset_for(&key);
 
         match self.active_tab {
+            DetailTab::Versions => {
+                if self.detail.version_insight.is_none() {
+                    match load_issue_version_insight(client, &key, 8).await {
+                        Ok(insight) => self.detail.version_insight = Some(insight),
+                        Err(e) => {
+                            self.set_status(format!("Version insight load failed: {e}"), true)
+                        }
+                    }
+                }
+            }
             DetailTab::Comments => {
                 if self.detail.comments.is_none() {
                     match client.get_comments(&key).await {
@@ -1130,8 +1141,7 @@ pub async fn run_tui(
                                 app.fix_version_catalog = versions
                                     .into_iter()
                                     .filter_map(|version| {
-                                        let name =
-                                            version.get("name").and_then(|v| v.as_str())?.trim();
+                                        let name = version.name.trim();
                                         if name.is_empty() {
                                             return None;
                                         }

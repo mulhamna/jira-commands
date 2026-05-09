@@ -49,6 +49,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 
 Detail tabs:
 - Summary
+- Versions (project fix versions + backlog preview for the selected issue's fix version)
 - Comments
 - Worklog
 - Attachments

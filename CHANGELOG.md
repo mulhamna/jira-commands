@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.35.0](https://github.com/mulhamna/jira-commands/compare/v0.34.0...v0.35.0) (2026-05-09)
+
+
+### Features
+
+* add Zed extension wrapper and fix-version backlog insights ([#228](https://github.com/mulhamna/jira-commands/issues/228)) ([b9a9553](https://github.com/mulhamna/jira-commands/commit/b9a95532ee94e4d0672c3e25973cfdcd613a9b4c))
+
 ## [0.34.0](https://github.com/mulhamna/jira-commands/compare/v0.33.0...v0.34.0) (2026-05-07)
 
 

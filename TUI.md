@@ -19,6 +19,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `j` / `k`   | Navigate up / down                                            |
 | `Enter`     | Open split detail view                                        |
 | `p`         | Open saved JQL queries                                        |
+| `V`         | Browse project fix versions and preview one version backlog   |
 | `T`         | Open theme picker                                             |
 | `S`         | Show server summary                                           |
 | `g`         | Show config summary                                           |
@@ -49,7 +50,6 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 
 Detail tabs:
 - Summary
-- Versions (project fix versions + backlog preview for the selected issue's fix version)
 - Comments
 - Worklog
 - Attachments

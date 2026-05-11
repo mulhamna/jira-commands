@@ -35,7 +35,7 @@ pub async fn load_issue_version_insight(
     let issue_fix_versions = extract_fix_versions(&issue.fields);
 
     let mut project_versions = client.get_project_versions(&project_key).await?;
-    project_versions.sort_by_key(version_sort_key);
+    sort_project_versions(&mut project_versions);
 
     let mut previews = Vec::new();
     for version_name in &issue_fix_versions {
@@ -71,6 +71,36 @@ pub async fn load_issue_version_insight(
     })
 }
 
+pub async fn load_project_versions(
+    client: &JiraClient,
+    project_key: &str,
+) -> Result<Vec<ProjectVersion>> {
+    let mut versions = client.get_project_versions(project_key).await?;
+    sort_project_versions(&mut versions);
+    Ok(versions)
+}
+
+pub async fn load_version_backlog_preview(
+    client: &JiraClient,
+    project_key: &str,
+    version: ProjectVersion,
+    preview_limit: u32,
+) -> Result<VersionBacklogPreview> {
+    let jql = format!(
+        "project = \"{}\" AND fixVersion = \"{}\" AND statusCategory != Done ORDER BY updated DESC",
+        escape_jql(project_key),
+        escape_jql(&version.name),
+    );
+    let result = client
+        .search_issues(&jql, None, Some(preview_limit))
+        .await?;
+    Ok(VersionBacklogPreview {
+        version,
+        total_open: result.total.unwrap_or(result.issues.len() as u64),
+        issues: result.issues,
+    })
+}
+
 pub fn extract_fix_versions(fields: &Value) -> Vec<String> {
     fields
         .get("fixVersions")
@@ -89,6 +119,10 @@ pub fn extract_fix_versions(fields: &Value) -> Vec<String> {
 
 fn escape_jql(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+pub fn sort_project_versions(versions: &mut [ProjectVersion]) {
+    versions.sort_by_key(version_sort_key);
 }
 
 fn version_sort_key(version: &ProjectVersion) -> (u8, String, String) {

@@ -1,11 +1,9 @@
-use crate::version_insights::IssueVersionInsight;
 use jira_core::model::{Comment, Worklog};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DetailTab {
     Summary,
-    Versions,
     Comments,
     Worklog,
     Attachments,
@@ -14,9 +12,8 @@ pub(super) enum DetailTab {
 }
 
 impl DetailTab {
-    pub(super) const ALL: [DetailTab; 7] = [
+    pub(super) const ALL: [DetailTab; 6] = [
         DetailTab::Summary,
-        DetailTab::Versions,
         DetailTab::Comments,
         DetailTab::Worklog,
         DetailTab::Attachments,
@@ -27,7 +24,6 @@ impl DetailTab {
     pub(super) fn label(self) -> &'static str {
         match self {
             DetailTab::Summary => "Summary",
-            DetailTab::Versions => "Versions",
             DetailTab::Comments => "Comments",
             DetailTab::Worklog => "Worklog",
             DetailTab::Attachments => "Attachments",
@@ -54,7 +50,6 @@ impl DetailTab {
 #[derive(Debug, Default)]
 pub(super) struct DetailData {
     pub(super) issue_key: String,
-    pub(super) version_insight: Option<IssueVersionInsight>,
     pub(super) comments: Option<Vec<Comment>>,
     pub(super) worklogs: Option<Vec<Worklog>>,
     pub(super) remote_links: Option<Vec<Value>>,

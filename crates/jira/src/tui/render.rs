@@ -17,7 +17,7 @@ use super::mode::Mode;
 use super::panel::{DetailTab, Focus};
 use super::picker::PickerOption;
 use super::theme::{Palette, ThemeName};
-use super::version_format::{backlog_preview_lines, project_versions_preview};
+use super::version_format::{backlog_preview_lines, version_status_badges};
 
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
@@ -47,6 +47,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::Search => " Jira CLI — Search ".to_string(),
         Mode::Transition => " Jira CLI — Select Transition ".to_string(),
         Mode::Help => " Jira CLI — Help ".to_string(),
+        Mode::ProjectVersionBrowser => " Jira CLI — Project Versions ".to_string(),
         Mode::ColumnPicker => " Jira CLI — Columns ".to_string(),
         Mode::AssigneePicker => " Jira CLI — Assignee Picker ".to_string(),
         Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
@@ -81,6 +82,10 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::Help => {
             render_browse(f, app, chunks[1], palette);
             render_help_popup(f, size, palette);
+        }
+        Mode::ProjectVersionBrowser => {
+            render_browse(f, app, chunks[1], palette);
+            render_project_version_browser_popup(f, app, size, palette);
         }
         Mode::ColumnPicker => {
             render_browse(f, app, chunks[1], palette);
@@ -140,6 +145,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
         Mode::Transition => " j/k:move  Enter:execute  Esc:cancel".to_string(),
         Mode::Help => " Any key: close".to_string(),
+        Mode::ProjectVersionBrowser => " type:filter  j/k:move  Esc:close".to_string(),
         Mode::ColumnPicker => " ↑/↓:move  Space:toggle  type:filter  Tab:clear  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
@@ -281,7 +287,6 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
 
     let body = match app.active_tab {
         DetailTab::Summary => build_summary_lines(issue, palette),
-        DetailTab::Versions => build_version_lines(app, palette),
         DetailTab::Comments => build_comment_lines(app, palette),
         DetailTab::Worklog => build_worklog_lines(app, palette),
         DetailTab::Attachments => build_attachment_lines(issue),
@@ -350,70 +355,6 @@ fn build_summary_lines(issue: &jira_core::model::Issue, palette: Palette) -> Vec
                 lines.push(Line::from(format!("  {line}")));
             }
         }
-    }
-
-    lines
-}
-
-fn build_version_lines(app: &App, palette: Palette) -> Vec<Line<'static>> {
-    let Some(insight) = &app.detail.version_insight else {
-        return build_placeholder_lines("Versions", "Loading fix version insight...");
-    };
-
-    let mut lines: Vec<Line<'static>> = vec![
-        owned_field_line("Issue", insight.issue_key.clone(), palette),
-        owned_field_line("Project", insight.project_key.clone(), palette),
-    ];
-
-    let current = if insight.issue_fix_versions.is_empty() {
-        "—".to_string()
-    } else {
-        insight.issue_fix_versions.join(", ")
-    };
-    lines.push(owned_field_line("Current", current, palette));
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Project versions:",
-        Style::default().add_modifier(Modifier::UNDERLINED),
-    )));
-    lines.push(Line::from(""));
-    for line in project_versions_preview(insight, 12) {
-        lines.push(Line::from(format!("  {line}")));
-    }
-    if insight.project_versions.len() > 12 {
-        lines.push(Line::from(format!(
-            "  … {} more version(s)",
-            insight.project_versions.len() - 12
-        )));
-    }
-
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Open backlog preview:",
-        Style::default().add_modifier(Modifier::UNDERLINED),
-    )));
-    lines.push(Line::from(""));
-
-    if insight.previews.is_empty() {
-        if insight.issue_fix_versions.is_empty() {
-            lines.push(Line::from("  No fix version is set on this issue yet."));
-        } else {
-            lines.push(Line::from(
-                "  No open backlog items found for this issue's fix version(s).",
-            ));
-        }
-        return lines;
-    }
-
-    for preview in &insight.previews {
-        for line in backlog_preview_lines(preview, 6) {
-            lines.push(Line::from(format!("  {line}")));
-        }
-        lines.push(Line::from(""));
-    }
-    if matches!(lines.last(), Some(line) if line.spans.is_empty()) {
-        lines.pop();
     }
 
     lines
@@ -853,6 +794,125 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
             "Esc cancel",
         ],
     );
+}
+
+fn render_project_version_browser_popup(
+    f: &mut Frame,
+    app: &mut App,
+    area: Rect,
+    palette: Palette,
+) {
+    let popup_area = centered_rect(86, 82, area);
+    let [left_area, right_area] = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
+        .areas(popup_area);
+
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .split(left_area);
+
+    let query = Paragraph::new(app.project_version_query.clone())
+        .block(
+            Block::default()
+                .title(format!(
+                    " Fix Versions — {} ",
+                    if app.project_version_project_key.is_empty() {
+                        "project"
+                    } else {
+                        &app.project_version_project_key
+                    }
+                ))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .style(Style::default().fg(palette.header_fg));
+
+    let version_items: Vec<ListItem> = if app.project_version_options.is_empty() {
+        vec![ListItem::new("No fix versions")]
+    } else {
+        app.project_version_options
+            .iter()
+            .map(|option| ListItem::new(option.label.clone()))
+            .collect()
+    };
+
+    let versions = List::new(version_items)
+        .block(
+            Block::default()
+                .title(" Versions ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(palette.header_fg)
+                .bg(palette.highlight)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
+
+    let mut right_lines: Vec<Line<'static>> = Vec::new();
+    if let Some(version) = app.selected_project_version() {
+        right_lines.push(Line::from(Span::styled(
+            version.name.clone(),
+            Style::default()
+                .fg(palette.tab_active)
+                .add_modifier(Modifier::BOLD),
+        )));
+        let badges = version_status_badges(version);
+        if !badges.is_empty() {
+            right_lines.push(Line::from(badges));
+        }
+        if let Some(description) = version.description.as_deref() {
+            let trimmed = description.trim();
+            if !trimmed.is_empty() {
+                right_lines.push(Line::from(""));
+                right_lines.push(Line::from(trimmed.to_string()));
+            }
+        }
+        right_lines.push(Line::from(""));
+        right_lines.push(Line::from(Span::styled(
+            "Open backlog:",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )));
+        right_lines.push(Line::from(""));
+
+        match &app.project_version_preview {
+            Some(preview) if preview.version.name == version.name => {
+                for line in backlog_preview_lines(preview, 25) {
+                    right_lines.push(Line::from(line));
+                }
+            }
+            _ => right_lines.push(Line::from("Loading backlog preview...")),
+        }
+    } else {
+        right_lines.push(Line::from("Select a fix version to preview its backlog."));
+    }
+
+    let detail = Paragraph::new(right_lines)
+        .block(
+            Block::default()
+                .title(" Backlog Preview ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(query, left_chunks[0]);
+    f.render_stateful_widget(versions, left_chunks[1], &mut app.project_version_state);
+    f.render_widget(detail, right_area);
+
+    let before_cursor: String = app
+        .project_version_query
+        .chars()
+        .take(app.project_version_cursor)
+        .collect();
+    let cursor_x = left_chunks[0].x + 1 + before_cursor.len() as u16;
+    let cursor_y = left_chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
 }
 
 fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {

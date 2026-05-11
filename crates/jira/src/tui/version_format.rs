@@ -1,6 +1,6 @@
 use jira_core::model::{Issue, ProjectVersion};
 
-use crate::version_insights::{IssueVersionInsight, VersionBacklogPreview};
+use crate::version_insights::VersionBacklogPreview;
 
 pub(super) fn version_status_badges(version: &ProjectVersion) -> String {
     let mut parts: Vec<String> = Vec::new();
@@ -20,31 +20,6 @@ pub(super) fn version_status_badges(version: &ProjectVersion) -> String {
 
 pub(super) fn preview_issue_line(issue: &Issue) -> String {
     format!("{} [{}] {}", issue.key, issue.status, issue.summary)
-}
-
-pub(super) fn project_versions_preview(insight: &IssueVersionInsight, limit: usize) -> Vec<String> {
-    insight
-        .project_versions
-        .iter()
-        .take(limit)
-        .map(|version| {
-            let marker = if insight
-                .issue_fix_versions
-                .iter()
-                .any(|name| name == &version.name)
-            {
-                "*"
-            } else {
-                "•"
-            };
-            let badges = version_status_badges(version);
-            if badges.is_empty() {
-                format!("{marker} {}", version.name)
-            } else {
-                format!("{marker} {} ({badges})", version.name)
-            }
-        })
-        .collect()
 }
 
 pub(super) fn backlog_preview_lines(preview: &VersionBacklogPreview, limit: usize) -> Vec<String> {

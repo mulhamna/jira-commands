@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.36.0](https://github.com/mulhamna/jira-commands/compare/v0.35.0...v0.36.0) (2026-05-11)
+
+
+### Features
+
+* **tui:** add project fix-version browser ([#235](https://github.com/mulhamna/jira-commands/issues/235)) ([788e316](https://github.com/mulhamna/jira-commands/commit/788e3165df18073ba91b599f9898702ad4c61c24))
+
 ## [0.35.0](https://github.com/mulhamna/jira-commands/compare/v0.34.0...v0.35.0) (2026-05-09)
 
 

@@ -33,6 +33,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         }
         Mode::Search => handle_search_key(app, code),
         Mode::Transition => handle_transition_key(app, code),
+        Mode::ProjectVersionBrowser => handle_project_version_browser_key(app, code),
         Mode::ColumnPicker => handle_column_picker_key(app, code),
         Mode::AssigneePicker => handle_assignee_picker_key(app, code),
         Mode::ComponentPicker => handle_component_picker_key(app, code),
@@ -103,6 +104,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             app.mode = Mode::ThemePicker;
             AppAction::None
         }
+        KeyCode::Char('V') => AppAction::OpenProjectVersionBrowser,
         KeyCode::Char('S') => {
             app.mode = Mode::ServerInfo;
             AppAction::LoadServerInfo
@@ -203,6 +205,7 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('t') => AppAction::FetchTransitions,
         KeyCode::Char('R') => AppAction::MarkNotificationsRead,
         KeyCode::Char('o') => AppAction::OpenBrowser,
+        KeyCode::Char('V') => AppAction::OpenProjectVersionBrowser,
         KeyCode::Char('?') => {
             app.mode = Mode::Help;
             AppAction::None
@@ -528,6 +531,53 @@ fn handle_assignee_picker_key(app: &mut App, code: KeyCode) -> AppAction {
                 }
             }
             AppAction::None
+        }
+        _ => AppAction::None,
+    }
+}
+
+fn handle_project_version_browser_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            picker_nav_down(
+                &mut app.project_version_state,
+                app.project_version_options.len(),
+            );
+            AppAction::RefreshProjectVersionPreview
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            picker_nav_up(&mut app.project_version_state);
+            AppAction::RefreshProjectVersionPreview
+        }
+        KeyCode::Left => {
+            picker_cursor_left(&mut app.project_version_cursor);
+            AppAction::None
+        }
+        KeyCode::Right => {
+            picker_cursor_right(&mut app.project_version_cursor, &app.project_version_query);
+            AppAction::None
+        }
+        KeyCode::Backspace => {
+            if picker_backspace(
+                &mut app.project_version_query,
+                &mut app.project_version_cursor,
+            ) {
+                AppAction::RefreshProjectVersionBrowser
+            } else {
+                AppAction::None
+            }
+        }
+        KeyCode::Char(c) => {
+            picker_type_char(
+                &mut app.project_version_query,
+                &mut app.project_version_cursor,
+                c,
+            );
+            AppAction::RefreshProjectVersionBrowser
         }
         _ => AppAction::None,
     }

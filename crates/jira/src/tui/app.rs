@@ -41,7 +41,9 @@ use super::prompts::{
 use super::render::ui;
 use super::theme::ThemeName;
 use crate::version_check::{self, UpdateNotice};
-use crate::version_insights::load_issue_version_insight;
+use crate::version_insights::{
+    load_project_versions, load_version_backlog_preview, VersionBacklogPreview,
+};
 
 pub(super) fn looks_like_jql(input: &str) -> bool {
     let lower = input.trim().to_lowercase();
@@ -111,6 +113,13 @@ pub(super) struct App {
     pub(super) column_picker_state: ListState,
     pub(super) column_picker_filter: String,
     pub(super) available_fields: Vec<Field>,
+    pub(super) project_version_query: String,
+    pub(super) project_version_cursor: usize,
+    pub(super) project_version_options: Vec<PickerOption>,
+    pub(super) project_version_state: ListState,
+    pub(super) project_version_project_key: String,
+    pub(super) project_version_catalog: Vec<jira_core::model::ProjectVersion>,
+    pub(super) project_version_preview: Option<VersionBacklogPreview>,
     pub(super) assignee_query: String,
     pub(super) assignee_cursor: usize,
     pub(super) assignee_options: Vec<PickerOption>,
@@ -163,6 +172,9 @@ pub(super) enum AppAction {
     OpenNotifications,
     MarkNotificationsRead,
     CreateIssue,
+    OpenProjectVersionBrowser,
+    RefreshProjectVersionBrowser,
+    RefreshProjectVersionPreview,
     EditIssue(String),
     AssignIssue(String),
     OpenAssigneePicker(String),
@@ -207,16 +219,6 @@ impl App {
         self.detail.reset_for(&key);
 
         match self.active_tab {
-            DetailTab::Versions => {
-                if self.detail.version_insight.is_none() {
-                    match load_issue_version_insight(client, &key, 8).await {
-                        Ok(insight) => self.detail.version_insight = Some(insight),
-                        Err(e) => {
-                            self.set_status(format!("Version insight load failed: {e}"), true)
-                        }
-                    }
-                }
-            }
             DetailTab::Comments => {
                 if self.detail.comments.is_none() {
                     match client.get_comments(&key).await {
@@ -278,6 +280,13 @@ impl App {
             column_picker_state,
             column_picker_filter: String::new(),
             available_fields: Vec::new(),
+            project_version_query: String::new(),
+            project_version_cursor: 0,
+            project_version_options: Vec::new(),
+            project_version_state: ListState::default(),
+            project_version_project_key: String::new(),
+            project_version_catalog: Vec::new(),
+            project_version_preview: None,
             assignee_query: String::new(),
             assignee_cursor: 0,
             assignee_options: Vec::new(),
@@ -368,6 +377,32 @@ impl App {
 
     pub(super) fn selected_issue_key(&self) -> Option<String> {
         self.selected_issue().map(|i| i.key.clone())
+    }
+
+    pub(super) fn active_project_key(&self) -> Option<String> {
+        self.default_project.clone().or_else(|| {
+            self.selected_issue().map(|issue| {
+                issue
+                    .key
+                    .split_once('-')
+                    .map(|(project, _)| project.to_string())
+                    .unwrap_or_else(|| issue.project_key.clone())
+            })
+        })
+    }
+
+    pub(super) fn selected_project_version_name(&self) -> Option<&str> {
+        let idx = self.project_version_state.selected()?;
+        self.project_version_options
+            .get(idx)
+            .map(|option| option.value.as_str())
+    }
+
+    pub(super) fn selected_project_version(&self) -> Option<&jira_core::model::ProjectVersion> {
+        let name = self.selected_project_version_name()?;
+        self.project_version_catalog
+            .iter()
+            .find(|version| version.name == name)
     }
 
     pub(super) fn next_issue(&mut self) {
@@ -821,6 +856,157 @@ pub async fn run_tui(
                     }
                     Err(e) => {
                         app.set_status(format!("JQL error: {e}"), true);
+                    }
+                }
+            }
+
+            AppAction::OpenProjectVersionBrowser => {
+                let Some(project_key) = app.active_project_key() else {
+                    app.set_status(
+                        "Open a project-scoped TUI (`jirac tui -p PROJ`) or select an issue first",
+                        true,
+                    );
+                    continue;
+                };
+
+                app.project_version_project_key = project_key.clone();
+                app.project_version_query.clear();
+                app.project_version_cursor = 0;
+                app.project_version_options.clear();
+                app.project_version_catalog.clear();
+                app.project_version_preview = None;
+                app.project_version_state = ListState::default();
+                app.mode = Mode::ProjectVersionBrowser;
+                app.focus = Focus::List;
+                app.set_status(format!("Loading fix versions for {project_key}..."), false);
+                terminal.draw(|f| ui(f, &mut app))?;
+
+                match load_project_versions(&client, &project_key).await {
+                    Ok(versions) => {
+                        app.project_version_catalog = versions
+                            .into_iter()
+                            .filter(|version| !version.name.trim().is_empty())
+                            .collect();
+                        app.project_version_options = app
+                            .project_version_catalog
+                            .iter()
+                            .map(|version| PickerOption {
+                                value: version.name.clone(),
+                                label: version.name.clone(),
+                            })
+                            .collect();
+
+                        if !app.project_version_options.is_empty() {
+                            app.project_version_state.select(Some(0));
+                            if let Some(version) = app.selected_project_version().cloned() {
+                                app.set_status(
+                                    format!("Loading backlog preview for {}...", version.name),
+                                    false,
+                                );
+                                match load_version_backlog_preview(
+                                    &client,
+                                    &project_key,
+                                    version,
+                                    25,
+                                )
+                                .await
+                                {
+                                    Ok(preview) => {
+                                        app.project_version_preview = Some(preview);
+                                        app.clear_status();
+                                    }
+                                    Err(e) => app.set_status(
+                                        format!("Version backlog lookup failed: {e}"),
+                                        true,
+                                    ),
+                                }
+                            } else {
+                                app.clear_status();
+                            }
+                        } else {
+                            app.set_status(
+                                format!("No fix versions found for {project_key}"),
+                                false,
+                            );
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Fix version lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshProjectVersionBrowser => {
+                let query = app.project_version_query.to_lowercase();
+                app.project_version_options = app
+                    .project_version_catalog
+                    .iter()
+                    .filter(|version| {
+                        query.is_empty() || version.name.to_lowercase().contains(&query)
+                    })
+                    .map(|version| PickerOption {
+                        value: version.name.clone(),
+                        label: version.name.clone(),
+                    })
+                    .collect();
+                app.project_version_state
+                    .select(if app.project_version_options.is_empty() {
+                        None
+                    } else {
+                        Some(0)
+                    });
+                app.project_version_preview = None;
+
+                if app.project_version_options.is_empty() {
+                    app.set_status("No matching fix versions", false);
+                } else {
+                    app.clear_status();
+                }
+
+                if let Some(version) = app.selected_project_version().cloned() {
+                    app.set_status(
+                        format!("Loading backlog preview for {}...", version.name),
+                        false,
+                    );
+                    match load_version_backlog_preview(
+                        &client,
+                        &app.project_version_project_key,
+                        version,
+                        25,
+                    )
+                    .await
+                    {
+                        Ok(preview) => {
+                            app.project_version_preview = Some(preview);
+                            app.clear_status();
+                        }
+                        Err(e) => {
+                            app.set_status(format!("Version backlog lookup failed: {e}"), true)
+                        }
+                    }
+                }
+            }
+
+            AppAction::RefreshProjectVersionPreview => {
+                app.project_version_preview = None;
+                if let Some(version) = app.selected_project_version().cloned() {
+                    app.set_status(
+                        format!("Loading backlog preview for {}...", version.name),
+                        false,
+                    );
+                    match load_version_backlog_preview(
+                        &client,
+                        &app.project_version_project_key,
+                        version,
+                        25,
+                    )
+                    .await
+                    {
+                        Ok(preview) => {
+                            app.project_version_preview = Some(preview);
+                            app.clear_status();
+                        }
+                        Err(e) => {
+                            app.set_status(format!("Version backlog lookup failed: {e}"), true)
+                        }
                     }
                 }
             }

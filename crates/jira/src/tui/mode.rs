@@ -4,6 +4,7 @@ pub(super) enum Mode {
     Search,
     Transition,
     Help,
+    ProjectVersionBrowser,
     ColumnPicker,
     AssigneePicker,
     ComponentPicker,

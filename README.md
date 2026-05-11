@@ -4,7 +4,13 @@ Jira on the command line.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
-[![Homebrew](https://img.shields.io/badge/homebrew-mulhamna%2Ftap-orange)](https://github.com/mulhamna/homebrew-tap)
+[![npm](https://img.shields.io/npm/v/%40mulham28%2Fjirac)](https://www.npmjs.com/package/@mulham28/jirac)
+
+[![Homebrew](https://img.shields.io/badge/homebrew-v0.35.0-orange)](https://github.com/mulhamna/homebrew-tap)
+[![Winget](https://img.shields.io/winget/v/mulhamna.jirac)](https://github.com/mulhamna/winget-pkgs/tree/main/manifests/m/mulhamna/jirac)
+[![Chocolatey](https://img.shields.io/chocolatey/v/jirac)](https://community.chocolatey.org/packages/jirac)
+[![Scoop](https://img.shields.io/badge/dynamic/json?label=scoop&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fmulhamna%2Fscoop-bucket%2Fmain%2Fbucket%2Fjirac.json&color=00b4ff)](https://github.com/mulhamna/scoop-bucket)
+
 [![License: MIT + Apache-2.0](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
@@ -224,7 +230,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview, saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
 
 ```bash
 jirac tui -p PROJ

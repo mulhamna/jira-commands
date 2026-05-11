@@ -382,7 +382,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including a Versions detail tab for project fix versions and backlog preview, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, themes, single worklog entry via <code>w</code>, and bulk date-range worklogs via <code>b</code> with confirmation.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, themes, single worklog entry via <code>w</code>, and bulk date-range worklogs via <code>b</code> with confirmation.</p>
       <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
           <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -394,7 +394,7 @@ $ jirac issue transition CORE-183 --to Done
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
             <tr><td class="px-4 py-3"><span class="keycap">↑ / k</span></td><td class="px-4 py-3">Move to the issue above.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">↓ / j</span></td><td class="px-4 py-3">Move to the issue below.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">Enter</span></td><td class="px-4 py-3">Open details for the selected issue, including the Versions tab.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">Enter</span></td><td class="px-4 py-3">Open details for the selected issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">n</span></td><td class="px-4 py-3">Scan and open Jira mention notifications.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">R</span></td><td class="px-4 py-3">Mark the selected notification issue as read.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">c</span></td><td class="px-4 py-3">Create a new issue.</td></tr>
@@ -405,6 +405,7 @@ $ jirac issue transition CORE-183 --to Done
             <tr><td class="px-4 py-3"><span class="keycap">C</span></td><td class="px-4 py-3">Choose which table columns stay visible and persist that preference.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">T</span></td><td class="px-4 py-3">Open the theme picker, including Kanagawa Wave.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">p</span></td><td class="px-4 py-3">Open saved JQL queries.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">V</span></td><td class="px-4 py-3">Browse project fix versions and preview backlog for the selected version.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add a single worklog to the issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">b</span></td><td class="px-4 py-3">Add bulk worklogs across a date range, with confirmation before submit.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">v</span></td><td class="px-4 py-3">Edit fix versions.</td></tr>

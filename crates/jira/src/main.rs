@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use jira_commands::{cli, tui, version_check};
+use jira_commands::{cli, help_text, tui, version_check};
 use jira_core::{config::JiraConfig, JiraClient};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -8,7 +8,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 #[command(
     name = "jirac",
     about = "jirac — terminal client for the Jira ecosystem",
-    long_about = "A fast Jira terminal client built in Rust.\n\nQuick start:\n  jirac auth login                      Set up credentials\n  jirac issue list                      List your assigned issues\n  jirac tui -p MYPROJ                   Launch the interactive TUI\n  jirac mcp doctor                      Check MCP prerequisites and client readiness\n  jirac mcp install --client claude-code Register jirac-mcp with Claude Code\n\nInstall options:\n  Homebrew:  brew tap mulhamna/tap && brew install jira-commands\n  Scoop:     scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket\n             scoop install mulhamna/jirac\n  Winget:    winget install mulhamna.jirac\n  Cargo:     cargo install jira-commands\n\nDocs:\n  README.md  Usage overview and examples\n  INSTALL.md Detailed install instructions, including MCP helper targets\n\nConfig file: ~/.config/jira/config.toml\nEnv vars:    JIRA_PROFILE, JIRA_URL, JIRA_EMAIL, JIRA_TOKEN",
+    long_about = help_text::ROOT_LONG_ABOUT,
     version
 )]
 struct Cli {
@@ -26,12 +26,14 @@ enum Commands {
         #[command(subcommand)]
         command: Box<cli::issue::IssueCommand>,
     },
+    /// Manage Jira auth profiles, credentials, and active profile selection
+    #[command(long_about = help_text::AUTH_LONG_ABOUT)]
     Auth {
         #[command(subcommand)]
         command: cli::auth::AuthCommand,
     },
     #[command(
-        long_about = "Launch the interactive TUI to browse, search, update, and transition issues.\n\nKeyboard shortcuts:\n  j / k or ↑ / ↓   Navigate the issue list\n  Enter            Open split detail view (Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links)\n  p                Open saved JQL queries\n  T                Open theme picker\n  S                Show server summary\n  g                Show config summary\n  t                Transition the selected issue\n  C                Pick visible table columns and save preference\n  c                Create a new issue\n  e                Edit summary / description\n  y                Change issue type in a modal (native Jira move semantics)\n  M                Move issue to another project in a modal (native move, not clone+delete)\n  a                Open native assignee popup with searchable picker\n  ;                Add a comment\n  w                Add a worklog\n  l                Set labels\n  m                Open native component popup with searchable multi-select\n  v                Open native fix version popup with searchable multi-select\n  s                Open sprint picker\n  u                Upload an attachment\n  o                Open the selected issue in your browser\n  r                Refresh the issue list\n  n                Scan and open Jira mention notifications\n  /                Enter search mode and run JQL\n  ?                Show keyboard help overlay\n  Esc              Cancel search / go back\n  q                Quit\n\nThe TUI keeps these actions inside overlays and modals. It does not exit to the shell for type changes or project moves. Bulk worklog submission uses a two-step confirmation inside the modal.\n\nExamples:\n  jirac tui\n      Uses the default project from config, or your assigned issues\n\n  jirac tui -p PROJ\n      Start filtered to a specific project"
+        long_about = "Launch the interactive TUI to browse, search, update, and transition issues.\n\nKeyboard shortcuts:\n  j / k or ↑ / ↓   Navigate the issue list\n  Enter            Open split detail view (Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links)\n  p                Open saved JQL queries\n  V                Browse project fix versions and preview backlog\n  T                Open theme picker\n  S                Show server summary\n  g                Show config summary\n  t                Transition the selected issue\n  C                Pick visible table columns and save preference\n  c                Create a new issue\n  e                Edit summary / description\n  y                Change issue type in a modal (native Jira move semantics)\n  M                Move issue to another project in a modal (native move, not clone+delete)\n  a                Open native assignee popup with searchable picker\n  ;                Add a comment\n  w                Add a single worklog\n  b                Add a bulk/range worklog with confirmation\n  l                Set labels\n  m                Open native component popup with searchable multi-select\n  v                Open native fix version popup with searchable multi-select\n  s                Open sprint picker\n  u                Upload an attachment\n  o                Open the selected issue in your browser\n  r                Refresh the issue list\n  n                Scan and open Jira mention notifications\n  R                Mark the selected notification issue as read\n  /                Enter search mode and run JQL\n  ?                Show keyboard help overlay\n  Esc              Cancel search / go back\n  q                Quit\n\nThe TUI keeps these actions inside overlays and modals. It does not exit to the shell for type changes or project moves. Bulk worklog submission uses a two-step confirmation inside the modal.\n\nExamples:\n  jirac tui\n      Uses the default project from config, or your assigned issues\n\n  jirac tui -p PROJ\n      Start filtered to a specific project"
     )]
     Tui {
         #[arg(short, long, value_name = "PROJECT")]

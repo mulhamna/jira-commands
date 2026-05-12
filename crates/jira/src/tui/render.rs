@@ -1271,6 +1271,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
         Line::from("  p         Open saved queries (run/create/edit/delete)"),
+        Line::from("  V         Browse project fix versions + backlog preview"),
         Line::from("  T         Open theme picker"),
         Line::from("  S         Show server info"),
         Line::from("  g         Show config file"),

@@ -21,6 +21,7 @@ use crate::{
         },
         link::{IssueLink, IssueLinkType},
         sprint::Sprint,
+        version::{ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
     },
 };
@@ -783,19 +784,42 @@ impl JiraClient {
     }
 
     /// List fix versions available within a project.
-    pub async fn get_project_versions(
-        &self,
-        project_key: &str,
-    ) -> Result<Vec<crate::model::ProjectVersion>> {
+    pub async fn get_project_versions(&self, project_key: &str) -> Result<Vec<ProjectVersion>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/project/{project_key}/versions"));
 
         let http = &self.http;
-        let versions: Vec<crate::model::ProjectVersion> = self
+        let versions: Vec<ProjectVersion> = self
             .request(|| http.get(&url).headers(headers.clone()))
             .await?;
 
         Ok(versions)
+    }
+
+    /// Update project version metadata like release/start dates or release state.
+    pub async fn update_project_version(
+        &self,
+        version_id: &str,
+        request: &UpdateProjectVersionRequest,
+    ) -> Result<ProjectVersion> {
+        let path = format!(
+            "/rest/api/{}/version/{}",
+            self.config.api_version, version_id
+        );
+        let body = serde_json::to_value(request)?;
+        let value = self
+            .raw_request("PUT", &path, Some(body))
+            .await?
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Empty response when updating project version".into(),
+            })?;
+        let version: ProjectVersion =
+            serde_json::from_value(value).map_err(|e| JiraError::Api {
+                status: 0,
+                message: format!("Failed to parse updated project version: {e}"),
+            })?;
+        Ok(version)
     }
 
     /// List active and future sprints for a project via the Agile API.

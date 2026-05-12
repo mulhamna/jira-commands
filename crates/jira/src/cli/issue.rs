@@ -6,13 +6,14 @@ use crate::{
     version_insights::{extract_fix_versions, load_issue_version_insight},
 };
 use anyhow::{Context, Result};
+use chrono::NaiveDate;
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
-        CreateIssueRequest, CreateIssueRequestV2, UpdateIssueRequest,
+        CreateIssueRequest, CreateIssueRequestV2, UpdateIssueRequest, UpdateProjectVersionRequest,
     },
     FieldCache, IssueType, JiraClient,
 };
@@ -100,26 +101,52 @@ pub enum IssueCommand {
         json: bool,
     },
 
-    /// Browse project fix versions and optionally preview backlog items
+    /// Browse project fix versions, preview backlog items, or update version metadata
     ///
     /// Without --version, lists fix versions for the project.
     /// With --version, shows open backlog items assigned to that fix version.
+    /// Add one or more update flags to modify version metadata instead.
     ///
     /// Examples:
     ///   jirac issue versions -p PROJ
     ///   jirac issue versions -p PROJ --version "v1.2.0"
     ///   jirac issue versions -p PROJ --version "v1.2.0" --limit 15
+    ///   jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --released
     #[command(name = "versions")]
     Versions {
         /// Project key (e.g. PROJ). Defaults to configured project when present.
         #[arg(short, long, value_name = "PROJECT")]
         project: Option<String>,
-        /// Specific fix version name to inspect
+        /// Specific fix version name to inspect or update
         #[arg(long, value_name = "VERSION")]
         version: Option<String>,
         /// Maximum number of backlog issues to preview (default: 10)
         #[arg(short, long, default_value = "10", value_name = "N")]
         limit: u32,
+        /// Set or replace the version release date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        set_release_date: Option<String>,
+        /// Clear the version release date
+        #[arg(long, conflicts_with = "set_release_date")]
+        clear_release_date: bool,
+        /// Set or replace the version start date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        set_start_date: Option<String>,
+        /// Clear the version start date
+        #[arg(long, conflicts_with = "set_start_date")]
+        clear_start_date: bool,
+        /// Mark the version as released
+        #[arg(long, conflicts_with = "unreleased")]
+        released: bool,
+        /// Mark the version as unreleased
+        #[arg(long, conflicts_with = "released")]
+        unreleased: bool,
+        /// Mark the version as archived
+        #[arg(long, conflicts_with = "unarchived")]
+        archived: bool,
+        /// Mark the version as unarchived
+        #[arg(long, conflicts_with = "archived")]
+        unarchived: bool,
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -849,8 +876,36 @@ pub async fn handle(
             project,
             version,
             limit,
+            set_release_date,
+            clear_release_date,
+            set_start_date,
+            clear_start_date,
+            released,
+            unreleased,
+            archived,
+            unarchived,
             json,
-        } => view_project_versions(client, project.or(default_project), version, limit, json).await,
+        } => {
+            let update = ProjectVersionUpdateArgs {
+                set_release_date,
+                clear_release_date,
+                set_start_date,
+                clear_start_date,
+                released,
+                unreleased,
+                archived,
+                unarchived,
+            };
+            view_project_versions(
+                client,
+                project.or(default_project),
+                version,
+                limit,
+                update,
+                json,
+            )
+            .await
+        }
         IssueCommand::Create {
             project,
             summary,
@@ -1257,11 +1312,74 @@ fn print_version_summary(
     }
 }
 
+#[derive(Debug, Clone)]
+struct ProjectVersionUpdateArgs {
+    set_release_date: Option<String>,
+    clear_release_date: bool,
+    set_start_date: Option<String>,
+    clear_start_date: bool,
+    released: bool,
+    unreleased: bool,
+    archived: bool,
+    unarchived: bool,
+}
+
+impl ProjectVersionUpdateArgs {
+    fn has_changes(&self) -> bool {
+        self.set_release_date.is_some()
+            || self.clear_release_date
+            || self.set_start_date.is_some()
+            || self.clear_start_date
+            || self.released
+            || self.unreleased
+            || self.archived
+            || self.unarchived
+    }
+
+    fn to_request(&self) -> Result<UpdateProjectVersionRequest> {
+        let release_date = if self.clear_release_date {
+            Some(String::new())
+        } else if let Some(value) = self.set_release_date.as_deref() {
+            Some(validate_ymd_date(value, "release date")?)
+        } else {
+            None
+        };
+
+        let start_date = if self.clear_start_date {
+            Some(String::new())
+        } else if let Some(value) = self.set_start_date.as_deref() {
+            Some(validate_ymd_date(value, "start date")?)
+        } else {
+            None
+        };
+
+        Ok(UpdateProjectVersionRequest {
+            archived: if self.archived {
+                Some(true)
+            } else if self.unarchived {
+                Some(false)
+            } else {
+                None
+            },
+            released: if self.released {
+                Some(true)
+            } else if self.unreleased {
+                Some(false)
+            } else {
+                None
+            },
+            release_date,
+            start_date,
+        })
+    }
+}
+
 async fn view_project_versions(
     client: JiraClient,
     project: Option<String>,
     version: Option<String>,
     limit: u32,
+    update: ProjectVersionUpdateArgs,
     json: bool,
 ) -> Result<()> {
     let project_key = project
@@ -1280,6 +1398,40 @@ async fn view_project_versions(
             version.name.to_lowercase(),
         )
     });
+
+    if update.has_changes() {
+        let version_name = version.clone().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Version updates require --version \"<name>\" so jirac knows which fix version to modify"
+            )
+        })?;
+        let target = versions
+            .iter()
+            .find(|item| item.name == version_name)
+            .or_else(|| {
+                versions
+                    .iter()
+                    .find(|item| item.name.eq_ignore_ascii_case(&version_name))
+            })
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Fix version '{}' not found in project {}",
+                    version_name,
+                    project_key
+                )
+            })?;
+        let request = update.to_request()?;
+        let updated = client.update_project_version(&target.id, &request).await?;
+
+        if json {
+            println!("{}", serde_json::to_string_pretty(&updated)?);
+            return Ok(());
+        }
+
+        print_project_version_metadata(&project_key, &updated, Some("✓ Updated fix version"));
+        return Ok(());
+    }
 
     if let Some(version_name) = version {
         let jql = format!(
@@ -1309,17 +1461,7 @@ async fn view_project_versions(
 
         println!("Fix version backlog — {} / {}", project_key, version_name);
         if let Some(meta) = version_meta {
-            let status = if meta.archived {
-                "archived"
-            } else if meta.released {
-                "released"
-            } else {
-                "unreleased"
-            };
-            println!("  Status: {status}");
-            if let Some(date) = meta.release_date {
-                println!("  Release: {}", &date[..10.min(date.len())]);
-            }
+            print_project_version_metadata(&project_key, &meta, None);
         }
         println!(
             "  Open backlog: {}",
@@ -1351,23 +1493,63 @@ async fn view_project_versions(
         } else {
             "unreleased"
         };
-        if let Some(date) = version.release_date.as_deref() {
-            println!(
-                "  • {} [{} | release {}]",
-                version.name,
-                status,
-                &date[..10.min(date.len())]
-            );
-        } else {
-            println!("  • {} [{}]", version.name, status);
+        let mut details = vec![status.to_string()];
+        if let Some(date) = version.start_date.as_deref() {
+            details.push(format!("start {}", &date[..10.min(date.len())]));
         }
+        if let Some(date) = version.release_date.as_deref() {
+            details.push(format!("release {}", &date[..10.min(date.len())]));
+        }
+        println!("  • {} [{}]", version.name, details.join(" | "));
     }
     println!();
     println!(
         "Tip: run `jirac issue versions -p {} --version \"<name>\"` to preview backlog for one fix version.",
         project_key
     );
+    println!(
+        "Tip: add `--set-start-date YYYY-MM-DD`, `--set-release-date YYYY-MM-DD`, `--released`, or `--archived` with --version to update metadata."
+    );
     Ok(())
+}
+
+fn print_project_version_metadata(
+    project_key: &str,
+    version: &jira_core::model::ProjectVersion,
+    prefix: Option<&str>,
+) {
+    if let Some(prefix) = prefix {
+        println!("{} — {} / {}", prefix, project_key, version.name);
+    }
+
+    let status = if version.archived {
+        "archived"
+    } else if version.released {
+        "released"
+    } else {
+        "unreleased"
+    };
+    println!("  Status: {status}");
+    if let Some(date) = version.start_date.as_deref() {
+        println!("  Start: {}", &date[..10.min(date.len())]);
+    }
+    if let Some(date) = version.release_date.as_deref() {
+        println!("  Release: {}", &date[..10.min(date.len())]);
+    }
+    if let Some(description) = version.description.as_deref() {
+        let description = description.trim();
+        if !description.is_empty() {
+            println!("  Description: {description}");
+        }
+    }
+}
+
+fn validate_ymd_date(value: &str, label: &str) -> Result<String> {
+    let value = value.trim();
+    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        anyhow::anyhow!("Invalid {} '{}'. Expected format: YYYY-MM-DD", label, value)
+    })?;
+    Ok(value.to_string())
 }
 
 // ─── create ──────────────────────────────────────────────────────────────────

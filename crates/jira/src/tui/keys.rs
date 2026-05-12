@@ -561,6 +561,7 @@ fn handle_project_version_browser_key(app: &mut App, code: KeyCode) -> AppAction
             picker_cursor_right(&mut app.project_version_cursor, &app.project_version_query);
             AppAction::None
         }
+        KeyCode::Enter => AppAction::RefreshProjectVersionPreview,
         KeyCode::Backspace => {
             if picker_backspace(
                 &mut app.project_version_query,
@@ -571,6 +572,7 @@ fn handle_project_version_browser_key(app: &mut App, code: KeyCode) -> AppAction
                 AppAction::None
             }
         }
+        KeyCode::Char('e') => AppAction::OpenProjectVersionEditModal,
         KeyCode::Char(c) => {
             picker_type_char(
                 &mut app.project_version_query,

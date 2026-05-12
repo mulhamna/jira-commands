@@ -118,12 +118,23 @@ Detail tabs:
 
 ### Project versions browser
 
-| Key       | Action                             |
-| --------- | ---------------------------------- |
-| Type      | Filter project fix versions        |
-| `j` / `k` | Move selection                     |
+| Key       | Action                              |
+| --------- | ----------------------------------- |
+| Type      | Filter project fix versions         |
+| `j` / `k` | Move selection                      |
 | `Enter`   | Refresh backlog preview for version |
-| `Esc`     | Close browser                      |
+| `e`       | Edit start/release dates and status |
+| `Esc`     | Close browser                       |
+
+### Version edit modal
+
+| Key          | Action                           |
+| ------------ | -------------------------------- |
+| `Tab`        | Next field                       |
+| `Shift+Tab`  | Previous field                   |
+| `Ctrl+S`     | Save version metadata            |
+| `Enter`      | Submit when focused on one-line field |
+| `Esc`        | Cancel                           |
 
 ### Theme picker
 

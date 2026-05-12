@@ -17,7 +17,7 @@ use crossterm::{
 use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
 use jira_core::{
     adf::{inject_mentions, markdown_to_adf},
-    model::{field::Field, Issue, Sprint, UpdateIssueRequest},
+    model::{field::Field, Issue, Sprint, UpdateIssueRequest, UpdateProjectVersionRequest},
     IssueType, JiraClient,
 };
 
@@ -173,6 +173,7 @@ pub(super) enum AppAction {
     MarkNotificationsRead,
     CreateIssue,
     OpenProjectVersionBrowser,
+    OpenProjectVersionEditModal,
     RefreshProjectVersionBrowser,
     RefreshProjectVersionPreview,
     EditIssue(String),
@@ -1009,6 +1010,15 @@ pub async fn run_tui(
                         }
                     }
                 }
+            }
+
+            AppAction::OpenProjectVersionEditModal => {
+                let Some(version) = app.selected_project_version().cloned() else {
+                    app.set_status("Select a fix version first", true);
+                    continue;
+                };
+                let project_key = app.project_version_project_key.clone();
+                app.open_modal(Modal::edit_project_version(project_key, version));
             }
 
             AppAction::MarkNotificationsRead => match app.mark_selected_notifications_read() {
@@ -1928,15 +1938,16 @@ pub async fn run_tui(
                         let start = if start.is_empty() { None } else { Some(start) };
 
                         let exclude_raw = modal.field_text(4);
-                        let exclude_weekends = match parse_yes_no_field(&exclude_raw) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                if let Some(m) = app.modal.as_mut() {
-                                    m.set_error(format!("{e}"));
+                        let exclude_weekends =
+                            match parse_yes_no_field(&exclude_raw, "Exclude weekends") {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
                                 }
-                                continue;
-                            }
-                        };
+                            };
 
                         let comment_raw = modal.field_text(5);
                         let comment = comment_raw.trim();
@@ -2089,6 +2100,102 @@ pub async fn run_tui(
                             ),
                             false,
                         );
+                    }
+                    ModalKind::EditProjectVersion {
+                        project_key,
+                        version_id,
+                        version_name,
+                    } => {
+                        let start_raw = modal.field_text(0);
+                        let release_raw = modal.field_text(1);
+                        let released_raw = modal.field_text(2);
+                        let archived_raw = modal.field_text(3);
+
+                        let start_date = if start_raw.trim().is_empty() {
+                            Some(String::new())
+                        } else {
+                            match validate_modal_date(&start_raw, "start date") {
+                                Ok(value) => Some(value),
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        };
+
+                        let release_date = if release_raw.trim().is_empty() {
+                            Some(String::new())
+                        } else {
+                            match validate_modal_date(&release_raw, "release date") {
+                                Ok(value) => Some(value),
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        };
+
+                        let released = match parse_yes_no_field(&released_raw, "Released") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        let archived = match parse_yes_no_field(&archived_raw, "Archived") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+
+                        let request = UpdateProjectVersionRequest {
+                            start_date,
+                            release_date,
+                            released: Some(released),
+                            archived: Some(archived),
+                        };
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.update_project_version(&version_id, &request).await {
+                            Ok(updated) => {
+                                app.close_modal();
+                                if let Some(existing) = app
+                                    .project_version_catalog
+                                    .iter_mut()
+                                    .find(|item| item.id == updated.id)
+                                {
+                                    *existing = updated.clone();
+                                }
+                                if let Some(preview) = app.project_version_preview.as_mut() {
+                                    if preview.version.id == updated.id {
+                                        preview.version = updated.clone();
+                                    }
+                                }
+                                app.set_status(
+                                    format!("✓ Updated version {} / {}", project_key, version_name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Version update failed: {e}"));
+                                }
+                            }
+                        }
                     }
                     ModalKind::ChangeIssueType {
                         key,
@@ -2414,7 +2521,7 @@ async fn resolve_issue_type(
         .await
 }
 
-fn parse_yes_no_field(raw: &str) -> Result<bool> {
+fn parse_yes_no_field(raw: &str, label: &str) -> Result<bool> {
     let value = raw.trim().to_ascii_lowercase();
     if value.is_empty() {
         return Ok(false);
@@ -2424,10 +2531,19 @@ fn parse_yes_no_field(raw: &str) -> Result<bool> {
         "y" | "yes" | "true" | "1" => Ok(true),
         "n" | "no" | "false" | "0" => Ok(false),
         _ => anyhow::bail!(
-            "Invalid Exclude weekends value '{}'. Use y/n, yes/no, true/false, or 1/0",
+            "Invalid {} value '{}'. Use y/n, yes/no, true/false, or 1/0",
+            label,
             raw.trim()
         ),
     }
+}
+
+fn validate_modal_date(raw: &str, label: &str) -> Result<String> {
+    let value = raw.trim();
+    chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| {
+        anyhow::anyhow!("Invalid {} '{}'. Expected format: YYYY-MM-DD", label, value)
+    })?;
+    Ok(value.to_string())
 }
 
 fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {

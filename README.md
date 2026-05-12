@@ -112,8 +112,9 @@ jirac issue list
 jirac issue view PROJ-123
 jirac issue view PROJ-123 --versions
 
-# Browse project fix versions
+# Browse or update project fix versions
 jirac issue versions -p PROJ --version "v1.2.0"
+jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --released
 
 # Create an issue (interactive)
 jirac issue create -p PROJ
@@ -138,6 +139,8 @@ jirac issue view PROJ-123                           # view detail
 jirac issue view PROJ-123 --versions                # include fix-version backlog preview
 jirac issue versions -p PROJ                        # list project fix versions
 jirac issue versions -p PROJ --version "v1.2.0"    # preview backlog for one fix version
+jirac issue versions -p PROJ --version "v1.2.0" --set-start-date 2026-05-20
+jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --released
 jirac issue create -p PROJ                          # create (interactive)
 jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
 jirac issue render --input desc.md                  # preview Markdown -> ADF JSON
@@ -230,7 +233,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview, saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version metadata editing (`e`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
 
 ```bash
 jirac tui -p PROJ

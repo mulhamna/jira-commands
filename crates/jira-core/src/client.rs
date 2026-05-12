@@ -21,7 +21,7 @@ use crate::{
         },
         link::{IssueLink, IssueLinkType},
         sprint::Sprint,
-        version::{ProjectVersion, UpdateProjectVersionRequest},
+        version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
     },
 };
@@ -794,6 +794,28 @@ impl JiraClient {
             .await?;
 
         Ok(versions)
+    }
+
+    /// Create a project version in Jira.
+    pub async fn create_project_version(
+        &self,
+        request: &CreateProjectVersionRequest,
+    ) -> Result<ProjectVersion> {
+        let path = format!("/rest/api/{}/version", self.config.api_version);
+        let body = serde_json::to_value(request)?;
+        let value = self
+            .raw_request("POST", &path, Some(body))
+            .await?
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Empty response when creating project version".into(),
+            })?;
+        let version: ProjectVersion =
+            serde_json::from_value(value).map_err(|e| JiraError::Api {
+                status: 0,
+                message: format!("Failed to parse created project version: {e}"),
+            })?;
+        Ok(version)
     }
 
     /// Update project version metadata like release/start dates or release state.

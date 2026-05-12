@@ -145,7 +145,9 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
         Mode::Transition => " j/k:move  Enter:execute  Esc:cancel".to_string(),
         Mode::Help => " Any key: close".to_string(),
-        Mode::ProjectVersionBrowser => " type:filter  j/k:move  Enter:refresh  e:edit  Esc:close".to_string(),
+        Mode::ProjectVersionBrowser => {
+            " type:filter  j/k:move  Enter:refresh  n:new  e:edit  Esc:close".to_string()
+        }
         Mode::ColumnPicker => " ↑/↓:move  Space:toggle  type:filter  Tab:clear  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
@@ -889,7 +891,7 @@ fn render_project_version_browser_popup(
                 &date[..10.min(date.len())]
             )));
         }
-        right_lines.push(Line::from("  Press e to edit version metadata"));
+        right_lines.push(Line::from("  Press e to edit, n to create a version"));
         right_lines.push(Line::from(""));
         right_lines.push(Line::from(Span::styled(
             "Open backlog:",
@@ -1290,7 +1292,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  Enter     Open split detail view"),
         Line::from("  p         Open saved queries (run/create/edit/delete)"),
         Line::from("  V         Browse project fix versions + backlog preview"),
-        Line::from("            Enter refreshes preview, e edits version metadata"),
+        Line::from("            Enter refreshes preview, n creates, e edits metadata"),
         Line::from("  T         Open theme picker"),
         Line::from("  S         Show server info"),
         Line::from("  g         Show config file"),

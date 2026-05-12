@@ -13,7 +13,8 @@ use inquire::{MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
-        CreateIssueRequest, CreateIssueRequestV2, UpdateIssueRequest, UpdateProjectVersionRequest,
+        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, UpdateIssueRequest,
+        UpdateProjectVersionRequest,
     },
     FieldCache, IssueType, JiraClient,
 };
@@ -112,6 +113,7 @@ pub enum IssueCommand {
     ///   jirac issue versions -p PROJ --version "v1.2.0"
     ///   jirac issue versions -p PROJ --version "v1.2.0" --limit 15
     ///   jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --released
+    ///   jirac issue versions -p PROJ --create --version "v1.3.0" --description "June release"
     #[command(name = "versions")]
     Versions {
         /// Project key (e.g. PROJ). Defaults to configured project when present.
@@ -123,6 +125,18 @@ pub enum IssueCommand {
         /// Maximum number of backlog issues to preview (default: 10)
         #[arg(short, long, default_value = "10", value_name = "N")]
         limit: u32,
+        /// Create a new fix version instead of listing or previewing
+        #[arg(long)]
+        create: bool,
+        /// Rename the selected version
+        #[arg(long, value_name = "NAME")]
+        set_name: Option<String>,
+        /// Set or replace the version description
+        #[arg(long, value_name = "TEXT")]
+        description: Option<String>,
+        /// Clear the version description
+        #[arg(long, conflicts_with = "description")]
+        clear_description: bool,
         /// Set or replace the version release date (YYYY-MM-DD)
         #[arg(long, value_name = "YYYY-MM-DD")]
         set_release_date: Option<String>,
@@ -876,6 +890,10 @@ pub async fn handle(
             project,
             version,
             limit,
+            create,
+            set_name,
+            description,
+            clear_description,
             set_release_date,
             clear_release_date,
             set_start_date,
@@ -887,6 +905,10 @@ pub async fn handle(
             json,
         } => {
             let update = ProjectVersionUpdateArgs {
+                create,
+                set_name,
+                description,
+                clear_description,
                 set_release_date,
                 clear_release_date,
                 set_start_date,
@@ -1314,6 +1336,10 @@ fn print_version_summary(
 
 #[derive(Debug, Clone)]
 struct ProjectVersionUpdateArgs {
+    create: bool,
+    set_name: Option<String>,
+    description: Option<String>,
+    clear_description: bool,
     set_release_date: Option<String>,
     clear_release_date: bool,
     set_start_date: Option<String>,
@@ -1326,7 +1352,11 @@ struct ProjectVersionUpdateArgs {
 
 impl ProjectVersionUpdateArgs {
     fn has_changes(&self) -> bool {
-        self.set_release_date.is_some()
+        self.create
+            || self.set_name.is_some()
+            || self.description.is_some()
+            || self.clear_description
+            || self.set_release_date.is_some()
             || self.clear_release_date
             || self.set_start_date.is_some()
             || self.clear_start_date
@@ -1334,6 +1364,36 @@ impl ProjectVersionUpdateArgs {
             || self.unreleased
             || self.archived
             || self.unarchived
+    }
+
+    fn to_create_request(
+        &self,
+        project_key: &str,
+        version_name: &str,
+    ) -> Result<CreateProjectVersionRequest> {
+        Ok(CreateProjectVersionRequest {
+            name: version_name.trim().to_string(),
+            project: project_key.to_string(),
+            description: normalize_optional_text(self.description.as_deref()),
+            archived: self.archived,
+            released: self.released,
+            release_date: if self.clear_release_date {
+                None
+            } else {
+                self.set_release_date
+                    .as_deref()
+                    .map(|value| validate_ymd_date(value, "release date"))
+                    .transpose()?
+            },
+            start_date: if self.clear_start_date {
+                None
+            } else {
+                self.set_start_date
+                    .as_deref()
+                    .map(|value| validate_ymd_date(value, "start date"))
+                    .transpose()?
+            },
+        })
     }
 
     fn to_request(&self) -> Result<UpdateProjectVersionRequest> {
@@ -1354,6 +1414,15 @@ impl ProjectVersionUpdateArgs {
         };
 
         Ok(UpdateProjectVersionRequest {
+            name: self
+                .set_name
+                .as_deref()
+                .map(|value| value.trim().to_string()),
+            description: if self.clear_description {
+                Some(String::new())
+            } else {
+                normalize_optional_text(self.description.as_deref())
+            },
             archived: if self.archived {
                 Some(true)
             } else if self.unarchived {
@@ -1402,9 +1471,21 @@ async fn view_project_versions(
     if update.has_changes() {
         let version_name = version.clone().ok_or_else(|| {
             anyhow::anyhow!(
-                "Version updates require --version \"<name>\" so jirac knows which fix version to modify"
+                "Version create/update actions require --version \"<name>\" so jirac knows which fix version to create or modify"
             )
         })?;
+
+        if update.create {
+            let request = update.to_create_request(&project_key, &version_name)?;
+            let created = client.create_project_version(&request).await?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&created)?);
+                return Ok(());
+            }
+            print_project_version_metadata(&project_key, &created, Some("✓ Created fix version"));
+            return Ok(());
+        }
+
         let target = versions
             .iter()
             .find(|item| item.name == version_name)
@@ -1508,7 +1589,10 @@ async fn view_project_versions(
         project_key
     );
     println!(
-        "Tip: add `--set-start-date YYYY-MM-DD`, `--set-release-date YYYY-MM-DD`, `--released`, or `--archived` with --version to update metadata."
+        "Tip: add `--set-name`, `--description`, `--set-start-date YYYY-MM-DD`, `--set-release-date YYYY-MM-DD`, `--released`, or `--archived` with --version to update metadata."
+    );
+    println!(
+        "Tip: add `--create --version \"<name>\"` to create a new fix version in the project."
     );
     Ok(())
 }
@@ -1550,6 +1634,13 @@ fn validate_ymd_date(value: &str, label: &str) -> Result<String> {
         anyhow::anyhow!("Invalid {} '{}'. Expected format: YYYY-MM-DD", label, value)
     })?;
     Ok(value.to_string())
+}
+
+fn normalize_optional_text(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 // ─── create ──────────────────────────────────────────────────────────────────

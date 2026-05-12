@@ -562,6 +562,7 @@ fn handle_project_version_browser_key(app: &mut App, code: KeyCode) -> AppAction
             AppAction::None
         }
         KeyCode::Enter => AppAction::RefreshProjectVersionPreview,
+        KeyCode::Char('n') => AppAction::OpenProjectVersionCreateModal,
         KeyCode::Backspace => {
             if picker_backspace(
                 &mut app.project_version_query,

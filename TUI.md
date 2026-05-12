@@ -123,18 +123,21 @@ Detail tabs:
 | Type      | Filter project fix versions         |
 | `j` / `k` | Move selection                      |
 | `Enter`   | Refresh backlog preview for version |
-| `e`       | Edit start/release dates and status |
+| `n`       | Create a new project fix version    |
+| `e`       | Edit name, description, dates, status |
 | `Esc`     | Close browser                       |
 
-### Version edit modal
+### Version create / edit modal
 
-| Key          | Action                           |
-| ------------ | -------------------------------- |
-| `Tab`        | Next field                       |
-| `Shift+Tab`  | Previous field                   |
-| `Ctrl+S`     | Save version metadata            |
+| Key          | Action                                |
+| ------------ | ------------------------------------- |
+| `Tab`        | Next field                            |
+| `Shift+Tab`  | Previous field                        |
+| `Ctrl+S`     | Create or save version metadata       |
 | `Enter`      | Submit when focused on one-line field |
-| `Esc`        | Cancel                           |
+| `Esc`        | Cancel                                |
+
+Create/edit fields include name, description, start date, release date, released, and archived.
 
 ### Theme picker
 

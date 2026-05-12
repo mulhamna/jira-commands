@@ -29,6 +29,9 @@ pub(super) enum ModalKind {
     AddBulkWorklog {
         key: String,
     },
+    CreateProjectVersion {
+        project_key: String,
+    },
     EditProjectVersion {
         project_key: String,
         version_id: String,
@@ -52,6 +55,9 @@ impl ModalKind {
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
             ModalKind::AddWorklog { key } => format!(" Log Work on {key} "),
             ModalKind::AddBulkWorklog { key } => format!(" Bulk Worklog on {key} "),
+            ModalKind::CreateProjectVersion { project_key } => {
+                format!(" New Version: {project_key} ")
+            }
             ModalKind::EditProjectVersion {
                 project_key,
                 version_name,
@@ -70,6 +76,9 @@ impl ModalKind {
             ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
             ModalKind::AddBulkWorklog { .. } => {
                 " Tab: next field   Ctrl+S: log range   Esc: cancel "
+            }
+            ModalKind::CreateProjectVersion { .. } => {
+                " Tab: next field   Ctrl+S: create version   Esc: cancel "
             }
             ModalKind::EditProjectVersion { .. } => {
                 " Tab: next field   Ctrl+S: save version   Esc: cancel "
@@ -304,10 +313,90 @@ impl Modal {
         }
     }
 
+    pub(super) fn create_project_version(project_key: String) -> Self {
+        let mut name = TextArea::from(vec![String::new()]);
+        name.set_cursor_line_style(Style::default());
+        name.set_placeholder_text("v1.2.0");
+
+        let mut description = TextArea::from(vec![String::new()]);
+        description.set_cursor_line_style(Style::default());
+        description.set_placeholder_text("optional");
+
+        let mut start_date = TextArea::from(vec![String::new()]);
+        start_date.set_cursor_line_style(Style::default());
+        start_date.set_placeholder_text("optional YYYY-MM-DD");
+
+        let mut release_date = TextArea::from(vec![String::new()]);
+        release_date.set_cursor_line_style(Style::default());
+        release_date.set_placeholder_text("optional YYYY-MM-DD");
+
+        let mut released = TextArea::from(vec!["n".to_string()]);
+        released.set_cursor_line_style(Style::default());
+        released.set_placeholder_text("y / n");
+
+        let mut archived = TextArea::from(vec!["n".to_string()]);
+        archived.set_cursor_line_style(Style::default());
+        archived.set_placeholder_text("y / n");
+
+        Self {
+            kind: ModalKind::CreateProjectVersion { project_key },
+            fields: vec![
+                ModalField {
+                    label: "Name",
+                    area: name,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Description  (optional)",
+                    area: description,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Start date  (YYYY-MM-DD)",
+                    area: start_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Release date  (YYYY-MM-DD)",
+                    area: release_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Released  (y/N)",
+                    area: released,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Archived  (y/N)",
+                    area: archived,
+                    multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
     pub(super) fn edit_project_version(
         project_key: String,
         version: jira_core::model::ProjectVersion,
     ) -> Self {
+        let mut name = TextArea::from(vec![version.name.clone()]);
+        name.set_cursor_line_style(Style::default());
+
+        let mut description = TextArea::from(vec![version.description.unwrap_or_default()]);
+        description.set_cursor_line_style(Style::default());
+        description.set_placeholder_text("blank = clear");
+
         let mut start_date = TextArea::from(vec![version.start_date.unwrap_or_default()]);
         start_date.set_cursor_line_style(Style::default());
         start_date.set_placeholder_text("blank = clear");
@@ -333,6 +422,16 @@ impl Modal {
                 version_name: version.name,
             },
             fields: vec![
+                ModalField {
+                    label: "Name",
+                    area: name,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Description  (blank = clear)",
+                    area: description,
+                    multiline: true,
+                },
                 ModalField {
                     label: "Start date  (YYYY-MM-DD, blank = clear)",
                     area: start_date,

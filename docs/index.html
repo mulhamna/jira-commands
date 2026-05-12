@@ -10,14 +10,35 @@
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Official web documentation for jirac (jira-commands): a Rust terminal tool for Jira, with TUI, MCP server, and plugin support." />
-  <meta property="og:title" content="jirac — Jira on the command line" />
-  <meta property="og:description" content="Single-binary Rust CLI for Jira with split-pane TUI, MCP server, bulk ops, and runtime custom-field discovery." />
+  <meta name="description" content="jirac is a Jira CLI and terminal UI for Jira issue management, JQL search, fix versions, worklogs, MCP integration, and automation-friendly workflows." />
+  <meta name="keywords" content="jira cli,jira command line,jira terminal,jira tui,jql cli,jira mcp,jira automation,jira-commands,jirac" />
+  <link rel="canonical" href="https://mulhamna.github.io/jira-commands/" />
+  <meta property="og:title" content="jirac — Jira CLI, terminal UI, and MCP tooling" />
+  <meta property="og:description" content="Open-source Jira CLI for terminal-first teams: search Jira, browse issues, manage fix versions, log work, and run Jira through TUI or MCP." />
   <meta property="og:image" content="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" />
+  <meta property="og:url" content="https://mulhamna.github.io/jira-commands/" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="jirac — Jira CLI, terminal UI, and MCP tooling" />
+  <meta name="twitter:description" content="A modern Jira CLI for issue management, JQL, worklogs, fix versions, and terminal-first workflows." />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23124ee5'/%3E%3Ctext x='32' y='41' font-size='26' font-weight='700' text-anchor='middle' fill='white' font-family='Arial, sans-serif'%3Ejc%3C/text%3E%3C/svg%3E" />
-  <title>jirac Docs - Jira from Terminal</title>
+  <title>Jira CLI for Terminal, TUI, and MCP | jirac Docs</title>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "jirac",
+      "alternateName": ["jira-commands", "Jira CLI"],
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "description": "Open-source Jira CLI with terminal UI, JQL search, fix-version management, worklogs, and MCP integration.",
+      "url": "https://mulhamna.github.io/jira-commands/",
+      "downloadUrl": "https://github.com/mulhamna/jira-commands",
+      "softwareHelp": "https://mulhamna.github.io/jira-commands/",
+      "image": "https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg",
+      "license": "https://github.com/mulhamna/jira-commands/blob/main/LICENSE"
+    }
+  </script>
   <script>
     (function () {
       const saved = localStorage.getItem('theme');
@@ -228,9 +249,9 @@
       <div class="absolute inset-0 bg-grid"></div>
       <div class="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:px-8 lg:py-20">
         <div class="max-w-2xl">
-          <p class="mb-3 inline-flex rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">Terminal Jira CLI + MCP</p>
-          <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">Manage Jira faster from terminal with <span class="text-brand-700">jirac</span></h1>
-          <p class="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-400">Open-source Rust tool for issue management, native backlog type changes, native project moves, JQL search, mention notifications, worklogs, attachments, bulk actions, TUI themes, and MCP integration.</p>
+          <p class="mb-3 inline-flex rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">Jira CLI + terminal UI + MCP</p>
+          <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">A modern <span class="text-brand-700">Jira CLI</span> for terminal-first teams</h1>
+          <p class="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-400">jirac is an open-source Jira command-line tool with a full TUI, JQL search, fix-version management, worklogs, attachments, backlog moves, and MCP integration for AI-assisted workflows.</p>
           <div class="mt-8 flex flex-wrap gap-3">
             <a href="#quickstart" class="rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700">Get Started</a>
             <a href="#non-tech" class="rounded-md border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-brand-300 hover:text-brand-700">For Non-Tech Users</a>
@@ -253,6 +274,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="why" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Why jirac</h2>
+      <p class="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-400">If you searched for a Jira CLI, Jira command line tool, or terminal client for Jira, this page is the quick answer: <strong>jirac</strong> is built for browsing, updating, and automating Jira without living in the web UI.</p>
       <div class="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
           <h3 class="font-semibold">Latest Jira API v3</h3>
@@ -270,6 +292,26 @@ $ jirac issue transition CORE-183 --to Done
           <h3 class="font-semibold">Cross-platform</h3>
           <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">macOS, Linux, and Windows releases with focused CLI binaries for terminal and MCP workflows.</p>
         </article>
+      </div>
+    </section>
+
+    <section class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">What makes this Jira CLI different?</h2>
+        <div class="mt-6 grid gap-4 lg:grid-cols-3">
+          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
+            <h3 class="font-semibold">More than a thin wrapper</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">jirac is not just a couple of REST helpers. It ships a daily-driver Jira CLI, interactive TUI, MCP server, saved JQL flows, version browsing, and native-style issue move/type actions.</p>
+          </article>
+          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
+            <h3 class="font-semibold">Built for real Jira workflows</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use it to list assigned issues, search with JQL, update assignees, log work, preview fix-version backlog, manage project versions, and handle mention notifications from the terminal.</p>
+          </article>
+          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
+            <h3 class="font-semibold">Good fit for humans and agents</h3>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Terminal users get keyboard speed; automation stacks get CLI composability; AI tooling gets <code>jirac-mcp</code> for MCP-based Jira access.</p>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -358,6 +400,8 @@ $ jirac issue transition CORE-183 --to Done
               <tr><td class="px-4 py-3">View issue detail with fix-version backlog preview</td><td class="px-4 py-3 command-cell"><code>jirac issue view MYPROJ-123 --versions</code></td></tr>
               <tr><td class="px-4 py-3">Browse project fix versions</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ</code></td></tr>
               <tr><td class="px-4 py-3">Preview backlog for one fix version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --version "v1.2.0"</code></td></tr>
+              <tr><td class="px-4 py-3">Create a project version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --create --version "v1.3.0"</code></td></tr>
+              <tr><td class="px-4 py-3">Set release date on a version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --version "v1.2.0" --set-release-date 2026-06-30 --released</code></td></tr>
               <tr><td class="px-4 py-3">Create issue</td><td class="px-4 py-3 command-cell"><code>jirac issue create --project MYPROJ</code></td></tr>
               <tr><td class="px-4 py-3">Transition issue</td><td class="px-4 py-3 command-cell"><code>jirac issue transition MYPROJ-123 --to Done</code></td></tr>
               <tr><td class="px-4 py-3">Add worklog</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --comment "Worked on API"</code></td></tr>
@@ -549,6 +593,10 @@ cargo build --all</code></pre>
           <details class="rounded border border-slate-200 dark:border-slate-700 p-4">
             <summary class="cursor-pointer font-semibold">Does it support custom fields?</summary>
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Yes, custom fields are discovered dynamically per project.</p>
+          </details>
+          <details class="rounded border border-slate-200 dark:border-slate-700 p-4">
+            <summary class="cursor-pointer font-semibold">Can I use jirac as my main Jira CLI?</summary>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Yes. jirac covers day-to-day Jira command-line work like issue browsing, JQL search, worklogs, transitions, fix versions, project versions, and MCP/automation workflows.</p>
           </details>
         </div>
       </div>

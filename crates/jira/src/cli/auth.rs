@@ -1,3 +1,4 @@
+use crate::help_text;
 use anyhow::{Context, Result};
 use clap::{Subcommand, ValueEnum};
 use inquire::{Password, PasswordDisplayMode, Select, Text};
@@ -22,10 +23,7 @@ pub enum AuthTypeArg {
 #[derive(Debug, Subcommand)]
 pub enum AuthCommand {
     /// Set up Jira credentials — URL, email/username, and token/password
-    ///
-    /// Credentials are saved to ~/.config/jira/config.toml (chmod 600 on Unix).
-    /// Override the active runtime profile with environment variables:
-    ///   JIRA_PROFILE, JIRA_URL, JIRA_EMAIL, JIRA_TOKEN
+    #[command(long_about = help_text::AUTH_LOGIN_LONG_ABOUT)]
     Login {
         /// Profile name to save as active (defaults to hostname-derived name)
         #[arg(long, value_name = "PROFILE")]
@@ -64,6 +62,7 @@ pub enum AuthCommand {
     },
 
     /// Show current authentication status and active profile
+    #[command(long_about = help_text::AUTH_STATUS_LONG_ABOUT)]
     Status {
         /// Show a specific profile instead of the active one
         #[arg(long, value_name = "PROFILE")]

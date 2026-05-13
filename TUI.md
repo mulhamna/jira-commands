@@ -26,6 +26,8 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `C`         | Open column settings popup                                    |
 | `c`         | Create issue                                                  |
 | `e`         | Edit issue                                                    |
+| `y`         | Change issue type in a native Jira move modal                 |
+| `M`         | Move issue to another project in a native Jira modal          |
 | `a`         | Open native assignee popup and assign issue                   |
 | `t`         | Transition issue                                              |
 | `;`         | Add comment                                                   |
@@ -33,9 +35,13 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `b`         | Add a bulk/range worklog                                      |
 | `l`         | Manage labels                                                 |
 | `m`         | Open native component popup and set project-scoped components |
+| `v`         | Open native fix version popup and set project-scoped versions |
+| `s`         | Add issue to an active/future sprint                          |
 | `u`         | Upload attachment                                             |
 | `o`         | Open in browser                                               |
 | `r`         | Refresh issue list                                            |
+| `n`         | Scan and open Jira mention notifications                      |
+| `R`         | Mark selected notification issue as read                      |
 | `/`         | JQL search                                                    |
 | `?`         | Show in-app help                                              |
 | `q` / `Esc` | Quit or go back, depending on context                         |
@@ -50,6 +56,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 
 Detail tabs:
 - Summary
+- Versions
 - Comments
 - Worklog
 - Attachments
@@ -91,6 +98,16 @@ Detail tabs:
 | `Enter`   | Save selected components  |
 | `Esc`     | Cancel                    |
 
+### Fix version popup
+
+| Key       | Action                     |
+| --------- | -------------------------- |
+| Type      | Filter project fix versions |
+| `j` / `k` | Move selection             |
+| `Space`   | Toggle selected version    |
+| `Enter`   | Save selected versions     |
+| `Esc`     | Cancel                     |
+
 ### Saved queries popup
 
 | Key       | Action                   |
@@ -98,6 +115,29 @@ Detail tabs:
 | `j` / `k` | Move selection           |
 | `Enter`   | Run selected saved query |
 | `Esc`     | Cancel                   |
+
+### Project versions browser
+
+| Key       | Action                              |
+| --------- | ----------------------------------- |
+| Type      | Filter project fix versions         |
+| `j` / `k` | Move selection                      |
+| `Enter`   | Refresh backlog preview for version |
+| `n`       | Create a new project fix version    |
+| `e`       | Edit name, description, dates, status |
+| `Esc`     | Close browser                       |
+
+### Version create / edit modal
+
+| Key          | Action                                |
+| ------------ | ------------------------------------- |
+| `Tab`        | Next field                            |
+| `Shift+Tab`  | Previous field                        |
+| `Ctrl+S`     | Create or save version metadata       |
+| `Enter`      | Submit when focused on one-line field |
+| `Esc`        | Cancel                                |
+
+Create/edit fields include name, description, start date, release date, released, and archived.
 
 ### Theme picker
 

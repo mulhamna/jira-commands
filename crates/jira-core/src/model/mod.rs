@@ -15,5 +15,5 @@ pub use issue::{
 };
 pub use link::{IssueLink, IssueLinkType};
 pub use sprint::Sprint;
-pub use version::ProjectVersion;
+pub use version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest};
 pub use worklog::Worklog;

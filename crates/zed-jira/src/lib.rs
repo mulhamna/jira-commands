@@ -4,7 +4,7 @@ use zed::serde_json::Value;
 use zed::settings::ContextServerSettings;
 use zed_extension_api as zed;
 
-const CONTEXT_SERVER_ID: &str = "jira";
+const CONTEXT_SERVER_ID: &str = "jirac-mcp-server";
 const REPO: &str = "mulhamna/jira-commands";
 
 struct JiraExtension;
@@ -145,7 +145,7 @@ const INSTALLATION_INSTRUCTIONS: &str = r#"Install the Jira extension from the Z
 ```json
 {
   \"context_servers\": {
-    \"jira\": {
+    \"jirac-mcp-server\": {
       \"settings\": {
         \"jira_url\": \"https://yourcompany.atlassian.net\",
         \"jira_email\": \"you@example.com\",

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.37.1](https://github.com/mulhamna/jira-commands/compare/v0.37.0...v0.37.1) (2026-05-14)
+
+
+### Bug Fixes
+
+* **zed-jira:** use jirac-mcp-server extension id ([#241](https://github.com/mulhamna/jira-commands/issues/241)) ([db19460](https://github.com/mulhamna/jira-commands/commit/db194602bffdc7ac89adf6713720d2cc95662df7))
+
 ## [0.37.0](https://github.com/mulhamna/jira-commands/compare/v0.36.0...v0.37.0) (2026-05-13)
 
 

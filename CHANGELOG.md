@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.38.1](https://github.com/mulhamna/jira-commands/compare/v0.38.0...v0.38.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* restore release manifest PR flow ([#246](https://github.com/mulhamna/jira-commands/issues/246)) ([a768719](https://github.com/mulhamna/jira-commands/commit/a768719eac16f9231f731a38fa912a2bedc42428))
+
 ## [0.38.0](https://github.com/mulhamna/jira-commands/compare/v0.37.1...v0.38.0) (2026-05-15)
 
 

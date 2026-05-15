@@ -135,6 +135,8 @@ jirac tui -p PROJ
 jirac issue list                                    # assigned to you
 jirac issue list -p PROJ                            # by project
 jirac issue list --jql "status = 'In Progress'"     # custom JQL
+jirac issue standup                                  # daily standup summary
+jirac issue sprint-summary -p PROJ                   # current sprint summary
 
 jirac issue view PROJ-123                           # view detail
 jirac issue view PROJ-123 --versions                # include fix-version backlog preview
@@ -289,7 +291,7 @@ export JIRA_TOKEN=your_api_token
 
 Use `jirac mcp install --client <target>` to register `jirac-mcp` with supported clients, or `jirac mcp doctor` to check prerequisites.
 
-Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, generic JSON snippets, and Zed. Zed uses the official `Jira` marketplace extension from <https://github.com/mulhamna/jirac-ext>, while `jirac mcp install --client zed` seeds `context_servers.jira.settings` in `settings.json`.
+Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, OpenCode, generic JSON snippets, and Zed. Zed uses the official `Jira` marketplace extension from <https://github.com/mulhamna/jirac-ext>, while `jirac mcp install --client zed` seeds `context_servers.jira.settings` in `settings.json`.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 

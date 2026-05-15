@@ -1,6 +1,6 @@
 ---
 name: jirac
-description: Jira issue management skill for OpenClaw using the jirac CLI. Requires the `jirac` binary to be installed and authenticated before use. Use when listing, viewing, creating, updating, transitioning, commenting on, attaching files to, bulk-editing, cloning, deleting, or logging work against Jira issues from agent workflows.
+description: Jira issue management skill for OpenClaw using the jirac CLI. Requires the `jirac` binary to be installed and authenticated before use. Use when listing, viewing, creating, updating, transitioning, commenting on, attaching files to, bulk-editing, cloning, deleting, logging work against Jira issues, or generating standup and sprint summaries from agent workflows.
 metadata: {"openclaw":{"emoji":"🎫","requires":{"bins":["jirac"]},"install":[{"id":"github-releases","kind":"download","label":"Install jirac from GitHub Releases","url":"https://github.com/mulhamna/jira-commands/releases","extract":false}],"homepage":"https://github.com/mulhamna/jira-commands"}}
 ---
 
@@ -19,7 +19,8 @@ Use `jirac` as the Jira execution surface.
 3. Prefer direct `jirac` commands over raw Jira API calls when the CLI already supports the action.
 4. Use `jirac issue fields` when required fields or custom fields are unclear.
 5. Use `jirac issue transition <KEY>` without a transition argument when the target status is not known yet — shows an interactive picker.
-6. Confirm intent before destructive or high-impact operations such as delete, bulk edits, transitions, and file attachments.
+6. Use `jirac issue standup` when the user wants a concise personal update from assigned work, and `jirac issue sprint-summary -p PROJ` for a project sprint rollup.
+7. Confirm intent before destructive or high-impact operations such as delete, bulk edits, transitions, and file attachments.
 
 ## Common commands
 
@@ -28,6 +29,8 @@ Use `jirac` as the Jira execution surface.
 jirac issue list
 jirac issue list -p PROJ
 jirac issue list --jql 'project = PROJ AND status = "In Progress"'
+jirac issue standup
+jirac issue sprint-summary -p PROJ
 jirac issue view PROJ-123
 
 # Create

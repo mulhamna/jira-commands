@@ -42,6 +42,8 @@ pub enum McpClient {
     Cursor,
     GeminiCli,
     Codex,
+    #[value(name = "opencode")]
+    OpenCode,
     GenericJson,
     Zed,
 }
@@ -179,6 +181,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::Cursor,
             McpClient::GeminiCli,
             McpClient::Codex,
+            McpClient::OpenCode,
             McpClient::GenericJson,
             McpClient::Zed,
         ],
@@ -295,7 +298,9 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
             config_path_from_env_or_default("CURSOR_CONFIG", home.join(".cursor/mcp.json")),
             "mcpServers",
         ),
-        McpClient::GeminiCli | McpClient::Codex | McpClient::GenericJson => unreachable!(),
+        McpClient::GeminiCli | McpClient::Codex | McpClient::OpenCode | McpClient::GenericJson => {
+            unreachable!()
+        }
         McpClient::Zed => ("zed", zed_settings_path(&home), "context_servers"),
     };
 
@@ -339,6 +344,11 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             program: "codex",
             note: "Delegates to `codex mcp add ...`.",
         },
+        McpClient::OpenCode => ClientDescriptor::Delegated {
+            label: "opencode",
+            program: "opencode",
+            note: "Delegates to `opencode mcp add ...`.",
+        },
         McpClient::GenericJson => ClientDescriptor::SnippetOnly {
             label: "generic-json",
             note: "Prints a portable JSON snippet instead of writing a file.",
@@ -363,6 +373,11 @@ fn client_adapter(client: &McpClient) -> Option<ClientAdapter> {
         McpClient::Codex => Some(ClientAdapter {
             label: "codex",
             program: "codex",
+            build_steps: codex_steps,
+        }),
+        McpClient::OpenCode => Some(ClientAdapter {
+            label: "opencode",
+            program: "opencode",
             build_steps: codex_steps,
         }),
         _ => None,
@@ -562,7 +577,10 @@ fn zed_settings_path(home: &Path) -> PathBuf {
 }
 
 fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
-    if !matches!(client, McpClient::GeminiCli | McpClient::Codex) {
+    if !matches!(
+        client,
+        McpClient::GeminiCli | McpClient::Codex | McpClient::OpenCode
+    ) {
         return Ok(command.to_string());
     }
 
@@ -726,6 +744,13 @@ mod tests {
         let adapter = client_adapter(&McpClient::GeminiCli).unwrap();
         let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
         assert!(preview.contains("gemini mcp add -s user jira jirac-mcp serve"));
+    }
+
+    #[test]
+    fn opencode_preview_matches_cli_shape() {
+        let adapter = client_adapter(&McpClient::OpenCode).unwrap();
+        let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
+        assert!(preview.contains("opencode mcp add jira -- jirac-mcp serve --transport stdio"));
     }
 
     #[test]

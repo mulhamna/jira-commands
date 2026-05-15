@@ -47,7 +47,7 @@ enum Commands {
         #[command(subcommand)]
         command: cli::plan::PlanCommand,
     },
-    /// Register jirac-mcp with supported MCP clients like Claude, Cursor, Gemini CLI, or Codex
+    /// Register jirac-mcp with supported MCP clients like Claude, Cursor, Gemini CLI, OpenCode, or Codex
     Mcp {
         #[command(subcommand)]
         command: cli::mcp::McpCommand,

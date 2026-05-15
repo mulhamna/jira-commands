@@ -305,7 +305,7 @@ $ jirac issue transition CORE-183 --to Done
           </article>
           <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
             <h3 class="font-semibold">Built for real Jira workflows</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use it to list assigned issues, search with JQL, update assignees, log work, preview fix-version backlog, manage project versions, and handle mention notifications from the terminal.</p>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use it to list assigned issues, generate daily standups and sprint summaries, search with JQL, update assignees, log work, preview fix-version backlog, manage project versions, and handle mention notifications from the terminal.</p>
           </article>
           <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
             <h3 class="font-semibold">Good fit for humans and agents</h3>
@@ -396,6 +396,8 @@ $ jirac issue transition CORE-183 --to Done
             <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
               <tr><td class="px-4 py-3">List assigned issues</td><td class="px-4 py-3 command-cell"><code>jirac issue list</code></td></tr>
               <tr><td class="px-4 py-3">List by project</td><td class="px-4 py-3 command-cell"><code>jirac issue list --project MYPROJ</code></td></tr>
+              <tr><td class="px-4 py-3">Daily standup summary</td><td class="px-4 py-3 command-cell"><code>jirac issue standup</code></td></tr>
+              <tr><td class="px-4 py-3">Current sprint summary</td><td class="px-4 py-3 command-cell"><code>jirac issue sprint-summary --project MYPROJ</code></td></tr>
               <tr><td class="px-4 py-3">View issue detail</td><td class="px-4 py-3 command-cell"><code>jirac issue view MYPROJ-123</code></td></tr>
               <tr><td class="px-4 py-3">View issue detail with fix-version backlog preview</td><td class="px-4 py-3 command-cell"><code>jirac issue view MYPROJ-123 --versions</code></td></tr>
               <tr><td class="px-4 py-3">Browse project fix versions</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ</code></td></tr>
@@ -491,14 +493,17 @@ jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
 jirac mcp install --client codex
-jirac mcp install --client generic-json</code></pre>
+jirac mcp install --client opencode
+jirac mcp install --client generic-json
+jirac mcp install --client zed</code></pre>
             </div>
             <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-400">
               <li><code>generic-json</code> prints a portable JSON snippet instead of writing a file.</li>
-              <li><code>gemini-cli</code> and <code>codex</code> delegate to their native <code>mcp add</code> commands.</li>
+              <li><code>gemini-cli</code>, <code>codex</code>, and <code>opencode</code> delegate to their native <code>mcp add</code> commands.</li>
               <li>Use <code>--print</code> to show the JSON snippet or delegated client command first.</li>
               <li>Use <code>--dry-run</code> to preview without writing.</li>
               <li>Use <code>--force</code> to overwrite an existing entry with the same name.</li>
+              <li>Install helpers use the active Jira profile by default; if you only have one Jira login configured, that is the profile the MCP server will use.</li>
             </ul>
           </article>
         </div>

@@ -165,7 +165,7 @@ Supported targets now:
 - `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
 - `gemini-cli` (delegates to `gemini mcp add -s user ...`)
 - `codex` (delegates to `codex mcp add ...`)
-- `opencode` (delegates to `opencode mcp add ...`)
+- `opencode` (`~/.config/opencode/opencode.jsonc`, direct JSONC write)
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
 - `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension published from <https://github.com/mulhamna/jirac-ext>)
 

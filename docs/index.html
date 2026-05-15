@@ -499,7 +499,8 @@ jirac mcp install --client zed</code></pre>
             </div>
             <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-400">
               <li><code>generic-json</code> prints a portable JSON snippet instead of writing a file.</li>
-              <li><code>gemini-cli</code>, <code>codex</code>, and <code>opencode</code> delegate to their native <code>mcp add</code> commands.</li>
+              <li><code>gemini-cli</code> and <code>codex</code> delegate to their native <code>mcp add</code> commands.</li>
+              <li><code>opencode</code> writes <code>~/.config/opencode/opencode.jsonc</code> directly because its CLI flow is interactive.</li>
               <li>Use <code>--print</code> to show the JSON snippet or delegated client command first.</li>
               <li>Use <code>--dry-run</code> to preview without writing.</li>
               <li>Use <code>--force</code> to overwrite an existing entry with the same name.</li>

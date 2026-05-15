@@ -154,6 +154,7 @@ jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
 jirac mcp install --client codex
+jirac mcp install --client opencode
 jirac mcp install --client generic-json
 jirac mcp install --client zed
 ```
@@ -164,6 +165,7 @@ Supported targets now:
 - `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
 - `gemini-cli` (delegates to `gemini mcp add -s user ...`)
 - `codex` (delegates to `codex mcp add ...`)
+- `opencode` (delegates to `opencode mcp add ...`)
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
 - `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension published from <https://github.com/mulhamna/jirac-ext>)
 
@@ -171,6 +173,7 @@ Helpful flags:
 - `--print` prints the JSON snippet or delegated client command first
 - `--dry-run` previews without writing
 - `--force` overwrites an existing MCP entry with the same name, or runs remove+add for delegated clients
+- install helpers use the active Jira profile by default; if you only have one Jira login configured, that is the profile the MCP server will use
 - `--name jira` changes the MCP server name (except `zed`, which uses the fixed `jira` context server id)
 - `--command jirac-mcp` changes the launched binary
 - `--transport stdio` changes the transport args

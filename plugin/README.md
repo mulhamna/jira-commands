@@ -52,6 +52,8 @@ jirac auth login
 | `/jira:attach` | Upload a file or image to an issue |
 | `/jira:fields` | Inspect available Jira fields for a project and issue type |
 | `/jira:jql` | Build and run a JQL query interactively |
+| `/jira:daily-standup` | Generate a markdown-ready daily standup summary from assigned Jira issues |
+| `/jira:sprint-summary` | Summarize the current or named sprint by status and assignee |
 | `/jira:api` | Execute any raw Jira REST API call (GET, POST, PUT, DELETE, PATCH) |
 
 ---
@@ -59,9 +61,9 @@ jirac auth login
 ## Use cases
 
 **Daily standup prep**
-> "list my in-progress issues" → `/jira:list-issues`
+> "generate my standup for today" → `/jira:daily-standup`
 
-Claude lists all issues currently assigned to you with status In Progress.
+Claude groups your assigned issues into recently done, in progress, next up, and blocked buckets.
 
 ---
 
@@ -124,3 +126,9 @@ export JIRA_TOKEN=your_api_token
 ## Source
 
 [github.com/mulhamna/jira-commands](https://github.com/mulhamna/jira-commands)
+
+
+**Sprint rollup**
+> "summarize the current sprint in PROJ" → `/jira:sprint-summary`
+
+Claude summarizes sprint progress by status and assignee for a quick project pulse.

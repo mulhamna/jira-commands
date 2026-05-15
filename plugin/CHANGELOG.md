@@ -2,6 +2,14 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.16.0] - 2026-05-15
+
+### Added
+- Add Claude Code skills for daily standup and sprint summary workflows.
+
+### Changed
+- Document the OpenCode MCP install helper alongside the existing MCP client targets.
+
 ## [0.15.0] - 2026-04-30
 
 ### Changed

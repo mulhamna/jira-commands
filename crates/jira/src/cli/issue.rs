@@ -6,15 +6,15 @@ use crate::{
     version_insights::{extract_fix_versions, load_issue_version_insight},
 };
 use anyhow::{Context, Result};
-use chrono::NaiveDate;
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
-        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, UpdateIssueRequest,
-        UpdateProjectVersionRequest,
+        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, Issue,
+        UpdateIssueRequest, UpdateProjectVersionRequest,
     },
     FieldCache, IssueType, JiraClient,
 };
@@ -45,6 +45,57 @@ pub enum IssueCommand {
         #[arg(short, long, default_value = "25", value_name = "N")]
         limit: u32,
         /// Output results as JSON array
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Generate a daily standup summary from your assigned issues
+    ///
+    /// By default this inspects issues assigned to the current user and groups
+    /// them into recently done, in progress, next up, and blocked buckets.
+    /// Use --project to scope the report, or --jql for a custom source query.
+    ///
+    /// Examples:
+    ///   jirac issue standup
+    ///   jirac issue standup -p PROJ
+    ///   jirac issue standup --jql 'assignee = currentUser() AND project = PROJ ORDER BY updated DESC'
+    Standup {
+        /// Project key (e.g. PROJ). Overrides default project from config.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Raw JQL query — overrides --project when both are provided
+        #[arg(long, value_name = "JQL")]
+        jql: Option<String>,
+        /// Lookback window for the "recently done" bucket (for example 2d, 36h, 1w)
+        #[arg(long, default_value = "2d", value_name = "WINDOW")]
+        since: String,
+        /// Maximum number of issues to inspect (default: 50, max: 100)
+        #[arg(short, long, default_value = "50", value_name = "N")]
+        limit: u32,
+        /// Output the standup data as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Summarize the current or named sprint for a project
+    ///
+    /// Without --sprint, targets openSprints() for the project.
+    ///
+    /// Examples:
+    ///   jirac issue sprint-summary -p PROJ
+    ///   jirac issue sprint-summary -p PROJ --sprint "Sprint 24"
+    #[command(name = "sprint-summary")]
+    SprintSummary {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name or numeric sprint ID. Defaults to openSprints().
+        #[arg(long, value_name = "SPRINT")]
+        sprint: Option<String>,
+        /// Maximum number of sprint issues to inspect (default: 100)
+        #[arg(short, long, default_value = "100", value_name = "N")]
+        limit: u32,
+        /// Output the summary as JSON
         #[arg(long)]
         json: bool,
     },
@@ -874,6 +925,19 @@ pub async fn handle(
             limit,
             json,
         } => list_issues(client, project.or(default_project), jql, limit, json).await,
+        IssueCommand::Standup {
+            project,
+            jql,
+            since,
+            limit,
+            json,
+        } => standup_summary(client, project.or(default_project), jql, since, limit, json).await,
+        IssueCommand::SprintSummary {
+            project,
+            sprint,
+            limit,
+            json,
+        } => sprint_summary(client, project.or(default_project), sprint, limit, json).await,
         IssueCommand::Notifications {
             project,
             since,
@@ -3816,4 +3880,274 @@ fn read_description_file(
 fn _use_old_request() {
     let _ = CreateIssueRequest::default();
     let _: Option<Value> = None;
+}
+
+fn issue_status_category(issue: &Issue) -> String {
+    issue
+        .fields
+        .get("status")
+        .and_then(|status| status.get("statusCategory"))
+        .and_then(|category| category.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_lowercase()
+}
+
+fn issue_is_blocked(issue: &Issue) -> bool {
+    let status = issue.status.to_lowercase();
+    status.contains("blocked") || status.contains("on hold") || status.contains("stuck")
+}
+
+fn parse_relative_window(raw: &str) -> Result<Duration> {
+    let value = raw.trim().to_lowercase();
+    if value.len() < 2 {
+        anyhow::bail!("Invalid relative window '{raw}'. Use values like 2d, 36h, or 1w.");
+    }
+
+    let (num, unit) = value.split_at(value.len() - 1);
+    let amount: i64 = num.parse().with_context(|| {
+        format!("Invalid relative window '{raw}'. Use values like 2d, 36h, or 1w.")
+    })?;
+
+    match unit {
+        "h" => Ok(Duration::hours(amount)),
+        "d" => Ok(Duration::days(amount)),
+        "w" => Ok(Duration::weeks(amount)),
+        _ => anyhow::bail!("Invalid relative window '{raw}'. Use values like 2d, 36h, or 1w."),
+    }
+}
+
+fn issue_updated_at(issue: &Issue) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(&issue.updated)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn format_issue_line(issue: &Issue) -> String {
+    format!("- {} [{}] {}", issue.key, issue.status, issue.summary)
+}
+
+fn escape_jql_literal(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+async fn standup_summary(
+    client: JiraClient,
+    project: Option<String>,
+    jql: Option<String>,
+    since: String,
+    limit: u32,
+    json: bool,
+) -> Result<()> {
+    let cutoff = Utc::now() - parse_relative_window(&since)?;
+    let query = if let Some(jql) = jql {
+        jql
+    } else if let Some(project) = project {
+        format!("project = {project} AND assignee = currentUser() ORDER BY updated DESC")
+    } else {
+        "assignee = currentUser() ORDER BY updated DESC".to_string()
+    };
+
+    let spinner = spinner_new("Generating standup summary...");
+    let issues = client
+        .search_issues(&query, None, Some(limit.min(100)))
+        .await
+        .context("Failed to fetch issues for standup summary")?
+        .issues;
+    spinner.finish_and_clear();
+
+    let mut done = vec![];
+    let mut in_progress = vec![];
+    let mut next_up = vec![];
+    let mut blocked = vec![];
+    let mut other = vec![];
+
+    for issue in issues {
+        let category = issue_status_category(&issue);
+        let is_done_recent = category == "done"
+            && issue_updated_at(&issue)
+                .map(|updated| updated >= cutoff)
+                .unwrap_or(false);
+
+        if issue_is_blocked(&issue) {
+            blocked.push(issue);
+        } else if is_done_recent {
+            done.push(issue);
+        } else if category == "indeterminate" {
+            in_progress.push(issue);
+        } else if category == "new" {
+            next_up.push(issue);
+        } else {
+            other.push(issue);
+        }
+    }
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "query": query,
+                "since": since,
+                "recently_done": done,
+                "in_progress": in_progress,
+                "next_up": next_up,
+                "blocked": blocked,
+                "other": other,
+            }))?
+        );
+        return Ok(());
+    }
+
+    println!("# Daily standup");
+    println!();
+    println!("Source: `{}`", query);
+    println!("Recently done window: {}", since);
+    println!();
+
+    for (title, items) in [
+        ("Recently done", &done),
+        ("In progress", &in_progress),
+        ("Next up", &next_up),
+        ("Blocked", &blocked),
+        ("Other", &other),
+    ] {
+        if items.is_empty() {
+            continue;
+        }
+        println!("## {} ({})", title, items.len());
+        for issue in items {
+            println!("{}", format_issue_line(issue));
+        }
+        println!();
+    }
+
+    if done.is_empty()
+        && in_progress.is_empty()
+        && next_up.is_empty()
+        && blocked.is_empty()
+        && other.is_empty()
+    {
+        println!("No issues matched the standup query.");
+    }
+
+    Ok(())
+}
+
+async fn sprint_summary(
+    client: JiraClient,
+    project: Option<String>,
+    sprint: Option<String>,
+    limit: u32,
+    json: bool,
+) -> Result<()> {
+    let project =
+        project.context("Project is required. Pass --project or configure a default project.")?;
+    let sprint_label = sprint
+        .clone()
+        .unwrap_or_else(|| "openSprints()".to_string());
+    let sprint_clause = match sprint {
+        Some(value) if value.trim().parse::<u64>().is_ok() => format!("sprint = {}", value.trim()),
+        Some(value) => format!("sprint = \"{}\"", escape_jql_literal(value.trim())),
+        None => "sprint in openSprints()".to_string(),
+    };
+    let query = format!(
+        "project = {} AND {} ORDER BY status ASC, updated DESC",
+        project, sprint_clause
+    );
+
+    let spinner = spinner_new("Generating sprint summary...");
+    let issues = client
+        .search_issues(&query, None, Some(limit.min(100)))
+        .await
+        .context("Failed to fetch issues for sprint summary")?
+        .issues;
+    spinner.finish_and_clear();
+
+    let mut by_status: HashMap<String, Vec<Issue>> = HashMap::new();
+    let mut by_assignee: HashMap<String, usize> = HashMap::new();
+    let mut done_count = 0usize;
+    let mut in_progress_count = 0usize;
+    let mut todo_count = 0usize;
+    let mut blocked_count = 0usize;
+
+    for issue in issues {
+        let category = issue_status_category(&issue);
+        if issue_is_blocked(&issue) {
+            blocked_count += 1;
+        }
+        match category.as_str() {
+            "done" => done_count += 1,
+            "indeterminate" => in_progress_count += 1,
+            "new" => todo_count += 1,
+            _ => {}
+        }
+        let assignee = issue
+            .assignee
+            .clone()
+            .unwrap_or_else(|| "Unassigned".to_string());
+        *by_assignee.entry(assignee).or_insert(0) += 1;
+        by_status
+            .entry(issue.status.clone())
+            .or_default()
+            .push(issue);
+    }
+
+    let total: usize = by_status.values().map(Vec::len).sum();
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "project": project,
+                "sprint": sprint_label,
+                "query": query,
+                "total": total,
+                "done": done_count,
+                "in_progress": in_progress_count,
+                "todo": todo_count,
+                "blocked": blocked_count,
+                "by_assignee": by_assignee,
+                "by_status": by_status,
+            }))?
+        );
+        return Ok(());
+    }
+
+    println!("# Sprint summary — {}", project);
+    println!();
+    println!("Sprint: {}", sprint_label);
+    println!("Source: `{}`", query);
+    println!();
+    println!("- total issues: {}", total);
+    println!("- done: {}", done_count);
+    println!("- in progress: {}", in_progress_count);
+    println!("- to do: {}", todo_count);
+    println!("- blocked: {}", blocked_count);
+    println!();
+
+    let mut assignees = by_assignee.into_iter().collect::<Vec<_>>();
+    assignees.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    if !assignees.is_empty() {
+        println!("## By assignee");
+        for (assignee, count) in assignees {
+            println!("- {}: {}", assignee, count);
+        }
+        println!();
+    }
+
+    let mut statuses = by_status.into_iter().collect::<Vec<_>>();
+    statuses.sort_by(|a, b| a.0.cmp(&b.0));
+    for (status, issues) in statuses {
+        println!("## {} ({})", status, issues.len());
+        for issue in issues {
+            println!("{}", format_issue_line(&issue));
+        }
+        println!();
+    }
+
+    if total == 0 {
+        println!("No issues matched the sprint query.");
+    }
+
+    Ok(())
 }

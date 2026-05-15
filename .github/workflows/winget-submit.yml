@@ -2,7 +2,7 @@ name: Winget Submit
 
 on:
   workflow_run:
-    workflows: ["Release", "Release Recovery"]
+    workflows: ["Release"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: winget-submit-${{ github.event.workflow_run.head_branch || github.event.inputs.release_tag || github.run_id }}
+  group: winget-submit-${{ github.event.workflow_run.head_sha || github.event.inputs.release_tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -23,7 +23,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
-        (github.event.workflow_run.name == 'Release' || github.event.workflow_run.name == 'Release Recovery') &&
+        github.event.workflow_run.name == 'Release' &&
+        github.event.workflow_run.conclusion == 'success' &&
         (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
       )
     runs-on: ubuntu-latest
@@ -38,6 +39,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Resolve release tag
         id: vars
@@ -46,14 +49,13 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RELEASE_TAG="${{ inputs.release_tag }}"
           else
-            RELEASE_TAG="${{ github.event.workflow_run.head_branch }}"
+            RELEASE_TAG=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^v' | head -n 1 || true)
           fi
 
-          test -n "$RELEASE_TAG"
           case "$RELEASE_TAG" in
             v*) ;;
             *)
-              echo "Skipping Winget submit because workflow_run head_branch '$RELEASE_TAG' is not a release tag."
+              echo "Skipping Winget submit because no release tag could be resolved for '$RELEASE_TAG'."
               echo "skip=true" >> "$GITHUB_OUTPUT"
               exit 0
               ;;

@@ -15,6 +15,7 @@ README = Path("README.md")
 INSTALL = Path("INSTALL.md")
 START = "<!-- contributors:start -->"
 END = "<!-- contributors:end -->"
+HOMEBREW_FORMULA = "https://raw.githubusercontent.com/mulhamna/homebrew-tap/main/Formula/jira-commands.rb"
 
 
 def fetch_json(url: str):
@@ -45,6 +46,20 @@ def fetch_contributors(limit: int = 18):
         contributors.append({"login": login, "avatar": avatar, "html": html})
     return contributors
 
+
+
+def refresh_homebrew_badge(text: str) -> str:
+    formula = urllib.request.urlopen(HOMEBREW_FORMULA, timeout=30).read().decode()
+    match = re.search(r'version "([^"]+)"', formula)
+    if not match:
+        raise SystemExit('could not extract Homebrew formula version')
+    version = match.group(1)
+    return re.sub(
+        r"\[!\[Homebrew\]\(https://img\.shields\.io/badge/homebrew-v[^)]+\)\]\(https://github\.com/mulhamna/homebrew-tap\)",
+        f"[![Homebrew](https://img.shields.io/badge/homebrew-v{version}-orange)](https://github.com/mulhamna/homebrew-tap)",
+        text,
+        count=1,
+    )
 
 def replace_install_block(text: str) -> str:
     start = text.find("## Install\n")
@@ -134,6 +149,7 @@ def main() -> int:
     readme = README.read_text()
     install = INSTALL.read_text()
     contributors = fetch_contributors()
+    readme = refresh_homebrew_badge(readme)
     readme = replace_install_block(readme)
     readme = replace_footer(readme, contributors)
     install = refresh_install_md(install)

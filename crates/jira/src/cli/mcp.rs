@@ -77,7 +77,7 @@ fn install_client(
     }
 
     let resolved_command = resolve_command_for_client(&client, command, dry_run)?;
-    let spec = server_spec(name, &resolved_command, transport);
+    let spec = server_spec(&client, name, &resolved_command, transport);
 
     if matches!(client, McpClient::GenericJson) {
         print_snippet(&spec.json_snippet)?;
@@ -263,19 +263,39 @@ enum ClientDescriptor {
     },
 }
 
-fn server_spec(name: &str, command: &str, transport: &str) -> ServerSpec {
-    let file_entry = json!({
-        "command": command,
-        "args": ["serve", "--transport", transport]
-    });
-    let json_snippet = json!({
-        "mcpServers": {
-            name: file_entry.clone()
+fn server_spec(client: &McpClient, name: &str, command: &str, transport: &str) -> ServerSpec {
+    match client {
+        McpClient::OpenCode => {
+            let file_entry = json!({
+                "type": "local",
+                "command": [command, "serve", "--transport", transport],
+                "enabled": true,
+            });
+            let json_snippet = json!({
+                "mcp": {
+                    name: file_entry.clone()
+                }
+            });
+            ServerSpec {
+                file_entry,
+                json_snippet,
+            }
         }
-    });
-    ServerSpec {
-        file_entry,
-        json_snippet,
+        _ => {
+            let file_entry = json!({
+                "command": command,
+                "args": ["serve", "--transport", transport]
+            });
+            let json_snippet = json!({
+                "mcpServers": {
+                    name: file_entry.clone()
+                }
+            });
+            ServerSpec {
+                file_entry,
+                json_snippet,
+            }
+        }
     }
 }
 
@@ -298,9 +318,8 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
             config_path_from_env_or_default("CURSOR_CONFIG", home.join(".cursor/mcp.json")),
             "mcpServers",
         ),
-        McpClient::GeminiCli | McpClient::Codex | McpClient::OpenCode | McpClient::GenericJson => {
-            unreachable!()
-        }
+        McpClient::OpenCode => ("opencode", opencode_settings_path(&home), "mcp"),
+        McpClient::GeminiCli | McpClient::Codex | McpClient::GenericJson => unreachable!(),
         McpClient::Zed => ("zed", zed_settings_path(&home), "context_servers"),
     };
 
@@ -334,6 +353,13 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .unwrap_or_else(|_| PathBuf::from("~/.cursor/mcp.json")),
             note: "Provisional path until verified in a real Cursor install.",
         },
+        McpClient::OpenCode => ClientDescriptor::FileTarget {
+            label: "opencode",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.config/opencode/opencode.jsonc")),
+            note: "Writes JSONC at ~/.config/opencode/opencode.jsonc by default.",
+        },
         McpClient::GeminiCli => ClientDescriptor::Delegated {
             label: "gemini-cli",
             program: "gemini",
@@ -343,11 +369,6 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             label: "codex",
             program: "codex",
             note: "Delegates to `codex mcp add ...`.",
-        },
-        McpClient::OpenCode => ClientDescriptor::Delegated {
-            label: "opencode",
-            program: "opencode",
-            note: "Delegates to `opencode mcp add ...`.",
         },
         McpClient::GenericJson => ClientDescriptor::SnippetOnly {
             label: "generic-json",
@@ -373,11 +394,6 @@ fn client_adapter(client: &McpClient) -> Option<ClientAdapter> {
         McpClient::Codex => Some(ClientAdapter {
             label: "codex",
             program: "codex",
-            build_steps: codex_steps,
-        }),
-        McpClient::OpenCode => Some(ClientAdapter {
-            label: "opencode",
-            program: "opencode",
             build_steps: codex_steps,
         }),
         _ => None,
@@ -576,11 +592,28 @@ fn zed_settings_path(home: &Path) -> PathBuf {
     }
 }
 
+fn opencode_settings_path(home: &Path) -> PathBuf {
+    if let Some(path) = env::var_os("OPENCODE_CONFIG") {
+        return PathBuf::from(path);
+    }
+
+    if cfg!(target_os = "macos") {
+        home.join(".config/opencode/opencode.jsonc")
+    } else if cfg!(target_os = "windows") {
+        env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join("AppData/Roaming"))
+            .join("opencode/opencode.jsonc")
+    } else {
+        env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".config"))
+            .join("opencode/opencode.jsonc")
+    }
+}
+
 fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
-    if !matches!(
-        client,
-        McpClient::GeminiCli | McpClient::Codex | McpClient::OpenCode
-    ) {
+    if !matches!(client, McpClient::GeminiCli | McpClient::Codex) {
         return Ok(command.to_string());
     }
 
@@ -628,8 +661,9 @@ fn load_json_object(path: &Path) -> Result<Map<String, Value>> {
         return Ok(Map::new());
     }
 
-    let value: Value = serde_json::from_str(&raw)
-        .with_context(|| format!("Config file {} is not valid JSON", path.display()))?;
+    let sanitized = strip_json_comments(&raw);
+    let value: Value = serde_json::from_str(&sanitized)
+        .with_context(|| format!("Config file {} is not valid JSON/JSONC", path.display()))?;
 
     match value {
         Value::Object(map) => Ok(map),
@@ -638,6 +672,59 @@ fn load_json_object(path: &Path) -> Result<Map<String, Value>> {
             path.display()
         ),
     }
+}
+
+fn strip_json_comments(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while let Some(ch) = chars.next() {
+        if in_string {
+            out.push(ch);
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => {
+                in_string = true;
+                out.push(ch);
+            }
+            '/' if matches!(chars.peek(), Some('/')) => {
+                chars.next();
+                for next in chars.by_ref() {
+                    if next == '\n' {
+                        out.push('\n');
+                        break;
+                    }
+                }
+            }
+            '/' if matches!(chars.peek(), Some('*')) => {
+                chars.next();
+                let mut prev = '\0';
+                for next in chars.by_ref() {
+                    if prev == '*' && next == '/' {
+                        break;
+                    }
+                    if next == '\n' {
+                        out.push('\n');
+                    }
+                    prev = next;
+                }
+            }
+            _ => out.push(ch),
+        }
+    }
+
+    out
 }
 
 fn ensure_object_field<'a>(
@@ -717,7 +804,8 @@ mod tests {
 
     #[test]
     fn generic_json_snippet_contains_server_name() {
-        let snippet = server_spec("jira", "jirac-mcp", "stdio").json_snippet;
+        let snippet =
+            server_spec(&McpClient::GenericJson, "jira", "jirac-mcp", "stdio").json_snippet;
         let rendered = serde_json::to_string_pretty(&snippet).unwrap();
         assert!(rendered.contains("\"mcpServers\""));
         assert!(rendered.contains("\"jira\""));
@@ -747,10 +835,23 @@ mod tests {
     }
 
     #[test]
-    fn opencode_preview_matches_cli_shape() {
-        let adapter = client_adapter(&McpClient::OpenCode).unwrap();
-        let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
-        assert!(preview.contains("opencode mcp add jira -- jirac-mcp serve --transport stdio"));
+    fn opencode_snippet_uses_local_command_array() {
+        let snippet =
+            server_spec(&McpClient::OpenCode, "jira", "/tmp/jirac-mcp", "stdio").json_snippet;
+        let rendered = serde_json::to_string_pretty(&snippet).unwrap();
+        assert!(rendered.contains("\"mcp\""));
+        assert!(rendered.contains("\"type\": \"local\""));
+        assert!(rendered.contains("/tmp/jirac-mcp"));
+    }
+
+    #[test]
+    fn load_json_object_accepts_jsonc_comments() {
+        let path =
+            std::env::temp_dir().join(format!("jirac-opencode-test-{}.jsonc", std::process::id()));
+        fs::write(&path, "// top-level comment\n{\n  /* block */\n  \"mcp\": {\n    \"jira\": {\"enabled\": true}\n  }\n}\n").unwrap();
+        let parsed = load_json_object(&path).unwrap();
+        fs::remove_file(&path).ok();
+        assert!(parsed.contains_key("mcp"));
     }
 
     #[test]

@@ -114,7 +114,7 @@ jirac mcp install --client zed
 ```
 
 Notes:
-- `gemini-cli`, `codex`, and `opencode` delegate to their native CLI `mcp add` flows
+- `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows; `opencode` writes `~/.config/opencode/opencode.jsonc` directly
 - `generic-json` prints a portable JSON snippet instead of writing a file
 - `cursor` remains provisional until verified in a real Cursor install
 - `zed` writes `context_servers.jira.settings` for the official Zed marketplace extension

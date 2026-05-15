@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.38.0](https://github.com/mulhamna/jira-commands/compare/v0.37.1...v0.38.0) (2026-05-15)
+
+
+### Features
+
+* add Jira standups, sprint summaries, and release lane fixes ([#244](https://github.com/mulhamna/jira-commands/issues/244)) ([291572c](https://github.com/mulhamna/jira-commands/commit/291572cdd3ab7c1b10b269d8bcfa7fdab55d9e15))
+
 ## [0.37.1](https://github.com/mulhamna/jira-commands/compare/v0.37.0...v0.37.1) (2026-05-14)
 
 

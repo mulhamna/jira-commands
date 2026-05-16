@@ -149,6 +149,8 @@ Create/edit fields include name, description, start date, release date, released
 
 ### Theme picker
 
+Available presets include dark themes plus **GitHub Light** for a brighter, light-mode-friendly palette.
+
 | Key       | Action                        |
 | --------- | ----------------------------- |
 | `j` / `k` | Move selection                |

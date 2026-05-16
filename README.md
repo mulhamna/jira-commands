@@ -41,7 +41,7 @@ Jira on the command line.
 
 - **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, bulk-comment, worklog, upload, and inspect issues without leaving the terminal
 - **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
-- **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes
+- **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes (including GitHub Light)
 - **Multi-profile auth** — store and switch between multiple Jira accounts or deployments
 - **Custom fields** — discovered at runtime via the API, not hardcoded
 - **Attachments** — upload files to any issue from the CLI

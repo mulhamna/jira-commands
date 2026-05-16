@@ -477,6 +477,36 @@ pub enum IssueCommand {
         command: CommentCommand,
     },
 
+    /// Add the same Markdown comment to many issues
+    ///
+    /// Targets can come from a JQL query or an explicit key list.
+    /// Prompts for confirmation unless --force is used.
+    ///
+    /// Examples:
+    ///   jirac issue bulk-comment --jql 'project = PROJ AND status = "In Progress"' --body "QA started verification"
+    ///   jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md --force
+    #[command(name = "bulk-comment")]
+    BulkComment {
+        /// JQL query to select issues
+        #[arg(long, value_name = "JQL", conflicts_with = "keys")]
+        jql: Option<String>,
+        /// Explicit issue keys (space- or comma-separated)
+        #[arg(long, value_name = "KEY", num_args = 1.., value_delimiter = ',', conflicts_with = "jql")]
+        keys: Vec<String>,
+        /// Comment body in Markdown
+        #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
+        body: Option<String>,
+        /// Read comment body from a Markdown file
+        #[arg(long, value_name = "FILE", conflicts_with = "body")]
+        file: Option<std::path::PathBuf>,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+        /// Output result summary as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Manage time tracking (worklogs) on an issue
     ///
     /// Log time, list existing entries, or delete a worklog.
@@ -1091,6 +1121,14 @@ pub async fn handle(
             output,
         } => render_issue_content(input, format, output),
         IssueCommand::Comment { key, command } => comment(client, key, command).await,
+        IssueCommand::BulkComment {
+            jql,
+            keys,
+            body,
+            file,
+            force,
+            json,
+        } => bulk_comment(client, jql, keys, body, file, force, json).await,
         IssueCommand::Worklog { key, command } => worklog(client, key, command).await,
         IssueCommand::BulkTransition {
             jql,
@@ -2572,12 +2610,7 @@ async fn comment_add(
     body: Option<String>,
     file: Option<std::path::PathBuf>,
 ) -> Result<()> {
-    let comment_body = match (body, file) {
-        (Some(body), None) if !body.trim().is_empty() => body,
-        (None, Some(path)) => std::fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read comment file {}", path.display()))?,
-        _ => anyhow::bail!("Provide exactly one of --body or --file with non-empty content"),
-    };
+    let comment_body = read_comment_body(body, file)?;
 
     let spinner = spinner_new(format!("Adding comment to {key}..."));
     let comment = client
@@ -2587,6 +2620,132 @@ async fn comment_add(
     spinner.finish_and_clear();
 
     println!("✓ Added comment {} to {}", comment.id, key);
+    Ok(())
+}
+
+fn read_comment_body(body: Option<String>, file: Option<std::path::PathBuf>) -> Result<String> {
+    let comment_body = match (body, file) {
+        (Some(body), None) if !body.trim().is_empty() => body,
+        (None, Some(path)) => std::fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read comment file {}", path.display()))?,
+        _ => anyhow::bail!("Provide exactly one of --body or --file with non-empty content"),
+    };
+
+    if comment_body.trim().is_empty() {
+        anyhow::bail!("Comment cannot be empty");
+    }
+
+    Ok(comment_body)
+}
+
+fn normalize_issue_keys(raw_keys: Vec<String>) -> Vec<String> {
+    let mut out = Vec::new();
+    for raw in raw_keys {
+        for key in raw
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            if !out.iter().any(|existing| existing == key) {
+                out.push(key.to_string());
+            }
+        }
+    }
+    out
+}
+
+async fn bulk_comment(
+    client: JiraClient,
+    jql: Option<String>,
+    keys: Vec<String>,
+    body: Option<String>,
+    file: Option<std::path::PathBuf>,
+    force: bool,
+    json: bool,
+) -> Result<()> {
+    let comment_body = read_comment_body(body, file)?;
+
+    let target_keys = if let Some(jql) = jql.as_deref() {
+        let spinner = spinner_new("Fetching issues...");
+        let issues = client
+            .get_all_issues(jql)
+            .await
+            .context("Failed to fetch issues")?;
+        spinner.finish_and_clear();
+        issues
+            .into_iter()
+            .map(|issue| issue.key)
+            .collect::<Vec<_>>()
+    } else {
+        normalize_issue_keys(keys)
+    };
+
+    if target_keys.is_empty() {
+        if jql.is_some() {
+            println!("No issues found matching JQL.");
+            return Ok(());
+        }
+        anyhow::bail!("Provide --jql or at least one issue key via --keys.");
+    }
+
+    println!("Found {} issue(s).", target_keys.len());
+
+    if !force {
+        let target_label = if jql.is_some() {
+            "matched issues"
+        } else {
+            "explicit issue(s)"
+        };
+        let confirm = inquire::Confirm::new(&format!(
+            "Add this comment to {} {}?",
+            target_keys.len(),
+            target_label
+        ))
+        .with_default(false)
+        .prompt()
+        .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let pb = progress_bar(target_keys.len() as u64);
+    let mut ok = 0u64;
+    let mut failed: Vec<String> = Vec::new();
+
+    for key in &target_keys {
+        pb.set_message(key.clone());
+        match client.add_comment(key, &comment_body).await {
+            Ok(_) => ok += 1,
+            Err(e) => failed.push(format!("{}: {}", key, e)),
+        }
+        pb.inc(1);
+    }
+
+    pb.finish_and_clear();
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "total": target_keys.len(),
+                "succeeded": ok,
+                "failed_count": failed.len(),
+                "failed": failed,
+                "targets": target_keys,
+            }))?
+        );
+    } else {
+        println!("✓ Added comment to {ok}/{} issues", target_keys.len());
+        if !failed.is_empty() {
+            println!("✗ Failed ({}):", failed.len());
+            for item in &failed {
+                println!("  {item}");
+            }
+        }
+    }
+
     Ok(())
 }
 

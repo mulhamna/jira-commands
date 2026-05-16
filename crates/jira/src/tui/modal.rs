@@ -20,6 +20,7 @@ pub(super) enum ModalKind {
     AddComment {
         key: String,
     },
+    BulkComment,
     UploadAttachment {
         key: String,
     },
@@ -52,6 +53,7 @@ impl ModalKind {
         match self {
             ModalKind::EditIssue { key } => format!(" Edit {key} "),
             ModalKind::AddComment { key } => format!(" Comment on {key} "),
+            ModalKind::BulkComment => " Bulk Comment ".to_string(),
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
             ModalKind::AddWorklog { key } => format!(" Log Work on {key} "),
             ModalKind::AddBulkWorklog { key } => format!(" Bulk Worklog on {key} "),
@@ -72,6 +74,9 @@ impl ModalKind {
         match self {
             ModalKind::EditIssue { .. } => " Tab: next field   Ctrl+S: save   Esc: cancel ",
             ModalKind::AddComment { .. } => " Tab: next field   Ctrl+S: send   Esc: cancel ",
+            ModalKind::BulkComment => {
+                " Fill JQL or issue keys   Tab: next field   Ctrl+S: send   Esc: cancel "
+            }
             ModalKind::UploadAttachment { .. } => " Enter/Ctrl+S: upload   Esc: cancel ",
             ModalKind::AddWorklog { .. } => " Tab: next field   Ctrl+S: log   Esc: cancel ",
             ModalKind::AddBulkWorklog { .. } => {
@@ -173,6 +178,52 @@ impl Modal {
                     label: "Attachment path  (optional)",
                     area: attachment_area,
                     multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn bulk_comment(jql: String) -> Self {
+        let mut jql_area = TextArea::from(vec![jql]);
+        jql_area.set_cursor_line_style(Style::default());
+        jql_area.set_placeholder_text("use current filter or replace with custom JQL");
+
+        let mut keys_area = TextArea::default();
+        keys_area.set_cursor_line_style(Style::default());
+        keys_area.set_placeholder_text("optional: PROJ-1, PROJ-2 or one per line");
+
+        let mut comment_area = TextArea::default();
+        comment_area.set_cursor_line_style(Style::default());
+        comment_area.set_placeholder_text("required markdown comment");
+
+        Self {
+            kind: ModalKind::BulkComment,
+            fields: vec![
+                ModalField {
+                    label: "JQL  (leave as current filter, or clear when using keys)",
+                    area: jql_area,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Issue keys  (optional, comma / space / newline separated)",
+                    area: keys_area,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Comment",
+                    area: comment_area,
+                    multiline: true,
                 },
             ],
             focus: 0,
@@ -603,7 +654,12 @@ pub(super) fn handle_modal_key(modal: &mut Modal, key: KeyEvent) -> ModalOutcome
     }
 
     match (key.code, key.modifiers) {
-        (KeyCode::Char('@'), _) if matches!(modal.kind, ModalKind::AddComment { .. }) => {
+        (KeyCode::Char('@'), _)
+            if matches!(
+                modal.kind,
+                ModalKind::AddComment { .. } | ModalKind::BulkComment
+            ) =>
+        {
             modal.mention_active = true;
             modal.mention_query.clear();
             modal.mention_options.clear();

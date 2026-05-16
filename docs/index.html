@@ -412,8 +412,10 @@ $ jirac issue transition CORE-183 --to Done
               <tr><td class="px-4 py-3">Upload attachment</td><td class="px-4 py-3 command-cell"><code>jirac issue attach MYPROJ-123 ./screenshot.png</code></td></tr>
               <tr><td class="px-4 py-3">Change backlog type natively</td><td class="px-4 py-3 command-cell"><code>jirac issue change-type MYPROJ-123 Story</code></td></tr>
               <tr><td class="px-4 py-3">Move backlog to another project natively</td><td class="px-4 py-3 command-cell"><code>jirac issue move MYPROJ-123 OTHER</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk transition</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-transition -p MYPROJ -q 'status = "To Do"' -t "In Progress"</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk update field</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-update -p MYPROJ -q 'status = Done' --field assignee --value me@co.com</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk comment by JQL</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-comment --jql 'project = MYPROJ AND sprint = openSprints()' --body "Please post status before standup"</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk comment by explicit keys</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-comment --keys MYPROJ-123 MYPROJ-456 --file note.md</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk transition</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-transition --jql 'project = MYPROJ AND status = "To Do"' --to "In Progress"</code></td></tr>
+              <tr><td class="px-4 py-3">Bulk update field</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-update --jql 'project = MYPROJ AND assignee = EMPTY' --assignee me</code></td></tr>
               <tr><td class="px-4 py-3">Bulk create from manifest</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-create --manifest issues.json</code></td></tr>
               <tr><td class="px-4 py-3">Interactive JQL builder</td><td class="px-4 py-3 command-cell"><code>jirac issue jql</code></td></tr>
               <tr><td class="px-4 py-3">Mention notifications</td><td class="px-4 py-3 command-cell"><code>jirac issue notifications --since 7d</code></td></tr>
@@ -428,7 +430,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, themes, single worklog entry via <code>w</code>, and bulk date-range worklogs via <code>b</code> with confirmation.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, themes, single worklog entry via <code>w</code>, bulk date-range worklogs via <code>b</code>, and bulk comments via <code>:</code> with confirmation.</p>
       <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
           <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -452,6 +454,8 @@ $ jirac issue transition CORE-183 --to Done
             <tr><td class="px-4 py-3"><span class="keycap">T</span></td><td class="px-4 py-3">Open the theme picker, including Kanagawa Wave.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">p</span></td><td class="px-4 py-3">Open saved JQL queries.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">V</span></td><td class="px-4 py-3">Browse project fix versions and preview backlog for the selected version.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">;</span></td><td class="px-4 py-3">Add one comment to the selected issue.</td></tr>
+            <tr><td class="px-4 py-3"><span class="keycap">:</span></td><td class="px-4 py-3">Bulk-comment many issues by current/custom JQL or explicit issue keys.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add a single worklog to the issue.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">b</span></td><td class="px-4 py-3">Add bulk worklogs across a date range, with confirmation before submit.</td></tr>
             <tr><td class="px-4 py-3"><span class="keycap">v</span></td><td class="px-4 py-3">Edit fix versions.</td></tr>

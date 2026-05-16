@@ -135,11 +135,11 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
-            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
+            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -1304,6 +1304,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  M         Move issue to another project (native, not clone+delete)"),
         Line::from("  a         Assign selected issue"),
         Line::from("  ;         Add comment"),
+        Line::from("  :         Add the same comment to many issues (JQL or explicit keys)"),
         Line::from("  w         Add single worklog"),
         Line::from("  b         Add bulk worklog (confirm before submit)"),
         Line::from("  l         Set labels"),

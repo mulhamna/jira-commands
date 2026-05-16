@@ -126,6 +126,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::AddComment)
             .unwrap_or(AppAction::None),
+        KeyCode::Char(':') => AppAction::BulkComment,
         KeyCode::Char('w') => app
             .selected_issue_key()
             .map(AppAction::AddWorklog)
@@ -222,6 +223,7 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::AddComment)
             .unwrap_or(AppAction::None),
+        KeyCode::Char(':') => AppAction::BulkComment,
         KeyCode::Char('w') => app
             .selected_issue_key()
             .map(AppAction::AddWorklog)

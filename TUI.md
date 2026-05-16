@@ -31,6 +31,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `a`         | Open native assignee popup and assign issue                   |
 | `t`         | Transition issue                                              |
 | `;`         | Add comment                                                   |
+| `:`         | Add the same comment to many issues by JQL or explicit keys   |
 | `w`         | Add a single worklog                                          |
 | `b`         | Add a bulk/range worklog                                      |
 | `l`         | Manage labels                                                 |
@@ -68,6 +69,13 @@ Detail tabs:
 - `w` opens the single-worklog modal with time spent, optional date, optional start time, and comment.
 - `b` opens the bulk-worklog modal with time spent, from/to date, optional start time, optional weekend exclusion, and comment.
 - Bulk submission requires confirmation: press `Ctrl+S` once to review the summary, then `Ctrl+S` again to create the worklogs. Editing any field resets the confirmation state.
+
+## Bulk comment flow
+
+- `:` opens a bulk-comment modal.
+- Use either the current/custom JQL field or an explicit issue-key list.
+- Write one Markdown comment body that will be posted to every matched issue.
+- Submission requires confirmation: press `Ctrl+S` once to review the target count, then `Ctrl+S` again to post.
 
 ### Column settings
 
@@ -140,6 +148,8 @@ Detail tabs:
 Create/edit fields include name, description, start date, release date, released, and archived.
 
 ### Theme picker
+
+Available presets include dark themes plus **GitHub Light** for a brighter, light-mode-friendly palette.
 
 | Key       | Action                        |
 | --------- | ----------------------------- |

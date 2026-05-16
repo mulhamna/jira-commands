@@ -15,6 +15,7 @@ pub(super) enum ThemeName {
     Ayu,
     RosePine,
     Kanagawa,
+    GithubLight,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,10 +46,11 @@ impl ThemeName {
             ThemeName::Ayu => "Ayu Dark",
             ThemeName::RosePine => "Rosé Pine",
             ThemeName::Kanagawa => "Kanagawa Wave",
+            ThemeName::GithubLight => "GitHub Light",
         }
     }
 
-    pub(super) const ALL: [ThemeName; 12] = [
+    pub(super) const ALL: [ThemeName; 13] = [
         ThemeName::Default,
         ThemeName::Dracula,
         ThemeName::Nord,
@@ -61,6 +63,7 @@ impl ThemeName {
         ThemeName::Ayu,
         ThemeName::RosePine,
         ThemeName::Kanagawa,
+        ThemeName::GithubLight,
     ];
 
     pub(super) fn palette(self) -> Palette {
@@ -196,6 +199,17 @@ impl ThemeName {
                 highlight: Color::Rgb(42, 42, 55),
                 tab_active: Color::Rgb(230, 195, 132),
                 tab_inactive: Color::Rgb(114, 115, 126),
+            },
+            ThemeName::GithubLight => Palette {
+                header_fg: Color::Rgb(36, 41, 47),
+                header_bg: Color::Rgb(221, 244, 255),
+                accent: Color::Rgb(9, 105, 218),
+                muted: Color::Rgb(101, 109, 118),
+                focus_border: Color::Rgb(9, 105, 218),
+                blur_border: Color::Rgb(208, 215, 222),
+                highlight: Color::Rgb(234, 242, 255),
+                tab_active: Color::Rgb(191, 135, 0),
+                tab_inactive: Color::Rgb(139, 148, 158),
             },
         }
     }

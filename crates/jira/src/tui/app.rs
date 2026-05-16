@@ -185,6 +185,7 @@ pub(super) enum AppAction {
     OpenAssigneePicker(String),
     RefreshAssigneeOptions,
     AddComment(String),
+    BulkComment,
     AddWorklog(String),
     AddBulkWorklog(String),
     EditLabels(String),
@@ -1632,6 +1633,10 @@ pub async fn run_tui(
                 app.open_modal(Modal::add_comment(key));
             }
 
+            AppAction::BulkComment => {
+                app.open_modal(Modal::bulk_comment(app.jql.clone()));
+            }
+
             AppAction::AddWorklog(key) => {
                 app.open_modal(Modal::add_worklog(key));
             }
@@ -1812,6 +1817,122 @@ pub async fn run_tui(
                             }
                         }
                     }
+                    ModalKind::BulkComment => {
+                        let jql_raw = modal.field_text(0);
+                        let keys_raw = modal.field_text(1);
+                        let body = modal.field_text(2);
+                        let jql = jql_raw.trim().to_string();
+                        let body_trim = body.trim().to_string();
+
+                        let mut seen_keys = std::collections::HashSet::new();
+                        let mut target_keys = keys_raw
+                            .split(|c: char| c == ',' || c.is_whitespace())
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .filter(|key| seen_keys.insert((*key).to_string()))
+                            .map(str::to_string)
+                            .collect::<Vec<_>>();
+
+                        if body_trim.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Comment cannot be empty");
+                            }
+                            continue;
+                        }
+
+                        if !jql.is_empty() && !target_keys.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Use JQL or issue keys, not both");
+                            }
+                            continue;
+                        }
+
+                        if jql.is_empty() && target_keys.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Provide JQL or at least one issue key");
+                            }
+                            continue;
+                        }
+
+                        if !jql.is_empty() {
+                            match client.get_all_issues(&jql).await {
+                                Ok(issues) => {
+                                    target_keys =
+                                        issues.into_iter().map(|issue| issue.key).collect();
+                                }
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("Failed to fetch issues: {e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        }
+
+                        if target_keys.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("No issues matched the target");
+                            }
+                            continue;
+                        }
+
+                        let confirm_token =
+                            format!("{}|{}|{}", jql, target_keys.join(","), body_trim);
+                        let confirmed = app
+                            .modal
+                            .as_ref()
+                            .and_then(|m| m.confirm_token.as_ref())
+                            .map(|token| token == &confirm_token)
+                            .unwrap_or(false);
+                        if !confirmed {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_notice(
+                                    format!(
+                                        "Press Ctrl+S again to comment on {} issue(s)",
+                                        target_keys.len()
+                                    ),
+                                    Some(confirm_token),
+                                );
+                            }
+                            continue;
+                        }
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                            m.notice = None;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+
+                        let mut ok = 0usize;
+                        let mut failure: Option<String> = None;
+                        for key in &target_keys {
+                            if let Err(e) = client.add_comment(key, &body_trim).await {
+                                failure = Some(format!("{key}: {e}"));
+                                break;
+                            }
+                            ok += 1;
+                        }
+
+                        if let Some(err) = failure {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.busy = false;
+                                m.set_error(format!(
+                                    "Commented on {ok}/{} issue(s); stopped at {err}",
+                                    target_keys.len()
+                                ));
+                            }
+                            continue;
+                        }
+
+                        app.close_modal();
+                        app.detail.comments = None;
+                        app.warm_active_tab(&client).await;
+                        app.set_status(
+                            format!("✓ Comment added to {} issue(s)", target_keys.len()),
+                            false,
+                        );
+                    }
+
                     ModalKind::UploadAttachment { key } => {
                         let raw = modal.field_text(0);
                         let path_str = raw.trim();

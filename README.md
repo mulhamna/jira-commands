@@ -39,14 +39,14 @@ Jira on the command line.
 
 ## Highlights
 
-- **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, worklog, upload, and inspect issues without leaving the terminal
+- **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, bulk-comment, worklog, upload, and inspect issues without leaving the terminal
 - **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
-- **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes
+- **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes (including GitHub Light)
 - **Multi-profile auth** — store and switch between multiple Jira accounts or deployments
 - **Custom fields** — discovered at runtime via the API, not hardcoded
 - **Attachments** — upload files to any issue from the CLI
 - **Worklogs** — add, list, and delete time entries
-- **Bulk operations** — transition, update, archive, or create many issues from JQL or JSON manifests
+- **Bulk operations** — comment, transition, update, archive, or create many issues from JQL, explicit issue keys, or JSON manifests
 - **JQL builder** — interactive prompt that helps you construct queries
 - **Raw API passthrough** — call any Jira REST endpoint directly
 - **MCP server** — expose Jira as typed tools for editors and AI agents ([docs](crates/jira-mcp/README.md))
@@ -158,6 +158,8 @@ jirac issue transition PROJ-123                     # interactive picker
 jirac issue transition PROJ-123 --to "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
+jirac issue bulk-comment --jql 'project = PROJ AND status = "In Progress"' --body "QA is reviewing this now"
+jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md
 jirac issue delete PROJ-123
 jirac issue change-type PROJ-123 Story
 jirac issue move PROJ-123 OTHER
@@ -186,12 +188,16 @@ jirac issue worklog delete PROJ-123 --id 10234
 ### Bulk operations
 
 ```bash
-jirac issue bulk-transition -p PROJ -q 'status = "To Do"' -t "In Progress"
-jirac issue bulk-update -p PROJ -q 'status = Done' --field assignee --value me@co.com
-jirac issue archive -p PROJ -q 'status = Done AND updated < -90d'
+jirac issue bulk-comment --jql 'project = PROJ AND sprint = openSprints()' --body 'Please post status before standup'
+jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md
+jirac issue bulk-transition --jql 'project = PROJ AND status = "To Do"' --to "In Progress"
+jirac issue bulk-update --jql 'project = PROJ AND assignee = EMPTY' --assignee me
+jirac issue archive --jql 'project = PROJ AND status = Done AND updated < -90d'
 jirac issue bulk-create --manifest issues.json
 jirac issue batch --manifest ops.json
 ```
+
+In the TUI, press `:` to open a bulk-comment modal. It supports the current JQL view or an explicit issue-key list, then asks for one more `Ctrl+S` confirmation before posting.
 
 ### JQL builder
 

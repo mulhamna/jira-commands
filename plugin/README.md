@@ -48,6 +48,7 @@ jirac auth login
 | `/jira:transition` | Move an issue to a new status (e.g. In Progress, Done) |
 | `/jira:comment` | List comments or add a new Markdown comment on an issue |
 | `/jira:worklog` | List, add, or delete time entries on an issue |
+| `/jira:bulk-comment` | Add one Markdown comment to many issues via JQL or explicit keys |
 | `/jira:bulk-transition` | Transition multiple issues at once via JQL query |
 | `/jira:attach` | Upload a file or image to an issue |
 | `/jira:fields` | Inspect available Jira fields for a project and issue type |
@@ -99,6 +100,13 @@ Claude runs `/jira:worklog` with `--time 3h` and the comment filled in.
 > "close all done issues in PROJ that haven't been updated in 30 days"
 
 Claude builds the JQL and runs `/jira:bulk-transition` with `--force`.
+
+---
+
+**Bulk status reminder**
+> "comment on all sprint issues asking owners to post an update"
+
+Claude can use `/jira:bulk-comment` with a JQL query or an explicit issue-key list.
 
 ---
 

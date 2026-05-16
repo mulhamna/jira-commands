@@ -1,13 +1,13 @@
 {
   "name": "@mulham28/jirac",
   "version": "0.38.1",
-  "description": "Install the jirac Jira CLI from GitHub Releases",
+  "description": "Fast Jira CLI with TUI, worklogs, bulk ops, and MCP-friendly workflows — installed from npm via GitHub Releases",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mulhamna/jira-commands.git"
   },
-  "homepage": "https://github.com/mulhamna/jira-commands",
+  "homepage": "https://jirac.keton.id",
   "bugs": {
     "url": "https://github.com/mulhamna/jira-commands/issues"
   },
@@ -15,7 +15,10 @@
     "jira",
     "atlassian",
     "cli",
-    "tui"
+    "tui",
+    "mcp",
+    "worklog",
+    "terminal"
   ],
   "bin": {
     "jirac": "bin/jirac.js"

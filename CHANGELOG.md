@@ -6,6 +6,18 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.39.0](https://github.com/mulhamna/jira-commands/compare/v0.38.1...v0.39.0) (2026-05-16)
+
+
+### Features
+
+* add bulk comment flows and light theme ([#251](https://github.com/mulhamna/jira-commands/issues/251)) ([4a5a915](https://github.com/mulhamna/jira-commands/commit/4a5a915b8e668221916cf593d95811e0e8b7c2f3))
+
+
+### Bug Fixes
+
+* write opencode MCP config directly ([#249](https://github.com/mulhamna/jira-commands/issues/249)) ([0568369](https://github.com/mulhamna/jira-commands/commit/0568369364ac22f3522e6d84e3702b0af9b108bb))
+
 ## [0.38.1](https://github.com/mulhamna/jira-commands/compare/v0.38.0...v0.38.1) (2026-05-15)
 
 

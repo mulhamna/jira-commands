@@ -7,6 +7,7 @@ pub mod issue_type;
 pub mod link;
 pub mod remote_link;
 pub mod sprint;
+pub mod transition;
 pub mod version;
 pub mod worklog;
 
@@ -21,5 +22,6 @@ pub use issue_type::IssueType;
 pub use link::{IssueLink, IssueLinkType};
 pub use remote_link::{RemoteLink, RemoteLinkObject};
 pub use sprint::Sprint;
+pub use transition::{Transition, TransitionStatus};
 pub use version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest};
 pub use worklog::Worklog;

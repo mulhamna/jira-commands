@@ -2172,22 +2172,13 @@ async fn transition_issue(
     let transition_id = if let Some(name_or_id) = transition {
         transitions
             .iter()
-            .find(|t| {
-                t.get("id").and_then(|v| v.as_str()) == Some(&name_or_id)
-                    || t.get("name").and_then(|v| v.as_str()) == Some(&name_or_id)
-            })
-            .and_then(|t| t.get("id"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .find(|t| t.id == name_or_id || t.name == name_or_id)
+            .map(|t| t.id.clone())
             .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", name_or_id))?
     } else {
         let options: Vec<String> = transitions
             .iter()
-            .filter_map(|t| {
-                let id = t.get("id")?.as_str()?;
-                let name = t.get("name")?.as_str()?;
-                Some(format!("{name} [{id}]"))
-            })
+            .map(|t| format!("{} [{}]", t.name, t.id))
             .collect();
 
         let selected = Select::new("Select transition:", options.clone())
@@ -3020,16 +3011,8 @@ async fn bulk_transition(
 
     let transition_id = transitions
         .iter()
-        .find(|t| {
-            t.get("id").and_then(|v| v.as_str()) == Some(&to)
-                || t.get("name")
-                    .and_then(|v| v.as_str())
-                    .map(|n| n.to_lowercase())
-                    == Some(to.to_lowercase())
-        })
-        .and_then(|t| t.get("id"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+        .find(|t| t.id == to || t.name.eq_ignore_ascii_case(&to))
+        .map(|t| t.id.clone())
         .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", to))?;
 
     let pb = progress_bar(issues.len() as u64);
@@ -3504,16 +3487,8 @@ async fn batch_manifest(
                         .map_err(|e| anyhow::anyhow!(e))?;
                     let tid = transitions
                         .iter()
-                        .find(|t| {
-                            t.get("id").and_then(|v| v.as_str()) == Some(&to)
-                                || t.get("name")
-                                    .and_then(|v| v.as_str())
-                                    .map(|n| n.to_lowercase())
-                                    == Some(to.to_lowercase())
-                        })
-                        .and_then(|t| t.get("id"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
+                        .find(|t| t.id == to || t.name.eq_ignore_ascii_case(&to))
+                        .map(|t| t.id.clone())
                         .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", to))?;
                     client
                         .transition_issue(&key, &tid)

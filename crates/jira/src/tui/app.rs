@@ -1078,14 +1078,8 @@ pub async fn run_tui(
                     terminal.draw(|f| ui(f, &mut app))?;
                     match client.get_transitions(&key).await {
                         Ok(raw) => {
-                            let transitions: Vec<(String, String)> = raw
-                                .iter()
-                                .filter_map(|t| {
-                                    let id = t.get("id")?.as_str()?.to_string();
-                                    let name = t.get("name")?.as_str()?.to_string();
-                                    Some((id, name))
-                                })
-                                .collect();
+                            let transitions: Vec<(String, String)> =
+                                raw.into_iter().map(|t| (t.id, t.name)).collect();
 
                             if transitions.is_empty() {
                                 app.set_status("No transitions available", true);

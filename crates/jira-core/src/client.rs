@@ -24,6 +24,7 @@ use crate::{
         link::{IssueLink, IssueLinkType},
         remote_link::RemoteLink,
         sprint::Sprint,
+        transition::Transition,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
     },
@@ -550,13 +551,13 @@ impl JiraClient {
     }
 
     /// Get available transitions for an issue.
-    pub async fn get_transitions(&self, key: &str) -> Result<Vec<Value>> {
+    pub async fn get_transitions(&self, key: &str) -> Result<Vec<Transition>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{key}/transitions"));
 
         #[derive(serde::Deserialize)]
         struct TransitionsResponse {
-            transitions: Vec<Value>,
+            transitions: Vec<Transition>,
         }
 
         let http = &self.http;

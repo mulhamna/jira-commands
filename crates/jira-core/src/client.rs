@@ -69,31 +69,15 @@ impl JiraClient {
     }
 
     fn auth_headers(&self) -> Result<HeaderMap> {
-        let token = self.config.token.as_deref().ok_or_else(|| {
-            JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
-        })?;
-
-        let auth_value = match self.config.auth_type {
-            JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic => {
-                let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
-                format!("Basic {credentials}")
-            }
-            JiraAuthType::DataCenterPat => format!("Bearer {token}"),
-        };
-
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&auth_value)
-                .map_err(|e| JiraError::Auth(format!("Invalid auth header: {e}")))?,
-        );
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
-        Ok(headers)
+        self.build_auth_headers(true)
     }
 
     /// Auth headers without Content-Type — required for multipart uploads.
     fn auth_headers_no_content_type(&self) -> Result<HeaderMap> {
+        self.build_auth_headers(false)
+    }
+
+    fn build_auth_headers(&self, include_content_type: bool) -> Result<HeaderMap> {
         let token = self.config.token.as_deref().ok_or_else(|| {
             JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
@@ -112,6 +96,9 @@ impl JiraClient {
             HeaderValue::from_str(&auth_value)
                 .map_err(|e| JiraError::Auth(format!("Invalid auth header: {e}")))?,
         );
+        if include_content_type {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        }
         Ok(headers)
     }
 

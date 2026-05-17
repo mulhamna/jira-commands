@@ -2572,4 +2572,186 @@ mod tests {
             "Blocked Issue"
         );
     }
+
+    #[tokio::test]
+    async fn get_remote_links_parses_object_title_and_url() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/remotelink"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "id": 10001,
+                    "self": "https://jira.example.com/rest/api/3/issue/TEST-1/remotelink/10001",
+                    "globalId": "system=https://docs.example.com&id=42",
+                    "relationship": "Wiki Page",
+                    "object": {
+                        "title": "Design Doc",
+                        "url": "https://docs.example.com/design",
+                        "summary": "Architecture overview"
+                    }
+                },
+                {
+                    "id": 10002,
+                    "object": {
+                        "title": "Tracking ticket",
+                        "url": "https://tracker.example.com/4242"
+                    }
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let links = client
+            .get_remote_links("TEST-1")
+            .await
+            .expect("remote links should parse");
+
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].id, 10001);
+        assert_eq!(
+            links[0].global_id.as_deref(),
+            Some("system=https://docs.example.com&id=42")
+        );
+        assert_eq!(links[0].object.title, "Design Doc");
+        assert_eq!(links[0].object.url, "https://docs.example.com/design");
+        assert_eq!(
+            links[0].object.summary.as_deref(),
+            Some("Architecture overview")
+        );
+        assert_eq!(links[1].id, 10002);
+        assert!(links[1].global_id.is_none());
+        assert!(links[1].object.summary.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_remote_links_returns_empty_when_no_links() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/remotelink"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let links = client.get_remote_links("TEST-1").await.expect("parse");
+        assert!(links.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_project_components_parses_id_and_name() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/project/PROJ/components"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "id": "10100",
+                    "name": "Backend",
+                    "description": "Server-side code",
+                    "self": "https://jira.example.com/rest/api/3/component/10100"
+                },
+                {
+                    "id": "10101",
+                    "name": "Frontend"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let components = client
+            .get_project_components("PROJ")
+            .await
+            .expect("components should parse");
+
+        assert_eq!(components.len(), 2);
+        assert_eq!(components[0].id, "10100");
+        assert_eq!(components[0].name, "Backend");
+        assert_eq!(
+            components[0].description.as_deref(),
+            Some("Server-side code")
+        );
+        assert!(components[0].self_url.is_some());
+        assert_eq!(components[1].name, "Frontend");
+        assert!(components[1].description.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_transitions_parses_id_name_and_preserves_extra_fields() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/transitions"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "expand": "transitions",
+                "transitions": [
+                    {
+                        "id": "21",
+                        "name": "In Progress",
+                        "hasScreen": false,
+                        "isGlobal": false,
+                        "isInitial": false,
+                        "isAvailable": true,
+                        "to": {
+                            "id": "3",
+                            "name": "In Progress",
+                            "statusCategory": { "key": "indeterminate" }
+                        }
+                    },
+                    {
+                        "id": "31",
+                        "name": "Done",
+                        "to": { "id": "10001", "name": "Done" }
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let transitions = client
+            .get_transitions("TEST-1")
+            .await
+            .expect("transitions should parse");
+
+        assert_eq!(transitions.len(), 2);
+        assert_eq!(transitions[0].id, "21");
+        assert_eq!(transitions[0].name, "In Progress");
+        assert_eq!(
+            transitions[0].to.as_ref().and_then(|t| t.name.as_deref()),
+            Some("In Progress")
+        );
+
+        // Extra Jira fields (hasScreen, isGlobal, ...) must round-trip via #[serde(flatten)]
+        // so MCP consumers re-serializing the struct keep the full payload shape.
+        let reserialized = serde_json::to_value(&transitions[0]).expect("serialize");
+        assert_eq!(reserialized["hasScreen"], json!(false));
+        assert_eq!(reserialized["isAvailable"], json!(true));
+
+        assert_eq!(transitions[1].id, "31");
+        assert!(transitions[1].to.is_some());
+    }
+
+    #[tokio::test]
+    async fn get_transitions_returns_empty_when_no_transitions_available() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/transitions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "transitions": []
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let transitions = client.get_transitions("TEST-1").await.expect("parse");
+        assert!(transitions.is_empty());
+    }
 }

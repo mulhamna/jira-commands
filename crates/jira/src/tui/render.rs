@@ -253,6 +253,7 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
         );
 
     f.render_stateful_widget(table, area, &mut app.table_state);
+    app.hit_zones.list = Some(area);
 }
 
 fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {

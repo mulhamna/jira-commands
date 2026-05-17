@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::notifications::{
@@ -164,6 +164,8 @@ pub(super) struct App {
     pub(super) prev_mode: Option<Mode>,
     pub(super) notification_entries: Vec<NotificationEntry>,
     pub(super) hit_zones: HitZones,
+    /// (when, column, row) of the last left-click. Used to detect double-click.
+    pub(super) last_click: Option<(Instant, u16, u16)>,
 }
 
 pub(super) enum AppAction {
@@ -335,6 +337,7 @@ impl App {
             prev_mode: None,
             notification_entries: Vec::new(),
             hit_zones: HitZones::default(),
+            last_click: None,
         }
     }
 

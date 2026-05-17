@@ -1606,33 +1606,9 @@ where
 
 /// Returns current UTC time in Jira worklog format: "2006-01-02T15:04:05.000+0000"
 fn current_jira_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    // Manual conversion: secs since epoch → date/time components
-    let s = secs % 60;
-    let m = (secs / 60) % 60;
-    let h = (secs / 3600) % 24;
-    // Days since epoch
-    let days = secs / 86400;
-    // Simplified: use a rough date calculation
-    // For worklog "started", accuracy to the day is sufficient
-    let year_approx = 1970 + days / 365;
-    let day_of_year = days % 365;
-    let month = (day_of_year / 30) + 1;
-    let day = (day_of_year % 30) + 1;
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000+0000",
-        year_approx,
-        month.min(12),
-        day.min(28),
-        h,
-        m,
-        s
-    )
+    chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.3f%z")
+        .to_string()
 }
 
 fn base64_encode(input: &str) -> String {

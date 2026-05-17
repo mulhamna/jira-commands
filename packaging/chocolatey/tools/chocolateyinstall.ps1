@@ -2,8 +2,8 @@
 
 $packageName = 'jirac'
 $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$url64 = 'https://github.com/mulhamna/jira-commands/releases/download/v0.39.0/jirac-windows-x86_64.zip'
-$checksum64 = '73e92a6c485b094979f8530150ce6822ba21f54bc1290ef4641c0a85839cdfec'
+$url64 = 'https://github.com/mulhamna/jira-commands/releases/download/v1.0.0/jirac-windows-x86_64.zip'
+$checksum64 = 'd8daf59dcaa39c11b15e15f1dc1440b9be5561dd4161334e41f296b010bca513'
 
 $packageArgs = @{
   packageName    = $packageName

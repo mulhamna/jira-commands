@@ -83,11 +83,22 @@ pub(super) struct HitZones {
     pub(super) detail_pane: Option<Rect>,
     /// One rect per visible detail tab header (Summary, Comments, ...).
     pub(super) detail_tabs: Vec<(Rect, DetailTab)>,
-    /// Visible picker option rects, indexed by option position.
-    pub(super) picker_rows: Vec<Rect>,
+    /// The currently visible picker list (transition, assignee, etc.).
+    /// `area` is the inner content area (no border) where rows are drawn.
+    pub(super) picker: Option<PickerHit>,
     /// The currently visible popup bounding box. Clicks *outside* this
     /// rect while a popup mode is active should close the popup.
     pub(super) popup: Option<Rect>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct PickerHit {
+    /// Inner area (excluding borders) where rows are rendered.
+    pub(super) area: Rect,
+    /// The list state's current scroll offset (0 = first option at top).
+    pub(super) offset: usize,
+    /// Total number of options in the picker (bounds-check upper limit).
+    pub(super) count: usize,
 }
 
 impl HitZones {
@@ -95,7 +106,20 @@ impl HitZones {
         self.list = None;
         self.detail_pane = None;
         self.detail_tabs.clear();
-        self.picker_rows.clear();
+        self.picker = None;
         self.popup = None;
+    }
+}
+
+impl PickerHit {
+    /// Translate a pointer row to an option index, or `None` if the row
+    /// lands on a border / past the last option.
+    pub(super) fn row_to_index(&self, row: u16) -> Option<usize> {
+        if row < self.area.y || row >= self.area.y.saturating_add(self.area.height) {
+            return None;
+        }
+        let visible = (row - self.area.y) as usize;
+        let idx = self.offset.saturating_add(visible);
+        (idx < self.count).then_some(idx)
     }
 }

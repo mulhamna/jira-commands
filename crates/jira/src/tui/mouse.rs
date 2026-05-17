@@ -7,10 +7,13 @@
 
 use std::time::{Duration, Instant};
 
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
+use ratatui::widgets::ListState;
 
 use super::app::{App, AppAction};
+use super::keys;
+use super::mode::Mode;
 use super::panel::Focus;
 
 /// Maximum gap between two left-clicks on the same cell to count as a double-click.
@@ -42,6 +45,23 @@ fn list_row_index(app: &App, rect: &Rect, row: u16) -> Option<usize> {
     (idx < app.issues.len()).then_some(idx)
 }
 
+fn synth_press(app: &mut App, code: KeyCode) -> AppAction {
+    keys::handle_key(app, KeyEvent::new(code, KeyModifiers::NONE))
+}
+
+/// Select an option in a picker list state and then synthesize the keypress
+/// (`Enter` for single-select pickers, `Space` for multi-select) so the
+/// existing keyboard handler runs the apply/toggle logic.
+fn select_and_press(
+    app: &mut App,
+    state_field: fn(&mut App) -> &mut ListState,
+    idx: usize,
+    code: KeyCode,
+) -> AppAction {
+    state_field(app).select(Some(idx));
+    synth_press(app, code)
+}
+
 pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
     let col = event.column;
     let row = event.row;
@@ -56,6 +76,90 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 })
                 .unwrap_or(false);
             app.last_click = Some((now, col, row));
+
+            // Picker option click — dispatch per-mode.
+            if let Some(picker) = app.hit_zones.picker {
+                if let Some(idx) = picker.row_to_index(row) {
+                    if col >= picker.area.x && col < picker.area.x.saturating_add(picker.area.width)
+                    {
+                        match app.mode {
+                            Mode::Transition => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.transition_list_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::AssigneePicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.assignee_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::SprintPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.sprint_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::SavedJqlPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.saved_jql_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::ThemePicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.theme_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::ProjectVersionBrowser => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.project_version_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
+                            Mode::ComponentPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.component_state,
+                                    idx,
+                                    KeyCode::Char(' '),
+                                );
+                            }
+                            Mode::FixVersionPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.fix_version_state,
+                                    idx,
+                                    KeyCode::Char(' '),
+                                );
+                            }
+                            Mode::ColumnPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.column_picker_state,
+                                    idx,
+                                    KeyCode::Char(' '),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
 
             // Detail tab header click → switch tab + warm async.
             for (tab_rect, tab) in app.hit_zones.detail_tabs.clone() {

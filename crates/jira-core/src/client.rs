@@ -19,6 +19,7 @@ use crate::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
             SearchResult, UpdateIssueRequest,
         },
+        issue_type::IssueType,
         link::{IssueLink, IssueLinkType},
         sprint::Sprint,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
@@ -1491,13 +1492,6 @@ impl JiraClient {
         self.request_no_body(|| http.delete(&url).headers(headers.clone()))
             .await
     }
-}
-
-/// Issue type metadata (id + name) returned by createmeta.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct IssueType {
-    pub id: String,
-    pub name: String,
 }
 
 async fn handle_response<T>(response: Response) -> Result<T>

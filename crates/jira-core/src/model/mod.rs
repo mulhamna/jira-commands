@@ -2,6 +2,7 @@ pub mod attachment;
 pub mod comment;
 pub mod field;
 pub mod issue;
+pub mod issue_type;
 pub mod link;
 pub mod sprint;
 pub mod version;
@@ -13,6 +14,7 @@ pub use field::{Field, FieldKind, FieldValue};
 pub use issue::{
     CreateIssueRequest, CreateIssueRequestV2, Issue, SearchResult, UpdateIssueRequest,
 };
+pub use issue_type::IssueType;
 pub use link::{IssueLink, IssueLinkType};
 pub use sprint::Sprint;
 pub use version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest};

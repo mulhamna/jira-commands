@@ -30,6 +30,14 @@ use crate::{
 const AGILE_BASE: &str = "/rest/agile/1.0";
 const MAX_RETRIES: u32 = 3;
 
+#[derive(serde::Deserialize)]
+struct MyselfResponse {
+    #[serde(rename = "accountId")]
+    account_id: Option<String>,
+    #[serde(rename = "timeZone")]
+    time_zone: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct JiraClient {
     http: Client,
@@ -103,7 +111,7 @@ impl JiraClient {
         Ok(headers)
     }
 
-    async fn get_myself_value(&self) -> Result<Value> {
+    async fn get_myself_info(&self) -> Result<MyselfResponse> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/myself");
 
@@ -114,24 +122,16 @@ impl JiraClient {
 
     /// Get the current authenticated user's accountId.
     pub async fn get_myself(&self) -> Result<String> {
-        let user = self.get_myself_value().await?;
-
-        user.get("accountId")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .ok_or_else(|| JiraError::Api {
-                status: 0,
-                message: "Could not get accountId from /myself".into(),
-            })
+        let me = self.get_myself_info().await?;
+        me.account_id.ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Could not get accountId from /myself".into(),
+        })
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.
     pub async fn get_myself_timezone(&self) -> Result<Option<String>> {
-        let user = self.get_myself_value().await?;
-        Ok(user
-            .get("timeZone")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()))
+        Ok(self.get_myself_info().await?.time_zone)
     }
 
     /// Resolve an assignee string to a Jira accountId.

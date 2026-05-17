@@ -257,9 +257,11 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
 }
 
 fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let Some(issue) = app.selected_issue() else {
-        return;
+    let issue_key = match app.selected_issue() {
+        Some(issue) => issue.key.clone(),
+        None => return,
     };
+    app.hit_zones.detail_pane = Some(area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -281,20 +283,56 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
         })
         .collect::<Vec<_>>();
 
+    // Record one Rect per tab header so mouse::handle_mouse can hit-test clicks.
+    // Tabs are rendered on the single content row of a bordered Paragraph at
+    // chunks[0], so the first tab starts at (x + 1, y + 1) and each tab's
+    // width matches its formatted label (" {label} ") in columns.
+    let tab_origin_x = chunks[0].x.saturating_add(1);
+    let tab_origin_y = chunks[0].y.saturating_add(1);
+    let inner_width = chunks[0].width.saturating_sub(2);
+    let mut cursor_x = tab_origin_x;
+    let tab_rects: Vec<(Rect, DetailTab)> = DetailTab::ALL
+        .iter()
+        .filter_map(|tab| {
+            let label_width = (tab.label().chars().count() + 2) as u16;
+            if cursor_x.saturating_add(label_width) > tab_origin_x.saturating_add(inner_width) {
+                return None;
+            }
+            let rect = Rect {
+                x: cursor_x,
+                y: tab_origin_y,
+                width: label_width,
+                height: 1,
+            };
+            cursor_x = cursor_x.saturating_add(label_width);
+            Some((rect, *tab))
+        })
+        .collect();
+    app.hit_zones.detail_tabs = tab_rects;
+
     let tabs = Paragraph::new(Line::from(tab_titles)).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(palette.focus_border))
-            .title(format!(" {} ", issue.key)),
+            .title(format!(" {issue_key} ")),
     );
     f.render_widget(tabs, chunks[0]);
 
     let body = match app.active_tab {
-        DetailTab::Summary => build_summary_lines(issue, palette),
+        DetailTab::Summary => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_summary_lines(issue, palette)
+        }
         DetailTab::Comments => build_comment_lines(app, palette),
         DetailTab::Worklog => build_worklog_lines(app, palette),
-        DetailTab::Attachments => build_attachment_lines(issue),
-        DetailTab::Subtasks => build_subtask_lines(issue),
+        DetailTab::Attachments => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_attachment_lines(issue)
+        }
+        DetailTab::Subtasks => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_subtask_lines(issue)
+        }
         DetailTab::Links => build_link_lines(app),
     };
 

@@ -57,14 +57,37 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 .unwrap_or(false);
             app.last_click = Some((now, col, row));
 
-            // List row click
+            // Detail tab header click → switch tab + warm async.
+            for (tab_rect, tab) in app.hit_zones.detail_tabs.clone() {
+                if contains(&tab_rect, col, row) {
+                    app.focus = Focus::Detail;
+                    app.set_active_tab(tab);
+                    return AppAction::WarmActiveTab;
+                }
+            }
+
+            // List row click → select issue. In list-only view a double-click
+            // promotes focus to Detail (matches Enter key behavior).
             if let Some(list_rect) = app.hit_zones.list {
                 if contains(&list_rect, col, row) {
                     if let Some(idx) = list_row_index(app, &list_rect, row) {
                         app.table_state.select(Some(idx));
-                        if is_double_click {
+                        if is_double_click && app.focus == Focus::List {
                             app.focus = Focus::Detail;
+                            return AppAction::WarmActiveTab;
                         }
+                    }
+                    return AppAction::None;
+                }
+            }
+
+            // Click anywhere inside the detail pane but not on a tab → focus
+            // the detail (no-op if focus is already Detail).
+            if let Some(pane) = app.hit_zones.detail_pane {
+                if contains(&pane, col, row) {
+                    if app.focus != Focus::Detail {
+                        app.focus = Focus::Detail;
+                        return AppAction::WarmActiveTab;
                     }
                     return AppAction::None;
                 }

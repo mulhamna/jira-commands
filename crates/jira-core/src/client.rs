@@ -14,6 +14,7 @@ use crate::{
     model::{
         attachment::Attachment,
         comment::Comment,
+        component::Component,
         field::Field,
         issue::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
@@ -21,6 +22,7 @@ use crate::{
         },
         issue_type::IssueType,
         link::{IssueLink, IssueLinkType},
+        remote_link::RemoteLink,
         sprint::Sprint,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
@@ -353,6 +355,15 @@ impl JiraClient {
     }
 
     /// Create a new issue.
+    ///
+    /// Deprecated in favor of [`JiraClient::create_issue_v2`], which supports
+    /// custom fields, labels, components, parent, fix versions, and ADF
+    /// descriptions. This method is retained for backward compatibility and
+    /// will be removed in a future release.
+    #[deprecated(
+        since = "0.40.0",
+        note = "Use `create_issue_v2` — supports custom fields, labels, components, parent, fix versions"
+    )]
     pub async fn create_issue(&self, req: CreateIssueRequest) -> Result<Issue> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
@@ -718,16 +729,13 @@ impl JiraClient {
     }
 
     /// List components available within a project.
-    pub async fn get_project_components(&self, project_key: &str) -> Result<Vec<Value>> {
+    pub async fn get_project_components(&self, project_key: &str) -> Result<Vec<Component>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/project/{project_key}/components"));
 
         let http = &self.http;
-        let components: Vec<Value> = self
-            .request(|| http.get(&url).headers(headers.clone()))
-            .await?;
-
-        Ok(components)
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
     }
 
     /// List fix versions available within a project.
@@ -1147,7 +1155,7 @@ impl JiraClient {
     }
 
     /// List remote links on an issue.
-    pub async fn get_remote_links(&self, issue_key: &str) -> Result<Vec<Value>> {
+    pub async fn get_remote_links(&self, issue_key: &str) -> Result<Vec<RemoteLink>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/remotelink"));
 

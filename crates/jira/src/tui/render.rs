@@ -449,20 +449,11 @@ fn build_link_lines(app: &App) -> Vec<Line<'static>> {
                 Line::from(""),
             ];
             for link in links {
-                let object = link.get("object");
-                let title = object
-                    .and_then(|o| o.get("title"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Untitled link");
-                let url = object
-                    .and_then(|o| o.get("url"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("-");
                 lines.push(Line::from(Span::styled(
-                    title.to_string(),
+                    link.object.title.clone(),
                     Style::default().add_modifier(Modifier::BOLD),
                 )));
-                lines.push(Line::from(format!("  {url}")));
+                lines.push(Line::from(format!("  {}", link.object.url)));
                 lines.push(Line::from(""));
             }
             lines

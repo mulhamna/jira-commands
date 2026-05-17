@@ -1,5 +1,4 @@
-use jira_core::model::{Comment, Worklog};
-use serde_json::Value;
+use jira_core::model::{Comment, RemoteLink, Worklog};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DetailTab {
@@ -52,7 +51,7 @@ pub(super) struct DetailData {
     pub(super) issue_key: String,
     pub(super) comments: Option<Vec<Comment>>,
     pub(super) worklogs: Option<Vec<Worklog>>,
-    pub(super) remote_links: Option<Vec<Value>>,
+    pub(super) remote_links: Option<Vec<RemoteLink>>,
 }
 
 impl DetailData {

@@ -1278,8 +1278,7 @@ pub async fn run_tui(
                                 app.component_catalog = components
                                     .into_iter()
                                     .filter_map(|component| {
-                                        let name =
-                                            component.get("name").and_then(|v| v.as_str())?.trim();
+                                        let name = component.name.trim();
                                         if name.is_empty() {
                                             return None;
                                         }

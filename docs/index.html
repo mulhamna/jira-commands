@@ -430,7 +430,7 @@ $ jirac issue transition CORE-183 --to Done
 
     <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, light and dark themes (including <code>GitHub Light</code>), single worklog entry via <code>w</code>, bulk date-range worklogs via <code>b</code>, and bulk comments via <code>:</code> with confirmation.</p>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard- and mouse-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, light and dark themes (including <code>GitHub Light</code>), single worklog entry via <code>w</code>, bulk date-range worklogs via <code>b</code>, and bulk comments via <code>:</code> with confirmation. Click rows, detail tabs, and picker options; double-click to open detail; scroll the wheel to navigate; click outside any popup to dismiss it.</p>
       <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
           <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
@@ -465,6 +465,27 @@ $ jirac issue transition CORE-183 --to Done
           </tbody>
         </table>
       </div>
+      <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+        <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
+          <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
+            <tr>
+              <th class="px-4 py-3 font-semibold">Mouse</th>
+              <th class="px-4 py-3 font-semibold">Description</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            <tr><td class="px-4 py-3">Click issue row</td><td class="px-4 py-3">Select that row.</td></tr>
+            <tr><td class="px-4 py-3">Double-click issue row</td><td class="px-4 py-3">Open the split detail view (same as <span class="keycap">Enter</span>).</td></tr>
+            <tr><td class="px-4 py-3">Click detail tab</td><td class="px-4 py-3">Switch to that tab; comments, worklog, and links lazy-load.</td></tr>
+            <tr><td class="px-4 py-3">Click detail pane</td><td class="px-4 py-3">Switch focus to detail when currently on the issue list.</td></tr>
+            <tr><td class="px-4 py-3">Click picker option</td><td class="px-4 py-3">Apply for single-select pickers (transition, assignee, sprint, saved JQL, theme, project versions); toggle for multi-select pickers (components, fix versions, columns).</td></tr>
+            <tr><td class="px-4 py-3">Click outside popup</td><td class="px-4 py-3">Close popup (equivalent to <span class="keycap">Esc</span>). Form modals are exempt to protect in-flight input.</td></tr>
+            <tr><td class="px-4 py-3">Scroll wheel on list</td><td class="px-4 py-3">Previous / next issue.</td></tr>
+            <tr><td class="px-4 py-3">Scroll wheel on picker</td><td class="px-4 py-3">Move picker selection up / down.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">To copy terminal text while the TUI is running, hold <span class="keycap">Shift</span> (iTerm2 / most Linux terminals) or <span class="keycap">Option</span> (Terminal.app) while selecting. Under tmux, set <code>set -g mouse on</code> so events reach the TUI.</p>
     </section>
 
     <section id="mcp" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">

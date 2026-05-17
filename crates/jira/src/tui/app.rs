@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::notifications::{
@@ -10,7 +10,7 @@ use crate::notifications::{
 };
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -24,7 +24,7 @@ use jira_core::{
     IssueType, JiraClient,
 };
 
-use super::panel::{DetailData, DetailTab, Focus};
+use super::panel::{DetailData, DetailTab, Focus, HitZones};
 use ratatui::{
     backend::CrosstermBackend,
     widgets::{ListState, TableState},
@@ -35,6 +35,7 @@ use super::column::{format_column_summary, ColumnSpec};
 use super::keys;
 use super::modal::{Modal, ModalKind};
 use super::mode::Mode;
+use super::mouse;
 use super::picker::PickerOption;
 use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
@@ -162,6 +163,9 @@ pub(super) struct App {
     pub(super) modal: Option<Modal>,
     pub(super) prev_mode: Option<Mode>,
     pub(super) notification_entries: Vec<NotificationEntry>,
+    pub(super) hit_zones: HitZones,
+    /// (when, column, row) of the last left-click. Used to detect double-click.
+    pub(super) last_click: Option<(Instant, u16, u16)>,
 }
 
 pub(super) enum AppAction {
@@ -332,6 +336,8 @@ impl App {
             modal: None,
             prev_mode: None,
             notification_entries: Vec::new(),
+            hit_zones: HitZones::default(),
+            last_click: None,
         }
     }
 
@@ -795,7 +801,7 @@ pub async fn run_tui(
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -825,14 +831,18 @@ pub async fn run_tui(
             continue;
         }
 
-        let Ok(Event::Key(key)) = event::read() else {
-            continue;
+        let action = match event::read() {
+            Ok(Event::Key(key)) => {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                keys::handle_key(&mut app, key)
+            }
+            Ok(Event::Mouse(mouse_event)) => mouse::handle_mouse(&mut app, mouse_event),
+            _ => continue,
         };
-        if key.kind != KeyEventKind::Press {
-            continue;
-        }
 
-        match keys::handle_key(&mut app, key) {
+        match action {
             AppAction::Quit => break,
 
             AppAction::Refresh => {
@@ -1078,14 +1088,8 @@ pub async fn run_tui(
                     terminal.draw(|f| ui(f, &mut app))?;
                     match client.get_transitions(&key).await {
                         Ok(raw) => {
-                            let transitions: Vec<(String, String)> = raw
-                                .iter()
-                                .filter_map(|t| {
-                                    let id = t.get("id")?.as_str()?.to_string();
-                                    let name = t.get("name")?.as_str()?.to_string();
-                                    Some((id, name))
-                                })
-                                .collect();
+                            let transitions: Vec<(String, String)> =
+                                raw.into_iter().map(|t| (t.id, t.name)).collect();
 
                             if transitions.is_empty() {
                                 app.set_status("No transitions available", true);
@@ -1157,20 +1161,12 @@ pub async fn run_tui(
                     Ok(users) => {
                         for user in users {
                             let display = user
-                                .get("displayName")
-                                .and_then(|v| v.as_str())
+                                .display_name
+                                .as_deref()
                                 .unwrap_or("Unknown user")
                                 .trim();
-                            let email = user
-                                .get("emailAddress")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .trim();
-                            let account_id = user
-                                .get("accountId")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .trim();
+                            let email = user.email_address.as_deref().unwrap_or("").trim();
+                            let account_id = user.account_id.trim();
                             if account_id.is_empty() {
                                 continue;
                             }
@@ -1208,20 +1204,12 @@ pub async fn run_tui(
                         }];
                         for user in users {
                             let display = user
-                                .get("displayName")
-                                .and_then(|v| v.as_str())
+                                .display_name
+                                .as_deref()
                                 .unwrap_or("Unknown user")
                                 .trim();
-                            let email = user
-                                .get("emailAddress")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .trim();
-                            let account_id = user
-                                .get("accountId")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .trim();
+                            let email = user.email_address.as_deref().unwrap_or("").trim();
+                            let account_id = user.account_id.trim();
                             if account_id.is_empty() {
                                 continue;
                             }
@@ -1278,8 +1266,7 @@ pub async fn run_tui(
                                 app.component_catalog = components
                                     .into_iter()
                                     .filter_map(|component| {
-                                        let name =
-                                            component.get("name").and_then(|v| v.as_str())?.trim();
+                                        let name = component.name.trim();
                                         if name.is_empty() {
                                             return None;
                                         }
@@ -1531,14 +1518,11 @@ pub async fn run_tui(
 
                     if let Ok(users) = client.search_users(&query).await {
                         let options: Vec<PickerOption> = users
-                            .iter()
+                            .into_iter()
                             .filter_map(|u| {
-                                let display =
-                                    u.get("displayName").and_then(|v| v.as_str())?.to_string();
-                                let account_id =
-                                    u.get("accountId").and_then(|v| v.as_str())?.to_string();
+                                let display = u.display_name?;
                                 Some(PickerOption {
-                                    value: account_id,
+                                    value: u.account_id,
                                     label: display,
                                 })
                             })
@@ -2780,7 +2764,11 @@ pub async fn run_tui(
     }
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     Ok(())

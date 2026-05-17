@@ -40,6 +40,7 @@ Jira on the command line.
 ## Highlights
 
 - **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, bulk-comment, worklog, upload, and inspect issues without leaving the terminal
+- **Mouse-driven TUI** — click rows, tabs, picker options, and outside-popup; scroll wheel navigates lists; double-click opens detail
 - **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
 - **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes (including GitHub Light)
 - **Multi-profile auth** — store and switch between multiple Jira accounts or deployments
@@ -246,11 +247,13 @@ jirac auth use client-dc
 
 The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version creation (`n`) and metadata editing (`e`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
 
+The TUI also accepts full mouse input: click any issue row to select, double-click (or click a tab) to open the detail view, click picker options to apply or toggle, scroll the wheel to navigate, and click outside any popup to dismiss it. Form modals stay keyboard-only so in-flight input isn't lost.
+
 ```bash
 jirac tui -p PROJ
 ```
 
-Full keybinding reference: [TUI.md](TUI.md)
+Full keybinding and mouse reference: [TUI.md](TUI.md)
 
 ## Configuration
 

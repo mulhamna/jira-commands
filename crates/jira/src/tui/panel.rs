@@ -1,5 +1,5 @@
-use jira_core::model::{Comment, Worklog};
-use serde_json::Value;
+use jira_core::model::{Comment, RemoteLink, Worklog};
+use ratatui::layout::Rect;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DetailTab {
@@ -52,7 +52,7 @@ pub(super) struct DetailData {
     pub(super) issue_key: String,
     pub(super) comments: Option<Vec<Comment>>,
     pub(super) worklogs: Option<Vec<Worklog>>,
-    pub(super) remote_links: Option<Vec<Value>>,
+    pub(super) remote_links: Option<Vec<RemoteLink>>,
 }
 
 impl DetailData {
@@ -70,4 +70,56 @@ impl DetailData {
 pub(super) enum Focus {
     List,
     Detail,
+}
+
+/// Click targets captured during the previous frame's render pass.
+/// Mouse events are hit-tested against these zones to translate pointer
+/// coordinates into the same `AppAction` variants the keyboard handler emits.
+#[derive(Debug, Default, Clone)]
+pub(super) struct HitZones {
+    /// Issue list table area (full bounding box including header + border).
+    pub(super) list: Option<Rect>,
+    /// Detail pane area (right side in master-detail layout).
+    pub(super) detail_pane: Option<Rect>,
+    /// One rect per visible detail tab header (Summary, Comments, ...).
+    pub(super) detail_tabs: Vec<(Rect, DetailTab)>,
+    /// The currently visible picker list (transition, assignee, etc.).
+    /// `area` is the inner content area (no border) where rows are drawn.
+    pub(super) picker: Option<PickerHit>,
+    /// The currently visible popup bounding box. Clicks *outside* this
+    /// rect while a popup mode is active should close the popup.
+    pub(super) popup: Option<Rect>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct PickerHit {
+    /// Inner area (excluding borders) where rows are rendered.
+    pub(super) area: Rect,
+    /// The list state's current scroll offset (0 = first option at top).
+    pub(super) offset: usize,
+    /// Total number of options in the picker (bounds-check upper limit).
+    pub(super) count: usize,
+}
+
+impl HitZones {
+    pub(super) fn clear(&mut self) {
+        self.list = None;
+        self.detail_pane = None;
+        self.detail_tabs.clear();
+        self.picker = None;
+        self.popup = None;
+    }
+}
+
+impl PickerHit {
+    /// Translate a pointer row to an option index, or `None` if the row
+    /// lands on a border / past the last option.
+    pub(super) fn row_to_index(&self, row: u16) -> Option<usize> {
+        if row < self.area.y || row >= self.area.y.saturating_add(self.area.height) {
+            return None;
+        }
+        let visible = (row - self.area.y) as usize;
+        let idx = self.offset.saturating_add(visible);
+        (idx < self.count).then_some(idx)
+    }
 }

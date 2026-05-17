@@ -14,13 +14,18 @@ use crate::{
     model::{
         attachment::Attachment,
         comment::Comment,
+        component::Component,
         field::Field,
         issue::{
             CreateIssueRequest, CreateIssueRequestV2, Issue, RawIssue, RawSearchResponse,
             SearchResult, UpdateIssueRequest,
         },
+        issue_type::IssueType,
         link::{IssueLink, IssueLinkType},
+        remote_link::RemoteLink,
         sprint::Sprint,
+        transition::Transition,
+        user::JiraUser,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
     },
@@ -28,6 +33,14 @@ use crate::{
 
 const AGILE_BASE: &str = "/rest/agile/1.0";
 const MAX_RETRIES: u32 = 3;
+
+#[derive(serde::Deserialize)]
+struct MyselfResponse {
+    #[serde(rename = "accountId")]
+    account_id: Option<String>,
+    #[serde(rename = "timeZone")]
+    time_zone: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct JiraClient {
@@ -69,31 +82,15 @@ impl JiraClient {
     }
 
     fn auth_headers(&self) -> Result<HeaderMap> {
-        let token = self.config.token.as_deref().ok_or_else(|| {
-            JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
-        })?;
-
-        let auth_value = match self.config.auth_type {
-            JiraAuthType::CloudApiToken | JiraAuthType::DataCenterBasic => {
-                let credentials = base64_encode(&format!("{}:{}", self.config.email, token));
-                format!("Basic {credentials}")
-            }
-            JiraAuthType::DataCenterPat => format!("Bearer {token}"),
-        };
-
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            AUTHORIZATION,
-            HeaderValue::from_str(&auth_value)
-                .map_err(|e| JiraError::Auth(format!("Invalid auth header: {e}")))?,
-        );
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
-        Ok(headers)
+        self.build_auth_headers(true)
     }
 
     /// Auth headers without Content-Type — required for multipart uploads.
     fn auth_headers_no_content_type(&self) -> Result<HeaderMap> {
+        self.build_auth_headers(false)
+    }
+
+    fn build_auth_headers(&self, include_content_type: bool) -> Result<HeaderMap> {
         let token = self.config.token.as_deref().ok_or_else(|| {
             JiraError::Auth("No token configured. Run `jirac auth login` first.".into())
         })?;
@@ -112,10 +109,13 @@ impl JiraClient {
             HeaderValue::from_str(&auth_value)
                 .map_err(|e| JiraError::Auth(format!("Invalid auth header: {e}")))?,
         );
+        if include_content_type {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        }
         Ok(headers)
     }
 
-    async fn get_myself_value(&self) -> Result<Value> {
+    async fn get_myself_info(&self) -> Result<MyselfResponse> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/myself");
 
@@ -126,24 +126,16 @@ impl JiraClient {
 
     /// Get the current authenticated user's accountId.
     pub async fn get_myself(&self) -> Result<String> {
-        let user = self.get_myself_value().await?;
-
-        user.get("accountId")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .ok_or_else(|| JiraError::Api {
-                status: 0,
-                message: "Could not get accountId from /myself".into(),
-            })
+        let me = self.get_myself_info().await?;
+        me.account_id.ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Could not get accountId from /myself".into(),
+        })
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.
     pub async fn get_myself_timezone(&self) -> Result<Option<String>> {
-        let user = self.get_myself_value().await?;
-        Ok(user
-            .get("timeZone")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string()))
+        Ok(self.get_myself_info().await?.time_zone)
     }
 
     /// Resolve an assignee string to a Jira accountId.
@@ -163,19 +155,49 @@ impl JiraClient {
         users
             .iter()
             .find(|u| {
-                u.get("emailAddress")
-                    .and_then(|v| v.as_str())
+                u.email_address
+                    .as_deref()
                     .map(|e| e.eq_ignore_ascii_case(s))
                     .unwrap_or(false)
             })
             .or_else(|| users.first())
-            .and_then(|u| u.get("accountId"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .map(|u| u.account_id.clone())
             .ok_or_else(|| JiraError::Api {
                 status: 0,
                 message: format!("User not found: {s}"),
             })
+    }
+
+    /// Send a request, retrying on HTTP 429 according to the `Retry-After` header.
+    /// Returns the first non-429 response, or `RateLimit` after `MAX_RETRIES` attempts.
+    async fn execute_with_retry(
+        &self,
+        builder_fn: impl Fn() -> reqwest::RequestBuilder,
+    ) -> Result<reqwest::Response> {
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            let response = builder_fn().send().await?;
+
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                return Ok(response);
+            }
+
+            let retry_after = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(60);
+
+            warn!("Rate limited. Retrying after {}s", retry_after);
+
+            if attempt >= MAX_RETRIES {
+                return Err(JiraError::RateLimit { retry_after });
+            }
+
+            tokio::time::sleep(Duration::from_secs(retry_after)).await;
+        }
     }
 
     /// Core request method with rate-limit retry logic.
@@ -183,32 +205,8 @@ impl JiraClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            return handle_response(response).await;
-        }
+        let response = self.execute_with_retry(builder_fn).await?;
+        handle_response(response).await
     }
 
     /// Core request method for responses with no body (204 No Content).
@@ -216,44 +214,19 @@ impl JiraClient {
         &self,
         builder_fn: impl Fn() -> reqwest::RequestBuilder,
     ) -> Result<()> {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            let status = response.status();
-            if status.is_success() {
-                return Ok(());
-            }
-
-            let body = response.text().await.unwrap_or_default();
-            if status == StatusCode::NOT_FOUND {
-                return Err(JiraError::NotFound(body));
-            }
-            return Err(JiraError::Api {
-                status: status.as_u16(),
-                message: body,
-            });
+        let response = self.execute_with_retry(builder_fn).await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
         }
+        let body = response.text().await.unwrap_or_default();
+        if status == StatusCode::NOT_FOUND {
+            return Err(JiraError::NotFound(body));
+        }
+        Err(JiraError::Api {
+            status: status.as_u16(),
+            message: body,
+        })
     }
 
     /// Multipart request with rate-limit retry (for attachment uploads).
@@ -264,32 +237,8 @@ impl JiraClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            return handle_response(response).await;
-        }
+        let response = self.execute_with_retry(builder_fn).await?;
+        handle_response(response).await
     }
 
     /// Search issues using JQL with cursor-based pagination.
@@ -406,6 +355,15 @@ impl JiraClient {
     }
 
     /// Create a new issue.
+    ///
+    /// Deprecated in favor of [`JiraClient::create_issue_v2`], which supports
+    /// custom fields, labels, components, parent, fix versions, and ADF
+    /// descriptions. This method is retained for backward compatibility and
+    /// will be removed in a future release.
+    #[deprecated(
+        since = "0.40.0",
+        note = "Use `create_issue_v2` — supports custom fields, labels, components, parent, fix versions"
+    )]
     pub async fn create_issue(&self, req: CreateIssueRequest) -> Result<Issue> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
@@ -592,13 +550,13 @@ impl JiraClient {
     }
 
     /// Get available transitions for an issue.
-    pub async fn get_transitions(&self, key: &str) -> Result<Vec<Value>> {
+    pub async fn get_transitions(&self, key: &str) -> Result<Vec<Transition>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{key}/transitions"));
 
         #[derive(serde::Deserialize)]
         struct TransitionsResponse {
-            transitions: Vec<Value>,
+            transitions: Vec<Transition>,
         }
 
         let http = &self.http;
@@ -754,33 +712,27 @@ impl JiraClient {
     }
 
     /// Search Jira users by query string (for User field autocomplete).
-    pub async fn search_users(&self, query: &str) -> Result<Vec<Value>> {
+    pub async fn search_users(&self, query: &str) -> Result<Vec<JiraUser>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/user/search");
 
         let http = &self.http;
-        let users: Vec<Value> = self
-            .request(|| {
-                http.get(&url)
-                    .headers(headers.clone())
-                    .query(&[("query", query), ("maxResults", "20")])
-            })
-            .await?;
-
-        Ok(users)
+        self.request(|| {
+            http.get(&url)
+                .headers(headers.clone())
+                .query(&[("query", query), ("maxResults", "20")])
+        })
+        .await
     }
 
     /// List components available within a project.
-    pub async fn get_project_components(&self, project_key: &str) -> Result<Vec<Value>> {
+    pub async fn get_project_components(&self, project_key: &str) -> Result<Vec<Component>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/project/{project_key}/components"));
 
         let http = &self.http;
-        let components: Vec<Value> = self
-            .request(|| http.get(&url).headers(headers.clone()))
-            .await?;
-
-        Ok(components)
+        self.request(|| http.get(&url).headers(headers.clone()))
+            .await
     }
 
     /// List fix versions available within a project.
@@ -1200,7 +1152,7 @@ impl JiraClient {
     }
 
     /// List remote links on an issue.
-    pub async fn get_remote_links(&self, issue_key: &str) -> Result<Vec<Value>> {
+    pub async fn get_remote_links(&self, issue_key: &str) -> Result<Vec<RemoteLink>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/remotelink"));
 
@@ -1384,65 +1336,48 @@ impl JiraClient {
         let url = format!("{}{}", self.config.base_url.trim_end_matches('/'), path);
 
         let http = &self.http;
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = match method.to_uppercase().as_str() {
-                "GET" => http.get(&url),
-                "POST" => http.post(&url),
-                "PUT" => http.put(&url),
-                "DELETE" => http.delete(&url),
-                "PATCH" => http.patch(&url),
-                _ => http.get(&url),
-            };
-            let req = req.headers(headers.clone());
-            let req = if let Some(b) = &body {
-                req.json(b)
-            } else {
-                req
-            };
-
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-                warn!("Rate limited. Retrying after {}s", retry_after);
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
+        let response = self
+            .execute_with_retry(|| {
+                let req = match method.to_uppercase().as_str() {
+                    "GET" => http.get(&url),
+                    "POST" => http.post(&url),
+                    "PUT" => http.put(&url),
+                    "DELETE" => http.delete(&url),
+                    "PATCH" => http.patch(&url),
+                    _ => http.get(&url),
+                };
+                let req = req.headers(headers.clone());
+                if let Some(b) = &body {
+                    req.json(b)
+                } else {
+                    req
                 }
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
+            })
+            .await?;
 
-            let status = response.status();
+        let status = response.status();
 
-            // 204 No Content — success with empty body
-            if status == StatusCode::NO_CONTENT {
-                return Ok(None);
-            }
-
-            if status.is_success() {
-                let value: Value = response.json().await?;
-                return Ok(Some(value));
-            }
-
-            let body_text = response.text().await.unwrap_or_default();
-            return Err(match status {
-                StatusCode::NOT_FOUND => JiraError::NotFound(body_text),
-                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                    JiraError::Auth(format!("HTTP {status}: {body_text}"))
-                }
-                _ => JiraError::Api {
-                    status: status.as_u16(),
-                    message: body_text,
-                },
-            });
+        // 204 No Content — success with empty body
+        if status == StatusCode::NO_CONTENT {
+            return Ok(None);
         }
+
+        if status.is_success() {
+            let value: Value = response.json().await?;
+            return Ok(Some(value));
+        }
+
+        let body_text = response.text().await.unwrap_or_default();
+        Err(match status {
+            StatusCode::NOT_FOUND => JiraError::NotFound(body_text),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                JiraError::Auth(format!("HTTP {status}: {body_text}"))
+            }
+            _ => JiraError::Api {
+                status: status.as_u16(),
+                message: body_text,
+            },
+        })
     }
 
     // ── Plans API (Jira Premium) ──────────────────────────────────────────────
@@ -1564,13 +1499,6 @@ impl JiraClient {
     }
 }
 
-/// Issue type metadata (id + name) returned by createmeta.
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct IssueType {
-    pub id: String,
-    pub name: String,
-}
-
 async fn handle_response<T>(response: Response) -> Result<T>
 where
     T: serde::de::DeserializeOwned,
@@ -1606,33 +1534,9 @@ where
 
 /// Returns current UTC time in Jira worklog format: "2006-01-02T15:04:05.000+0000"
 fn current_jira_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    // Manual conversion: secs since epoch → date/time components
-    let s = secs % 60;
-    let m = (secs / 60) % 60;
-    let h = (secs / 3600) % 24;
-    // Days since epoch
-    let days = secs / 86400;
-    // Simplified: use a rough date calculation
-    // For worklog "started", accuracy to the day is sufficient
-    let year_approx = 1970 + days / 365;
-    let day_of_year = days % 365;
-    let month = (day_of_year / 30) + 1;
-    let day = (day_of_year % 30) + 1;
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.000+0000",
-        year_approx,
-        month.min(12),
-        day.min(28),
-        h,
-        m,
-        s
-    )
+    chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.3f%z")
+        .to_string()
 }
 
 fn base64_encode(input: &str) -> String {
@@ -1914,9 +1818,9 @@ mod tests {
             .expect("search should parse");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0]["accountId"], "acct-1");
-        assert_eq!(users[0]["displayName"], "Alice Example");
-        assert!(users[0].get("emailAddress").is_none());
+        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].display_name.as_deref(), Some("Alice Example"));
+        assert!(users[0].email_address.is_none());
     }
 
     #[tokio::test]
@@ -2425,7 +2329,7 @@ mod tests {
             .expect("request should retry and succeed");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0]["accountId"], "acct-1");
+        assert_eq!(users[0].account_id, "acct-1");
     }
 
     #[tokio::test]
@@ -2667,5 +2571,187 @@ mod tests {
             link.outward_issue.as_ref().unwrap().summary,
             "Blocked Issue"
         );
+    }
+
+    #[tokio::test]
+    async fn get_remote_links_parses_object_title_and_url() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/remotelink"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "id": 10001,
+                    "self": "https://jira.example.com/rest/api/3/issue/TEST-1/remotelink/10001",
+                    "globalId": "system=https://docs.example.com&id=42",
+                    "relationship": "Wiki Page",
+                    "object": {
+                        "title": "Design Doc",
+                        "url": "https://docs.example.com/design",
+                        "summary": "Architecture overview"
+                    }
+                },
+                {
+                    "id": 10002,
+                    "object": {
+                        "title": "Tracking ticket",
+                        "url": "https://tracker.example.com/4242"
+                    }
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let links = client
+            .get_remote_links("TEST-1")
+            .await
+            .expect("remote links should parse");
+
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].id, 10001);
+        assert_eq!(
+            links[0].global_id.as_deref(),
+            Some("system=https://docs.example.com&id=42")
+        );
+        assert_eq!(links[0].object.title, "Design Doc");
+        assert_eq!(links[0].object.url, "https://docs.example.com/design");
+        assert_eq!(
+            links[0].object.summary.as_deref(),
+            Some("Architecture overview")
+        );
+        assert_eq!(links[1].id, 10002);
+        assert!(links[1].global_id.is_none());
+        assert!(links[1].object.summary.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_remote_links_returns_empty_when_no_links() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/remotelink"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let links = client.get_remote_links("TEST-1").await.expect("parse");
+        assert!(links.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_project_components_parses_id_and_name() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/project/PROJ/components"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "id": "10100",
+                    "name": "Backend",
+                    "description": "Server-side code",
+                    "self": "https://jira.example.com/rest/api/3/component/10100"
+                },
+                {
+                    "id": "10101",
+                    "name": "Frontend"
+                }
+            ])))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let components = client
+            .get_project_components("PROJ")
+            .await
+            .expect("components should parse");
+
+        assert_eq!(components.len(), 2);
+        assert_eq!(components[0].id, "10100");
+        assert_eq!(components[0].name, "Backend");
+        assert_eq!(
+            components[0].description.as_deref(),
+            Some("Server-side code")
+        );
+        assert!(components[0].self_url.is_some());
+        assert_eq!(components[1].name, "Frontend");
+        assert!(components[1].description.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_transitions_parses_id_name_and_preserves_extra_fields() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/transitions"))
+            .and(header("authorization", cloud_auth().as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "expand": "transitions",
+                "transitions": [
+                    {
+                        "id": "21",
+                        "name": "In Progress",
+                        "hasScreen": false,
+                        "isGlobal": false,
+                        "isInitial": false,
+                        "isAvailable": true,
+                        "to": {
+                            "id": "3",
+                            "name": "In Progress",
+                            "statusCategory": { "key": "indeterminate" }
+                        }
+                    },
+                    {
+                        "id": "31",
+                        "name": "Done",
+                        "to": { "id": "10001", "name": "Done" }
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let transitions = client
+            .get_transitions("TEST-1")
+            .await
+            .expect("transitions should parse");
+
+        assert_eq!(transitions.len(), 2);
+        assert_eq!(transitions[0].id, "21");
+        assert_eq!(transitions[0].name, "In Progress");
+        assert_eq!(
+            transitions[0].to.as_ref().and_then(|t| t.name.as_deref()),
+            Some("In Progress")
+        );
+
+        // Extra Jira fields (hasScreen, isGlobal, ...) must round-trip via #[serde(flatten)]
+        // so MCP consumers re-serializing the struct keep the full payload shape.
+        let reserialized = serde_json::to_value(&transitions[0]).expect("serialize");
+        assert_eq!(reserialized["hasScreen"], json!(false));
+        assert_eq!(reserialized["isAvailable"], json!(true));
+
+        assert_eq!(transitions[1].id, "31");
+        assert!(transitions[1].to.is_some());
+    }
+
+    #[tokio::test]
+    async fn get_transitions_returns_empty_when_no_transitions_available() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1/transitions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "transitions": []
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let transitions = client.get_transitions("TEST-1").await.expect("parse");
+        assert!(transitions.is_empty());
     }
 }

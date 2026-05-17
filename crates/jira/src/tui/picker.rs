@@ -116,20 +116,12 @@ pub(super) async fn prompt_assignee_selection(
 
     for user in users {
         let display = user
-            .get("displayName")
-            .and_then(|v| v.as_str())
+            .display_name
+            .as_deref()
             .unwrap_or("Unknown user")
             .trim();
-        let email = user
-            .get("emailAddress")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim();
-        let account_id = user
-            .get("accountId")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim();
+        let email = user.email_address.as_deref().unwrap_or("").trim();
+        let account_id = user.account_id.trim();
 
         if account_id.is_empty() {
             continue;

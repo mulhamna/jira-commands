@@ -6,6 +6,7 @@ pub mod error;
 pub mod field_cache;
 pub mod model;
 
-pub use client::{IssueType, JiraClient};
+pub use client::JiraClient;
 pub use error::{JiraError, Result};
 pub use field_cache::FieldCache;
+pub use model::IssueType;

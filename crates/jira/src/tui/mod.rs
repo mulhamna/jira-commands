@@ -3,6 +3,7 @@ mod column;
 mod keys;
 mod modal;
 mod mode;
+mod mouse;
 mod panel;
 mod picker;
 mod prefs;

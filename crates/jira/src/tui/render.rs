@@ -14,12 +14,30 @@ use super::app::App;
 use super::column::format_column_summary;
 use super::modal::render_modal;
 use super::mode::Mode;
-use super::panel::{DetailTab, Focus};
+use super::panel::{DetailTab, Focus, PickerHit};
 use super::picker::PickerOption;
 use super::theme::{Palette, ThemeName};
 use super::version_format::{backlog_preview_lines, version_status_badges};
 
+/// Build a `PickerHit` from a bordered list/table widget area.
+/// `area` is the *outer* rect (including borders); the result's `area`
+/// is shrunk by 1 cell on every side, matching where rows are actually drawn.
+fn picker_hit_for_bordered(area: Rect, offset: usize, count: usize) -> PickerHit {
+    let inner = Rect {
+        x: area.x.saturating_add(1),
+        y: area.y.saturating_add(1),
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    PickerHit {
+        area: inner,
+        offset,
+        count,
+    }
+}
+
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
+    app.hit_zones.clear();
     let size = f.area();
     let palette = app.prefs.theme.palette();
     let chunks = Layout::default()
@@ -81,7 +99,8 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::Help => {
             render_browse(f, app, chunks[1], palette);
-            render_help_popup(f, size, palette);
+            let popup = render_help_popup(f, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::ProjectVersionBrowser => {
             render_browse(f, app, chunks[1], palette);
@@ -117,11 +136,14 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::ServerInfo => {
             render_browse(f, app, chunks[1], palette);
-            render_text_popup(f, " Server Info ", &app.server_info_lines, size, palette);
+            let popup =
+                render_text_popup(f, " Server Info ", &app.server_info_lines, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::ConfigView => {
             render_browse(f, app, chunks[1], palette);
-            render_text_popup(f, " Config View ", &app.config_lines, size, palette);
+            let popup = render_text_popup(f, " Config View ", &app.config_lines, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::Modal => {
             render_browse(f, app, chunks[1], palette);
@@ -252,12 +274,15 @@ fn render_list(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
         );
 
     f.render_stateful_widget(table, area, &mut app.table_state);
+    app.hit_zones.list = Some(area);
 }
 
 fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
-    let Some(issue) = app.selected_issue() else {
-        return;
+    let issue_key = match app.selected_issue() {
+        Some(issue) => issue.key.clone(),
+        None => return,
     };
+    app.hit_zones.detail_pane = Some(area);
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -279,20 +304,56 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
         })
         .collect::<Vec<_>>();
 
+    // Record one Rect per tab header so mouse::handle_mouse can hit-test clicks.
+    // Tabs are rendered on the single content row of a bordered Paragraph at
+    // chunks[0], so the first tab starts at (x + 1, y + 1) and each tab's
+    // width matches its formatted label (" {label} ") in columns.
+    let tab_origin_x = chunks[0].x.saturating_add(1);
+    let tab_origin_y = chunks[0].y.saturating_add(1);
+    let inner_width = chunks[0].width.saturating_sub(2);
+    let mut cursor_x = tab_origin_x;
+    let tab_rects: Vec<(Rect, DetailTab)> = DetailTab::ALL
+        .iter()
+        .filter_map(|tab| {
+            let label_width = (tab.label().chars().count() + 2) as u16;
+            if cursor_x.saturating_add(label_width) > tab_origin_x.saturating_add(inner_width) {
+                return None;
+            }
+            let rect = Rect {
+                x: cursor_x,
+                y: tab_origin_y,
+                width: label_width,
+                height: 1,
+            };
+            cursor_x = cursor_x.saturating_add(label_width);
+            Some((rect, *tab))
+        })
+        .collect();
+    app.hit_zones.detail_tabs = tab_rects;
+
     let tabs = Paragraph::new(Line::from(tab_titles)).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(palette.focus_border))
-            .title(format!(" {} ", issue.key)),
+            .title(format!(" {issue_key} ")),
     );
     f.render_widget(tabs, chunks[0]);
 
     let body = match app.active_tab {
-        DetailTab::Summary => build_summary_lines(issue, palette),
+        DetailTab::Summary => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_summary_lines(issue, palette)
+        }
         DetailTab::Comments => build_comment_lines(app, palette),
         DetailTab::Worklog => build_worklog_lines(app, palette),
-        DetailTab::Attachments => build_attachment_lines(issue),
-        DetailTab::Subtasks => build_subtask_lines(issue),
+        DetailTab::Attachments => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_attachment_lines(issue)
+        }
+        DetailTab::Subtasks => {
+            let issue = app.selected_issue().expect("issue exists");
+            build_subtask_lines(issue)
+        }
         DetailTab::Links => build_link_lines(app),
     };
 
@@ -449,20 +510,11 @@ fn build_link_lines(app: &App) -> Vec<Line<'static>> {
                 Line::from(""),
             ];
             for link in links {
-                let object = link.get("object");
-                let title = object
-                    .and_then(|o| o.get("title"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Untitled link");
-                let url = object
-                    .and_then(|o| o.get("url"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("-");
                 lines.push(Line::from(Span::styled(
-                    title.to_string(),
+                    link.object.title.clone(),
                     Style::default().add_modifier(Modifier::BOLD),
                 )));
-                lines.push(Line::from(format!("  {url}")));
+                lines.push(Line::from(format!("  {}", link.object.url)));
                 lines.push(Line::from(""));
             }
             lines
@@ -582,6 +634,12 @@ fn render_transition_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pa
 
     f.render_widget(Clear, popup_area);
     f.render_stateful_widget(list, popup_area, &mut app.transition_list_state);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        popup_area,
+        app.transition_list_state.offset(),
+        app.transitions.len(),
+    ));
 }
 
 fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -678,8 +736,15 @@ fn render_column_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
     f.render_widget(Clear, popup_area);
     f.render_widget(selected_summary, header_area);
     f.render_widget(search_bar, search_area);
+    let visible_count = filtered.len();
     f.render_stateful_widget(list, list_area, &mut app.column_picker_state);
     f.render_widget(hints, hint_area);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.column_picker_state.offset(),
+        visible_count,
+    ));
 }
 
 fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -738,8 +803,15 @@ fn render_assignee_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palett
 
     f.render_widget(Clear, popup_area);
     f.render_widget(input, input_area);
+    let assignee_count = app.assignee_options.len();
     f.render_stateful_widget(list, list_area, &mut app.assignee_state);
     f.render_widget(hints, hint_area);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.assignee_state.offset(),
+        assignee_count,
+    ));
 
     let before_cursor: String = app
         .assignee_query
@@ -757,7 +829,8 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palet
         " Components: {} ({}) ",
         app.component_issue_key, app.component_project_key
     );
-    render_multi_select_picker_popup(
+    let option_count = app.component_options.len();
+    let (popup_area, list_area) = render_multi_select_picker_popup(
         f,
         area,
         palette,
@@ -773,6 +846,12 @@ fn render_component_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palet
             "Esc cancel",
         ],
     );
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.component_state.offset(),
+        option_count,
+    ));
 }
 
 fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -780,7 +859,8 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
         " Fix Versions: {} ({}) ",
         app.fix_version_issue_key, app.fix_version_project_key
     );
-    render_multi_select_picker_popup(
+    let option_count = app.fix_version_options.len();
+    let (popup_area, list_area) = render_multi_select_picker_popup(
         f,
         area,
         palette,
@@ -796,6 +876,12 @@ fn render_fix_version_picker_popup(f: &mut Frame, app: &mut App, area: Rect, pal
             "Esc cancel",
         ],
     );
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.fix_version_state.offset(),
+        option_count,
+    ));
 }
 
 fn render_project_version_browser_popup(
@@ -922,8 +1008,15 @@ fn render_project_version_browser_popup(
 
     f.render_widget(Clear, popup_area);
     f.render_widget(query, left_chunks[0]);
+    let version_count = app.project_version_options.len();
     f.render_stateful_widget(versions, left_chunks[1], &mut app.project_version_state);
     f.render_widget(detail, right_area);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        left_chunks[1],
+        app.project_version_state.offset(),
+        version_count,
+    ));
 
     let before_cursor: String = app
         .project_version_query
@@ -937,7 +1030,8 @@ fn render_project_version_browser_popup(
 
 fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let title = format!(" Sprint: {} ", app.sprint_issue_key);
-    render_single_select_picker_popup(
+    let option_count = app.sprint_options.len();
+    let (popup_area, list_area) = render_single_select_picker_popup(
         f,
         area,
         palette,
@@ -951,6 +1045,12 @@ fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
             "↑/↓ move   Enter assign   Esc cancel",
         ],
     );
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.sprint_state.offset(),
+        option_count,
+    ));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -965,7 +1065,7 @@ fn render_multi_select_picker_popup(
     state: &mut ListState,
     title: &str,
     hint_lines: &[&str],
-) {
+) -> (Rect, Rect) {
     let popup_area = side_panel_rect(area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -1033,6 +1133,8 @@ fn render_multi_select_picker_popup(
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,
     ));
+
+    (popup_area, list_area)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1046,7 +1148,7 @@ fn render_single_select_picker_popup(
     state: &mut ListState,
     title: &str,
     hint_lines: &[&str],
-) {
+) -> (Rect, Rect) {
     let popup_area = side_panel_rect(area);
     let [input_area, list_area, hint_area] = Layout::default()
         .direction(Direction::Vertical)
@@ -1107,6 +1209,8 @@ fn render_single_select_picker_popup(
         input_area.x + 1 + before_cursor.len() as u16,
         input_area.y + 1,
     ));
+
+    (popup_area, list_area)
 }
 
 fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -1209,8 +1313,15 @@ fn render_saved_jql_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Pal
     f.render_widget(Clear, popup_area);
     f.render_widget(selected_summary, summary_area);
     f.render_widget(search_bar, search_area);
+    let saved_count = filtered.len();
     f.render_stateful_widget(list, list_area, &mut app.saved_jql_state);
     f.render_widget(hints, hint_area);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.saved_jql_state.offset(),
+        saved_count,
+    ));
 }
 
 fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -1244,10 +1355,23 @@ fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: 
         .highlight_symbol("> ");
 
     f.render_widget(Clear, popup_area);
+    let theme_count = ThemeName::ALL.len();
     f.render_stateful_widget(list, popup_area, &mut app.theme_state);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        popup_area,
+        app.theme_state.offset(),
+        theme_count,
+    ));
 }
 
-fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, palette: Palette) {
+fn render_text_popup(
+    f: &mut Frame,
+    title: &str,
+    lines: &[String],
+    area: Rect,
+    palette: Palette,
+) -> Rect {
     let popup_area = centered_rect(72, 85, area);
     let mut content = if lines.is_empty() {
         vec![Line::from("No data")]
@@ -1272,9 +1396,10 @@ fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, p
 
     f.render_widget(Clear, popup_area);
     f.render_widget(paragraph, popup_area);
+    popup_area
 }
 
-fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
+fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
     let popup_area = centered_rect(70, 95, area);
 
     let lines = vec![
@@ -1330,6 +1455,18 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
         Line::from(""),
         Line::from(Span::styled(
+            "Mouse:",
+            Style::default().fg(palette.tab_active),
+        )),
+        Line::from("  Click row             Select issue"),
+        Line::from("  Double-click row      Open detail view"),
+        Line::from("  Click detail tab      Switch tab"),
+        Line::from("  Click detail pane     Focus detail (from list)"),
+        Line::from("  Click picker option   Apply (single-select) / toggle (multi-select)"),
+        Line::from("  Click outside popup   Close popup (same as Esc)"),
+        Line::from("  Scroll wheel          Move selection in list or picker"),
+        Line::from(""),
+        Line::from(Span::styled(
             "Press any key to close",
             Style::default().fg(palette.muted),
         )),
@@ -1346,6 +1483,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         )
         .wrap(Wrap { trim: false });
     f.render_widget(paragraph, popup_area);
+    popup_area
 }
 
 fn owned_field_line(label: &str, value: String, palette: Palette) -> Line<'static> {

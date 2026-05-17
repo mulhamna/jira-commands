@@ -535,14 +535,8 @@ async fn resolve_transition(
 ) -> AppResult<ResolvedTransition> {
     let transitions = client.get_transitions(key).await?;
     let found = transitions
-        .iter()
-        .find(|transition| {
-            transition.get("id").and_then(|value| value.as_str()) == Some(name_or_id)
-                || transition
-                    .get("name")
-                    .and_then(|value| value.as_str())
-                    .is_some_and(|name| name.eq_ignore_ascii_case(name_or_id))
-        })
+        .into_iter()
+        .find(|t| t.id == name_or_id || t.name.eq_ignore_ascii_case(name_or_id))
         .ok_or_else(|| {
             AppError::not_found(
                 format!("Transition '{name_or_id}' not found for {key}"),
@@ -551,16 +545,8 @@ async fn resolve_transition(
         })?;
 
     Ok(ResolvedTransition {
-        id: found
-            .get("id")
-            .and_then(|value| value.as_str())
-            .unwrap_or_default()
-            .to_string(),
-        name: found
-            .get("name")
-            .and_then(|value| value.as_str())
-            .unwrap_or(name_or_id)
-            .to_string(),
+        id: found.id,
+        name: found.name,
     })
 }
 

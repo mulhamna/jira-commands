@@ -178,37 +178,45 @@ impl JiraClient {
             })
     }
 
+    /// Send a request, retrying on HTTP 429 according to the `Retry-After` header.
+    /// Returns the first non-429 response, or `RateLimit` after `MAX_RETRIES` attempts.
+    async fn execute_with_retry(
+        &self,
+        builder_fn: impl Fn() -> reqwest::RequestBuilder,
+    ) -> Result<reqwest::Response> {
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            let response = builder_fn().send().await?;
+
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                return Ok(response);
+            }
+
+            let retry_after = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(60);
+
+            warn!("Rate limited. Retrying after {}s", retry_after);
+
+            if attempt >= MAX_RETRIES {
+                return Err(JiraError::RateLimit { retry_after });
+            }
+
+            tokio::time::sleep(Duration::from_secs(retry_after)).await;
+        }
+    }
+
     /// Core request method with rate-limit retry logic.
     async fn request<T>(&self, builder_fn: impl Fn() -> reqwest::RequestBuilder) -> Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            return handle_response(response).await;
-        }
+        let response = self.execute_with_retry(builder_fn).await?;
+        handle_response(response).await
     }
 
     /// Core request method for responses with no body (204 No Content).
@@ -216,44 +224,19 @@ impl JiraClient {
         &self,
         builder_fn: impl Fn() -> reqwest::RequestBuilder,
     ) -> Result<()> {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            let status = response.status();
-            if status.is_success() {
-                return Ok(());
-            }
-
-            let body = response.text().await.unwrap_or_default();
-            if status == StatusCode::NOT_FOUND {
-                return Err(JiraError::NotFound(body));
-            }
-            return Err(JiraError::Api {
-                status: status.as_u16(),
-                message: body,
-            });
+        let response = self.execute_with_retry(builder_fn).await?;
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
         }
+        let body = response.text().await.unwrap_or_default();
+        if status == StatusCode::NOT_FOUND {
+            return Err(JiraError::NotFound(body));
+        }
+        Err(JiraError::Api {
+            status: status.as_u16(),
+            message: body,
+        })
     }
 
     /// Multipart request with rate-limit retry (for attachment uploads).
@@ -264,32 +247,8 @@ impl JiraClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = builder_fn();
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-
-                warn!("Rate limited. Retrying after {}s", retry_after);
-
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
-                }
-
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
-
-            return handle_response(response).await;
-        }
+        let response = self.execute_with_retry(builder_fn).await?;
+        handle_response(response).await
     }
 
     /// Search issues using JQL with cursor-based pagination.
@@ -1384,65 +1343,48 @@ impl JiraClient {
         let url = format!("{}{}", self.config.base_url.trim_end_matches('/'), path);
 
         let http = &self.http;
-        let mut attempt = 0u32;
-        loop {
-            attempt += 1;
-            let req = match method.to_uppercase().as_str() {
-                "GET" => http.get(&url),
-                "POST" => http.post(&url),
-                "PUT" => http.put(&url),
-                "DELETE" => http.delete(&url),
-                "PATCH" => http.patch(&url),
-                _ => http.get(&url),
-            };
-            let req = req.headers(headers.clone());
-            let req = if let Some(b) = &body {
-                req.json(b)
-            } else {
-                req
-            };
-
-            let response = req.send().await?;
-
-            if response.status() == StatusCode::TOO_MANY_REQUESTS {
-                let retry_after = response
-                    .headers()
-                    .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
-                warn!("Rate limited. Retrying after {}s", retry_after);
-                if attempt >= MAX_RETRIES {
-                    return Err(JiraError::RateLimit { retry_after });
+        let response = self
+            .execute_with_retry(|| {
+                let req = match method.to_uppercase().as_str() {
+                    "GET" => http.get(&url),
+                    "POST" => http.post(&url),
+                    "PUT" => http.put(&url),
+                    "DELETE" => http.delete(&url),
+                    "PATCH" => http.patch(&url),
+                    _ => http.get(&url),
+                };
+                let req = req.headers(headers.clone());
+                if let Some(b) = &body {
+                    req.json(b)
+                } else {
+                    req
                 }
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
-                continue;
-            }
+            })
+            .await?;
 
-            let status = response.status();
+        let status = response.status();
 
-            // 204 No Content — success with empty body
-            if status == StatusCode::NO_CONTENT {
-                return Ok(None);
-            }
-
-            if status.is_success() {
-                let value: Value = response.json().await?;
-                return Ok(Some(value));
-            }
-
-            let body_text = response.text().await.unwrap_or_default();
-            return Err(match status {
-                StatusCode::NOT_FOUND => JiraError::NotFound(body_text),
-                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                    JiraError::Auth(format!("HTTP {status}: {body_text}"))
-                }
-                _ => JiraError::Api {
-                    status: status.as_u16(),
-                    message: body_text,
-                },
-            });
+        // 204 No Content — success with empty body
+        if status == StatusCode::NO_CONTENT {
+            return Ok(None);
         }
+
+        if status.is_success() {
+            let value: Value = response.json().await?;
+            return Ok(Some(value));
+        }
+
+        let body_text = response.text().await.unwrap_or_default();
+        Err(match status {
+            StatusCode::NOT_FOUND => JiraError::NotFound(body_text),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                JiraError::Auth(format!("HTTP {status}: {body_text}"))
+            }
+            _ => JiraError::Api {
+                status: status.as_u16(),
+                message: body_text,
+            },
+        })
     }
 
     // ── Plans API (Jira Premium) ──────────────────────────────────────────────

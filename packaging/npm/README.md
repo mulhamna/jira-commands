@@ -15,7 +15,7 @@ This package is a thin installer that downloads the matching prebuilt release fo
 
 `jirac` is a fast Jira terminal client with:
 
-- interactive TUI for browsing and updating issues
+- interactive TUI for browsing and updating issues, with full mouse support (click rows, tabs, picker options; scroll wheel)
 - worklog flows, attachments, and comments
 - bulk actions like bulk-comment, bulk-transition, and bulk-update
 - JQL builder and saved-query workflows

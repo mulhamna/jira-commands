@@ -28,7 +28,7 @@ Or use one of the workspace-level install options from the root README:
 - `jirac` primary CLI binary
 - issue listing, viewing, create, update, transition, delete, clone
 - worklog, attachment, bulk-update, bulk-transition, archive, batch, and bulk-create flows
-- interactive TUI flows, including split master-detail, saved JQL picker, theme picker, searchable assignee picker, project-scoped component picker, server summary, config summary, and saved column settings
+- interactive TUI flows, including split master-detail, saved JQL picker, theme picker, searchable assignee picker, project-scoped component picker, server summary, config summary, and saved column settings — fully usable with mouse (click rows, tabs, picker options; scroll wheel; click outside popup to dismiss)
 - raw Jira REST API passthrough
 - shared config with multi-profile auth support
 

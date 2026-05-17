@@ -27,6 +27,10 @@ jira-core = "0.12"
 - field metadata discovery and reuse
 - issue, worklog, transition, attachment, and bulk-operation helpers
 - Atlassian Document Format helpers for text and Markdown conversion
+- typed `model::` structs for every public response: `Issue`, `Comment`,
+  `Worklog`, `Attachment`, `Field`, `IssueLink`, `IssueType`,
+  `RemoteLink`, `Component`, `Transition`, `JiraUser`, `Sprint`,
+  `ProjectVersion` — no more walking raw `serde_json::Value`
 
 ## Example
 

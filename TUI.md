@@ -162,3 +162,23 @@ Available presets include dark themes plus **GitHub Light** for a brighter, ligh
 | Key         | Action      |
 | ----------- | ----------- |
 | `Esc` / `q` | Close popup |
+
+## Mouse support
+
+The TUI is fully keyboard-driven, but every pointer-friendly interaction is also wired up. Mouse capture is enabled automatically while the TUI is running; to copy text out of the terminal hold `Shift` (iTerm2 / most Linux terminals) or `Option` (Terminal.app) while selecting.
+
+| Action                  | Result                                                                  |
+| ----------------------- | ----------------------------------------------------------------------- |
+| Click issue row         | Select that row                                                         |
+| Double-click issue row  | Open split detail view (same as `Enter`)                                |
+| Click detail tab        | Switch to that tab; lazy-fetches comments/worklog/links as needed       |
+| Click detail pane       | Switch focus to detail when currently focused on the list               |
+| Click picker option     | Apply for single-select pickers (transition, assignee, sprint, saved JQL, theme, project versions browser); toggle for multi-select pickers (components, fix versions, columns) |
+| Click outside a popup   | Close popup (equivalent to `Esc`)                                       |
+| Scroll wheel on list    | Previous / next issue                                                   |
+| Scroll wheel on picker  | Move picker selection up / down                                         |
+
+Notes:
+- Modal forms (create / edit / bulk-comment) intentionally ignore outside clicks so partially filled forms aren't discarded. Use `Esc` to cancel.
+- Double-click window is 400 ms on the same cell. Slower clicks count as two separate selects.
+- Under tmux make sure `set -g mouse on` is set in `~/.tmux.conf` so mouse events are forwarded to the TUI.

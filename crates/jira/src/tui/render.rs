@@ -1455,6 +1455,18 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
         Line::from(""),
         Line::from(Span::styled(
+            "Mouse:",
+            Style::default().fg(palette.tab_active),
+        )),
+        Line::from("  Click row             Select issue"),
+        Line::from("  Double-click row      Open detail view"),
+        Line::from("  Click detail tab      Switch tab"),
+        Line::from("  Click detail pane     Focus detail (from list)"),
+        Line::from("  Click picker option   Apply (single-select) / toggle (multi-select)"),
+        Line::from("  Click outside popup   Close popup (same as Esc)"),
+        Line::from("  Scroll wheel          Move selection in list or picker"),
+        Line::from(""),
+        Line::from(Span::styled(
             "Press any key to close",
             Style::default().fg(palette.muted),
         )),

@@ -6,6 +6,17 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.0.0](https://github.com/mulhamna/jira-commands/compare/v0.39.0...v1.0.0) (2026-05-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jira-core,tui:** get_remote_links and get_project_components return types changed from Vec<Value> to typed Vec<RemoteLink> / Vec<Component>.
+
+### Miscellaneous Chores
+
+* **jira-core,tui:** SDK polish + mouse support for 1.0.0 ([#253](https://github.com/mulhamna/jira-commands/issues/253)) ([1b35d0e](https://github.com/mulhamna/jira-commands/commit/1b35d0e70b0fa1810890345f1305f6a0fc3efa08))
+
 ## [0.39.0](https://github.com/mulhamna/jira-commands/compare/v0.38.1...v0.39.0) (2026-05-16)
 
 

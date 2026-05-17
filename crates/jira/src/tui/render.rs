@@ -99,7 +99,8 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::Help => {
             render_browse(f, app, chunks[1], palette);
-            render_help_popup(f, size, palette);
+            let popup = render_help_popup(f, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::ProjectVersionBrowser => {
             render_browse(f, app, chunks[1], palette);
@@ -135,11 +136,14 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::ServerInfo => {
             render_browse(f, app, chunks[1], palette);
-            render_text_popup(f, " Server Info ", &app.server_info_lines, size, palette);
+            let popup =
+                render_text_popup(f, " Server Info ", &app.server_info_lines, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::ConfigView => {
             render_browse(f, app, chunks[1], palette);
-            render_text_popup(f, " Config View ", &app.config_lines, size, palette);
+            let popup = render_text_popup(f, " Config View ", &app.config_lines, size, palette);
+            app.hit_zones.popup = Some(popup);
         }
         Mode::Modal => {
             render_browse(f, app, chunks[1], palette);
@@ -1361,7 +1365,13 @@ fn render_theme_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: 
     ));
 }
 
-fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, palette: Palette) {
+fn render_text_popup(
+    f: &mut Frame,
+    title: &str,
+    lines: &[String],
+    area: Rect,
+    palette: Palette,
+) -> Rect {
     let popup_area = centered_rect(72, 85, area);
     let mut content = if lines.is_empty() {
         vec![Line::from("No data")]
@@ -1386,9 +1396,10 @@ fn render_text_popup(f: &mut Frame, title: &str, lines: &[String], area: Rect, p
 
     f.render_widget(Clear, popup_area);
     f.render_widget(paragraph, popup_area);
+    popup_area
 }
 
-fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
+fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
     let popup_area = centered_rect(70, 95, area);
 
     let lines = vec![
@@ -1460,6 +1471,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) {
         )
         .wrap(Wrap { trim: false });
     f.render_widget(paragraph, popup_area);
+    popup_area
 }
 
 fn owned_field_line(label: &str, value: String, palette: Palette) -> Line<'static> {

@@ -197,10 +197,26 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 }
             }
 
+            // Click outside an active popup → close (synthesize Esc, which every
+            // popup-mode handler treats as cancel).
+            if is_popup_mode(&app.mode) {
+                if let Some(popup) = app.hit_zones.popup {
+                    if !contains(&popup, col, row) {
+                        return synth_press(app, KeyCode::Esc);
+                    }
+                }
+            }
+
             AppAction::None
         }
         MouseEventKind::ScrollUp => {
-            // Wheel up over the list scrolls selection up.
+            // Wheel over a picker → move selection up.
+            if let Some(picker) = app.hit_zones.picker {
+                if contains(&picker.area, col, row) {
+                    return synth_press(app, KeyCode::Up);
+                }
+            }
+            // Wheel over the issue list → previous issue.
             if let Some(list_rect) = app.hit_zones.list {
                 if contains(&list_rect, col, row) {
                     app.prev_issue();
@@ -210,6 +226,11 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
             AppAction::None
         }
         MouseEventKind::ScrollDown => {
+            if let Some(picker) = app.hit_zones.picker {
+                if contains(&picker.area, col, row) {
+                    return synth_press(app, KeyCode::Down);
+                }
+            }
             if let Some(list_rect) = app.hit_zones.list {
                 if contains(&list_rect, col, row) {
                     app.next_issue();
@@ -220,4 +241,22 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
         }
         _ => AppAction::None,
     }
+}
+
+fn is_popup_mode(mode: &Mode) -> bool {
+    matches!(
+        mode,
+        Mode::Transition
+            | Mode::Help
+            | Mode::ProjectVersionBrowser
+            | Mode::ColumnPicker
+            | Mode::AssigneePicker
+            | Mode::ComponentPicker
+            | Mode::FixVersionPicker
+            | Mode::SprintPicker
+            | Mode::SavedJqlPicker
+            | Mode::ThemePicker
+            | Mode::ServerInfo
+            | Mode::ConfigView
+    )
 }

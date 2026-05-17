@@ -25,6 +25,7 @@ use crate::{
         remote_link::RemoteLink,
         sprint::Sprint,
         transition::Transition,
+        user::JiraUser,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
         worklog::Worklog,
     },
@@ -154,15 +155,13 @@ impl JiraClient {
         users
             .iter()
             .find(|u| {
-                u.get("emailAddress")
-                    .and_then(|v| v.as_str())
+                u.email_address
+                    .as_deref()
                     .map(|e| e.eq_ignore_ascii_case(s))
                     .unwrap_or(false)
             })
             .or_else(|| users.first())
-            .and_then(|u| u.get("accountId"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .map(|u| u.account_id.clone())
             .ok_or_else(|| JiraError::Api {
                 status: 0,
                 message: format!("User not found: {s}"),
@@ -713,20 +712,17 @@ impl JiraClient {
     }
 
     /// Search Jira users by query string (for User field autocomplete).
-    pub async fn search_users(&self, query: &str) -> Result<Vec<Value>> {
+    pub async fn search_users(&self, query: &str) -> Result<Vec<JiraUser>> {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/user/search");
 
         let http = &self.http;
-        let users: Vec<Value> = self
-            .request(|| {
-                http.get(&url)
-                    .headers(headers.clone())
-                    .query(&[("query", query), ("maxResults", "20")])
-            })
-            .await?;
-
-        Ok(users)
+        self.request(|| {
+            http.get(&url)
+                .headers(headers.clone())
+                .query(&[("query", query), ("maxResults", "20")])
+        })
+        .await
     }
 
     /// List components available within a project.
@@ -1822,9 +1818,9 @@ mod tests {
             .expect("search should parse");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0]["accountId"], "acct-1");
-        assert_eq!(users[0]["displayName"], "Alice Example");
-        assert!(users[0].get("emailAddress").is_none());
+        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].display_name.as_deref(), Some("Alice Example"));
+        assert!(users[0].email_address.is_none());
     }
 
     #[tokio::test]
@@ -2333,7 +2329,7 @@ mod tests {
             .expect("request should retry and succeed");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0]["accountId"], "acct-1");
+        assert_eq!(users[0].account_id, "acct-1");
     }
 
     #[tokio::test]

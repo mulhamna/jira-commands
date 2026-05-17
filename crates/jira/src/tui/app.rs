@@ -10,7 +10,7 @@ use crate::notifications::{
 };
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -24,7 +24,7 @@ use jira_core::{
     IssueType, JiraClient,
 };
 
-use super::panel::{DetailData, DetailTab, Focus};
+use super::panel::{DetailData, DetailTab, Focus, HitZones};
 use ratatui::{
     backend::CrosstermBackend,
     widgets::{ListState, TableState},
@@ -35,6 +35,7 @@ use super::column::{format_column_summary, ColumnSpec};
 use super::keys;
 use super::modal::{Modal, ModalKind};
 use super::mode::Mode;
+use super::mouse;
 use super::picker::PickerOption;
 use super::prefs::{SavedJql, TuiPreferences};
 use super::prompts::{
@@ -162,6 +163,7 @@ pub(super) struct App {
     pub(super) modal: Option<Modal>,
     pub(super) prev_mode: Option<Mode>,
     pub(super) notification_entries: Vec<NotificationEntry>,
+    pub(super) hit_zones: HitZones,
 }
 
 pub(super) enum AppAction {
@@ -332,6 +334,7 @@ impl App {
             modal: None,
             prev_mode: None,
             notification_entries: Vec::new(),
+            hit_zones: HitZones::default(),
         }
     }
 
@@ -795,7 +798,7 @@ pub async fn run_tui(
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -825,14 +828,18 @@ pub async fn run_tui(
             continue;
         }
 
-        let Ok(Event::Key(key)) = event::read() else {
-            continue;
+        let action = match event::read() {
+            Ok(Event::Key(key)) => {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+                keys::handle_key(&mut app, key)
+            }
+            Ok(Event::Mouse(mouse_event)) => mouse::handle_mouse(&mut app, mouse_event),
+            _ => continue,
         };
-        if key.kind != KeyEventKind::Press {
-            continue;
-        }
 
-        match keys::handle_key(&mut app, key) {
+        match action {
             AppAction::Quit => break,
 
             AppAction::Refresh => {
@@ -2754,7 +2761,11 @@ pub async fn run_tui(
     }
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
 
     Ok(())

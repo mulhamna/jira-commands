@@ -20,6 +20,7 @@ use super::theme::{Palette, ThemeName};
 use super::version_format::{backlog_preview_lines, version_status_badges};
 
 pub(super) fn ui(f: &mut Frame, app: &mut App) {
+    app.hit_zones.clear();
     let size = f.area();
     let palette = app.prefs.theme.palette();
     let chunks = Layout::default()

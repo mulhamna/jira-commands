@@ -382,23 +382,27 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Sync npm package version from release version
+      - name: Sync npm package versions from release version
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           VERSION="$VERSION" node - <<'EOF'
           const fs = require('fs');
-          const path = 'packaging/npm/package.json';
-          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.version = process.env.VERSION;
-          if (!pkg.version) throw new Error('VERSION env missing for npm package sync');
-          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
+          for (const path of ['packaging/npm/package.json', 'packaging/npm-mcp/package.json']) {
+            if (!fs.existsSync(path)) continue;
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            pkg.version = process.env.VERSION;
+            if (!pkg.version) throw new Error('VERSION env missing for npm package sync');
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
+            console.log(`synced ${pkg.name} -> ${pkg.version}`);
+          }
           EOF
-          echo "synced npm package.json version to $VERSION"
+          echo "synced npm package.json versions to $VERSION"
 
-      - name: Verify npm package version matches release tag
+      - name: Verify npm package versions match release tag
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+          NPM_MCP_VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
           EXPECTED_TAG="v${VERSION}"
           TAG="${GITHUB_REF_NAME}"
 
@@ -406,14 +410,16 @@ jobs:
             TAG="${{ inputs.release_tag }}"
           fi
 
-          echo "tag:       $TAG"
-          echo "workspace: $VERSION"
-          echo "npm:       $NPM_VERSION"
+          echo "tag:           $TAG"
+          echo "workspace:     $VERSION"
+          echo "npm jirac:     $NPM_VERSION"
+          echo "npm jirac-mcp: $NPM_MCP_VERSION"
 
           test "$TAG" = "$EXPECTED_TAG"
           test "$NPM_VERSION" = "$VERSION"
+          test "$NPM_MCP_VERSION" = "$VERSION"
 
-      - name: Publish npm package (skip if already published)
+      - name: Publish @mulham28/jirac (skip if already published)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -422,6 +428,17 @@ jobs:
             echo "✓ @mulham28/jirac npm v$VERSION already published, skipping"
           else
             npm publish ./packaging/npm --access public
+          fi
+
+      - name: Publish @mulham28/jirac-mcp (skip if already published)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
+          if npm view @mulham28/jirac-mcp@"$VERSION" version >/dev/null 2>&1; then
+            echo "✓ @mulham28/jirac-mcp npm v$VERSION already published, skipping"
+          else
+            npm publish ./packaging/npm-mcp --access public
           fi
 
 

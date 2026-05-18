@@ -1,0 +1,40 @@
+{
+  "name": "@mulham28/jirac-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Jira powered by jira-core — installed from npm via GitHub Releases",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mulhamna/jira-commands.git"
+  },
+  "homepage": "https://jirac.keton.id",
+  "bugs": {
+    "url": "https://github.com/mulhamna/jira-commands/issues"
+  },
+  "keywords": [
+    "jira",
+    "atlassian",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "claude",
+    "codex",
+    "opencode"
+  ],
+  "bin": {
+    "jirac-mcp": "bin/jirac-mcp.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node ./lib/install.js",
+    "release:check": "node ../../scripts/sync-npm-version.mjs && git diff --exit-code -- packaging/npm-mcp/package.json"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

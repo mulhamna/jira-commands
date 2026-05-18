@@ -1,11 +1,28 @@
 use std::collections::BTreeMap;
 
-use rmcp::schemars::JsonSchema;
+use rmcp::schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
+
+fn any_json_object(_: &mut SchemaGenerator) -> Schema {
+    serde_json::from_value(json!({
+        "type": "object",
+        "additionalProperties": {}
+    }))
+    .expect("static schema literal must deserialize")
+}
+
+fn any_json_object_map(_: &mut SchemaGenerator) -> Schema {
+    serde_json::from_value(json!({
+        "type": "object",
+        "additionalProperties": {}
+    }))
+    .expect("static schema literal must deserialize")
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ToolResponse {
+    #[schemars(schema_with = "any_json_object")]
     pub result: Value,
 }
 
@@ -51,6 +68,8 @@ pub struct IssueCreateArgs {
     pub summary: String,
     pub issue_type: String,
     pub description: Option<String>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
     pub assignee: Option<String>,
     pub priority: Option<String>,
@@ -58,6 +77,8 @@ pub struct IssueCreateArgs {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -66,6 +87,8 @@ pub struct IssueUpdateArgs {
     pub key: String,
     pub summary: Option<String>,
     pub description: Option<String>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
     pub assignee: Option<String>,
     pub priority: Option<String>,
@@ -73,6 +96,8 @@ pub struct IssueUpdateArgs {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -152,6 +177,10 @@ pub struct ArchiveArgs {
 pub struct ApiRequestArgs {
     pub method: String,
     pub path: String,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
     pub query: Option<BTreeMap<String, Value>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
     pub body: Option<Value>,
 }

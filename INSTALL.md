@@ -72,13 +72,16 @@ cargo install jira-commands
 
 ## npm
 
+Install the CLI, the MCP server, or both:
+
 ```bash
-npm install -g @mulham28/jirac
+npm install -g @mulham28/jirac        # jirac CLI + TUI
+npm install -g @mulham28/jirac-mcp    # jirac-mcp MCP server
 ```
 
-The npm package downloads the matching prebuilt `jirac` release binary during install. Linux support depends on the release binary's glibc compatibility.
+Each package downloads the matching prebuilt release binary during install. Linux support depends on the release binary's glibc compatibility.
 
-Install MCP binary:
+Alternatively, install the MCP server from crates.io:
 
 ```bash
 cargo install jira-mcp
@@ -146,7 +149,15 @@ jirac tui --help
 
 ## MCP client install helper
 
-If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then use:
+If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then run the helper.
+
+Interactive mode (recommended) — verifies prereqs and shows a picker:
+
+```bash
+jirac mcp install
+```
+
+Non-interactive mode for scripts — pass `--client` explicitly:
 
 ```bash
 jirac mcp install --client claude-code
@@ -160,8 +171,8 @@ jirac mcp install --client zed
 ```
 
 Supported targets now:
-- `claude-code` (`.mcp.json`, project-style JSON)
-- `claude-desktop` (`~/.claude.json`, user-level JSON)
+- `claude-code` (`~/.claude.json`, user-level JSON with `mcpServers`)
+- `claude-desktop` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows)
 - `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
 - `gemini-cli` (delegates to `gemini mcp add -s user ...`)
 - `codex` (delegates to `codex mcp add ...`)
@@ -185,7 +196,7 @@ jirac mcp doctor
 ```
 
 Local verification notes:
-- Claude Code project scope writes `.mcp.json`
-- Claude Desktop user scope writes `~/.claude.json`
+- Claude Code user scope writes `~/.claude.json` (top-level `mcpServers`); project-scoped MCP servers live in `<repo>/.mcp.json` and are not written by this helper
+- Claude Desktop user scope writes the platform support directory (`claude_desktop_config.json`); override with `CLAUDE_DESKTOP_CONFIG`
 - Gemini CLI currently stores user MCP config in `~/.gemini/settings.json`; this helper delegates to the Gemini CLI directly
 - Codex stores MCP entries under `~/.codex/config.toml`; this helper delegates to the Codex CLI directly

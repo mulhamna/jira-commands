@@ -30,6 +30,13 @@ jirac auth login
 jirac --help
 ```
 
+If you also want the Jira **MCP server** (for Claude Code, Cursor, Codex, OpenCode, etc.), install the companion package:
+
+```bash
+npm install -g @mulham28/jirac-mcp
+jirac mcp install   # interactive picker, registers the server into your MCP client
+```
+
 ## Quick examples
 
 ```bash

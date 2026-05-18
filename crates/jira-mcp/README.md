@@ -18,6 +18,9 @@ brew install jira-mcp
 
 # Cargo
 cargo install jira-mcp
+
+# npm (Node 18+)
+npm install -g @mulham28/jirac-mcp
 ```
 
 You can also use the workspace shell installer on macOS/Linux, the PowerShell installer flow on Windows, or download packaged release archives from GitHub Releases.
@@ -69,10 +72,16 @@ The MCP server includes tools for:
 
 ## Client install helper
 
-If you already have both `jirac` and `jirac-mcp` installed, you can register the MCP server into supported clients with:
+If you already have both `jirac` and `jirac-mcp` installed, register the MCP server into a supported client with:
 
 ```bash
-jirac mcp doctor
+jirac mcp doctor          # check prereqs only
+jirac mcp install         # interactive picker (recommended)
+```
+
+The interactive flow verifies that `jirac-mcp` is on PATH and that Jira auth is configured, then lets you pick the client to install into. Pass `--client` explicitly to skip the picker in scripts:
+
+```bash
 jirac mcp install --client claude-code
 jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
@@ -84,6 +93,8 @@ jirac mcp install --client zed
 ```
 
 Notes:
+- `claude-code` writes user-level `~/.claude.json` (`mcpServers`); project-scope `.mcp.json` is not written by this helper
+- `claude-desktop` writes the platform support dir (`claude_desktop_config.json`) — macOS Library, Windows APPDATA, Linux XDG
 - `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows; `opencode` writes `~/.config/opencode/opencode.jsonc` directly
 - `generic-json` prints a portable JSON snippet instead of writing a file
 - `cursor` remains provisional until verified in a real Cursor install

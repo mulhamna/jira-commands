@@ -13,7 +13,7 @@ This plugin is versioned and released independently from the main CLI/MCP worksp
 >
 > **Compatibility note:** the next release requires `jirac`. If you still have old scripts or aliases that call `jira`, update them before upgrading.
 
-> **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` with `cargo install jira-mcp`.
+> **Also available:** if you prefer MCP clients over Claude Code skills, install `jirac-mcp` (`cargo install jira-mcp`, `npm install -g @mulham28/jirac-mcp`, or `brew install mulhamna/tap/jira-mcp`) and then run `jirac mcp install` for an interactive picker.
 >
 > **Positioning note:** this directory is the Claude Code surface only. OpenClaw / ClawHub should be modeled as a separate integration surface with its own packaging, docs, and release flow.
 

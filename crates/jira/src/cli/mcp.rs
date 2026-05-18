@@ -9,10 +9,12 @@ use std::process::Command;
 
 #[derive(Debug, Subcommand)]
 pub enum McpCommand {
-    /// Install jirac-mcp into a supported MCP client config
+    /// Install jirac-mcp into a supported MCP client config.
+    ///
+    /// Omit `--client` to run interactively: prereqs are checked and a picker is shown.
     Install {
         #[arg(long, value_enum)]
-        client: McpClient,
+        client: Option<McpClient>,
         #[arg(long, default_value = "jira")]
         name: String,
         #[arg(long, default_value = "jirac-mcp")]
@@ -48,6 +50,24 @@ pub enum McpClient {
     Zed,
 }
 
+impl std::fmt::Display for McpClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            McpClient::ClaudeCode => "claude-code        (writes ~/.claude.json mcpServers)",
+            McpClient::ClaudeDesktop => {
+                "claude-desktop     (writes claude_desktop_config.json in Claude support dir)"
+            }
+            McpClient::Cursor => "cursor             (writes ~/.cursor/mcp.json)",
+            McpClient::Codex => "codex              (delegates to `codex mcp add`)",
+            McpClient::GeminiCli => "gemini-cli         (delegates to `gemini mcp add`)",
+            McpClient::OpenCode => "opencode           (writes opencode.jsonc)",
+            McpClient::Zed => "zed                (writes Zed settings.json context_servers)",
+            McpClient::GenericJson => "generic-json       (print snippet only, no file changes)",
+        };
+        f.write_str(label)
+    }
+}
+
 pub fn handle(command: McpCommand) -> Result<()> {
     match command {
         McpCommand::Install {
@@ -58,9 +78,85 @@ pub fn handle(command: McpCommand) -> Result<()> {
             print,
             dry_run,
             force,
-        } => install_client(client, &name, &command, &transport, print, dry_run, force),
+        } => {
+            let resolved_client = match client {
+                Some(c) => c,
+                None => run_interactive_prereqs_and_pick(&command)?,
+            };
+            install_client(
+                resolved_client,
+                &name,
+                &command,
+                &transport,
+                print,
+                dry_run,
+                force,
+            )
+        }
         McpCommand::Doctor { client, command } => doctor(client, &command),
     }
+}
+
+fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
+    use inquire::Select;
+
+    println!("jirac mcp install — interactive setup");
+    println!("─────────────────────────────────────");
+
+    let mcp_bin = resolve_command_path(server_command);
+    match &mcp_bin {
+        Some(path) => println!("[ok]   MCP server binary: {}", path.display()),
+        None => println!("[warn] MCP server binary not on PATH: {}", server_command),
+    }
+
+    let jirac_bin = resolve_command_path("jirac");
+    match &jirac_bin {
+        Some(path) => println!("[ok]   jirac CLI:         {}", path.display()),
+        None => println!("[info] jirac CLI not on PATH (optional, used for TUI and auth login)"),
+    }
+
+    let jira = JiraConfig::load().unwrap_or_default();
+    let auth_ok = !jira.base_url.trim().is_empty()
+        && jira.token_present()
+        && (!jira.requires_user_identity() || !jira.email.trim().is_empty());
+
+    if auth_ok {
+        println!("[ok]   Jira auth config present");
+    } else {
+        println!("[fail] Jira auth config missing or incomplete");
+    }
+
+    if mcp_bin.is_none() {
+        bail!(
+            "MCP server binary '{}' not found on PATH. Install it first:\n  cargo install jira-mcp\n  # or download from https://github.com/mulhamna/jira-commands/releases",
+            server_command
+        );
+    }
+
+    if !auth_ok {
+        bail!(
+            "Jira credentials not configured. Set them up first:\n\n  Option A (recommended): install the jirac CLI and run auth login\n    cargo install jira-commands\n    jirac auth login\n\n  Option B: edit the config file directly\n    ~/.config/jirac/config.toml (or platform equivalent)\n\nThen re-run `jirac mcp install` to register the MCP entry."
+        );
+    }
+
+    println!();
+    let choice = Select::new(
+        "Pick the MCP client to install into:",
+        vec![
+            McpClient::ClaudeCode,
+            McpClient::ClaudeDesktop,
+            McpClient::Cursor,
+            McpClient::Codex,
+            McpClient::GeminiCli,
+            McpClient::OpenCode,
+            McpClient::Zed,
+            McpClient::GenericJson,
+        ],
+    )
+    .prompt()
+    .context("MCP client selection cancelled")?;
+
+    Ok(choice)
 }
 
 fn install_client(
@@ -305,12 +401,15 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
     let (label, path, top_level_key) = match client {
         McpClient::ClaudeCode => (
             "claude-code",
-            config_path_from_env_or_default("CLAUDE_CODE_CONFIG", home.join(".mcp.json")),
+            config_path_from_env_or_default("CLAUDE_CODE_CONFIG", home.join(".claude.json")),
             "mcpServers",
         ),
         McpClient::ClaudeDesktop => (
             "claude-desktop",
-            config_path_from_env_or_default("CLAUDE_DESKTOP_CONFIG", home.join(".claude.json")),
+            config_path_from_env_or_default(
+                "CLAUDE_DESKTOP_CONFIG",
+                claude_desktop_settings_path(&home),
+            ),
             "mcpServers",
         ),
         McpClient::Cursor => (
@@ -336,15 +435,15 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             label: "claude-code",
             path: install_target(client)
                 .map(|t| t.path)
-                .unwrap_or_else(|_| PathBuf::from(".mcp.json")),
-            note: "Writes project-style JSON at .mcp.json by default.",
+                .unwrap_or_else(|_| PathBuf::from("~/.claude.json")),
+            note: "Writes user-level config at ~/.claude.json (mcpServers).",
         },
         McpClient::ClaudeDesktop => ClientDescriptor::FileTarget {
             label: "claude-desktop",
             path: install_target(client)
                 .map(|t| t.path)
-                .unwrap_or_else(|_| PathBuf::from("~/.claude.json")),
-            note: "Writes user-level JSON at ~/.claude.json by default.",
+                .unwrap_or_else(|_| PathBuf::from("claude_desktop_config.json")),
+            note: "macOS: ~/Library/Application Support/Claude/claude_desktop_config.json; Windows: %APPDATA%\\Claude\\claude_desktop_config.json.",
         },
         McpClient::Cursor => ClientDescriptor::FileTarget {
             label: "cursor",
@@ -589,6 +688,22 @@ fn zed_settings_path(home: &Path) -> PathBuf {
             .map(PathBuf::from)
             .unwrap_or_else(|| home.join(".config"))
             .join("zed/settings.json")
+    }
+}
+
+fn claude_desktop_settings_path(home: &Path) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        home.join("Library/Application Support/Claude/claude_desktop_config.json")
+    } else if cfg!(target_os = "windows") {
+        env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join("AppData/Roaming"))
+            .join("Claude/claude_desktop_config.json")
+    } else {
+        env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".config"))
+            .join("Claude/claude_desktop_config.json")
     }
 }
 

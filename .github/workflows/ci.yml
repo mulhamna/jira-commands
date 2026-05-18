@@ -89,6 +89,7 @@ jobs:
               - 'packaging/winget/**'
               - 'packaging/scoop/**'
               - 'packaging/npm/**'
+              - 'packaging/npm-mcp/**'
               - 'install.ps1'
             release:
               - 'release-please-config.json'
@@ -391,34 +392,48 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Verify npm package version matches workspace version
+      - name: Verify npm package versions match workspace version
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
+          NPM_MCP_VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
           HEAD_REF="${GITHUB_HEAD_REF:-}"
 
-          echo "workspace: $VERSION"
-          echo "npm:       $NPM_VERSION"
-          echo "head_ref:  $HEAD_REF"
+          echo "workspace:     $VERSION"
+          echo "npm jirac:     $NPM_VERSION"
+          echo "npm jirac-mcp: $NPM_MCP_VERSION"
+          echo "head_ref:      $HEAD_REF"
 
-          if [ "$VERSION" != "$NPM_VERSION" ]; then
+          mismatch=0
+          [ "$VERSION" = "$NPM_VERSION" ] || mismatch=1
+          [ "$VERSION" = "$NPM_MCP_VERSION" ] || mismatch=1
+
+          if [ "$mismatch" != "0" ]; then
             if [[ "$HEAD_REF" == release-please--branches--* ]]; then
               echo "Release Please branch version mismatch detected."
-              echo "This branch is expected to lag because release-please does not rewrite packaging/npm/package.json in this repo's current setup."
-              echo "The publish workflows still resync packaging/npm/package.json from VERSION before npm publish."
+              echo "This branch is expected to lag because release-please does not rewrite packaging/npm*/package.json in this repo's current setup."
+              echo "The publish workflows still resync packaging/npm*/package.json from VERSION before npm publish."
               exit 0
             fi
 
-            echo "ERROR: packaging/npm/package.json version is out of sync."
+            echo "ERROR: one or more packaging/npm*/package.json versions are out of sync."
             echo "Run: node scripts/sync-npm-version.mjs"
             exit 1
           fi
 
-      - name: npm pack smoke test
+      - name: npm pack smoke test (jirac)
         run: |
-          rm -f jira-commands-*.tgz
+          rm -f mulham28-jirac-*.tgz
           npm pack ./packaging/npm
-          PACKAGE_TGZ=$(ls -1 mulham28-jirac-*.tgz | head -n 1)
+          PACKAGE_TGZ=$(ls -1 mulham28-jirac-*.tgz | grep -v 'jirac-mcp' | head -n 1)
+          test -n "$PACKAGE_TGZ"
+          tar -tzf "$PACKAGE_TGZ" >/dev/null
+
+      - name: npm pack smoke test (jirac-mcp)
+        run: |
+          rm -f mulham28-jirac-mcp-*.tgz
+          npm pack ./packaging/npm-mcp
+          PACKAGE_TGZ=$(ls -1 mulham28-jirac-mcp-*.tgz | head -n 1)
           test -n "$PACKAGE_TGZ"
           tar -tzf "$PACKAGE_TGZ" >/dev/null
 

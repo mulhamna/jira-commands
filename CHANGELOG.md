@@ -6,6 +6,19 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.1.0](https://github.com/mulhamna/jira-commands/compare/v1.0.0...v1.1.0) (2026-05-18)
+
+
+### Features
+
+* **jira/cli:** interactive jirac mcp install + fix claude-code/-desktop paths ([78d7449](https://github.com/mulhamna/jira-commands/commit/78d74499bef3a38faa86d67e240899cd6ef02801))
+* **packaging:** split npm into @mulham28/jirac and @mulham28/jirac-mcp ([cfec213](https://github.com/mulhamna/jira-commands/commit/cfec2136bbbe3c95f986a93efc9a97a774cf9da2))
+
+
+### Bug Fixes
+
+* **jira-mcp:** replace boolean schemas with object schemas for arbitrary JSON fields ([01f6c62](https://github.com/mulhamna/jira-commands/commit/01f6c6242def958ca4ff1999d51048ff3ec9af3e))
+
 ## [1.0.0](https://github.com/mulhamna/jira-commands/compare/v0.39.0...v1.0.0) (2026-05-17)
 
 

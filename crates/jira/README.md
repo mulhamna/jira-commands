@@ -45,7 +45,7 @@ jirac issue create -p MYPROJ
 jirac issue render --input desc.md
 jirac tui -p MYPROJ
 jirac mcp doctor
-jirac mcp install --client claude-code
+jirac mcp install
 ```
 
 ## Config and auth
@@ -99,10 +99,18 @@ Useful skills include:
 
 ## MCP helper
 
-If you also installed `jirac-mcp`, `jirac` can register the MCP server into supported clients for you:
+If you also installed `jirac-mcp`, `jirac` can register the MCP server into supported clients for you.
+
+Interactive (recommended):
 
 ```bash
-jirac mcp doctor
+jirac mcp doctor          # check prereqs only
+jirac mcp install         # verifies prereqs, then shows a client picker
+```
+
+Non-interactive (pass `--client` for scripts):
+
+```bash
 jirac mcp install --client claude-code
 jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
@@ -114,6 +122,8 @@ jirac mcp install --client zed
 ```
 
 Notes:
+- `claude-code` writes user-level `~/.claude.json` (`mcpServers`); the project-scoped `<repo>/.mcp.json` is not written by this helper
+- `claude-desktop` writes the platform support directory (`claude_desktop_config.json`) on macOS/Windows/Linux
 - `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows; `opencode` writes `~/.config/opencode/opencode.jsonc` directly
 - `generic-json` prints a portable JSON snippet instead of writing a file
 - `cursor` remains provisional until verified in a real Cursor install

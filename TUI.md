@@ -19,6 +19,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `j` / `k`   | Navigate up / down                                            |
 | `Enter`     | Open split detail view                                        |
 | `p`         | Open saved JQL queries                                        |
+| `P`         | Browse project sprints and manage sprint lifecycle            |
 | `V`         | Browse project fix versions and preview one version backlog   |
 | `T`         | Open theme picker                                             |
 | `S`         | Show server summary                                           |
@@ -123,6 +124,21 @@ Detail tabs:
 | `j` / `k` | Move selection           |
 | `Enter`   | Run selected saved query |
 | `Esc`     | Cancel                   |
+
+### Project sprint browser
+
+| Key       | Action                                 |
+| --------- | -------------------------------------- |
+| Type      | Filter project sprints                 |
+| `j` / `k` | Move selection                         |
+| `n`       | Create a new sprint                    |
+| `e`       | Edit sprint name, goal, and dates      |
+| `s`       | Start selected sprint                  |
+| `c`       | Complete selected sprint               |
+| `d`       | Delete selected sprint                 |
+| `Esc`     | Close browser                          |
+
+Create/edit fields cover board id, name, goal, start date, and end date. Start/complete flows use dedicated modals, and delete requires typing the sprint name to confirm.
 
 ### Project versions browser
 

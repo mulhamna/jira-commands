@@ -131,6 +131,14 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                                     KeyCode::Enter,
                                 );
                             }
+                            Mode::ProjectSprintBrowser => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.project_sprint_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
                             Mode::ComponentPicker => {
                                 return select_and_press(
                                     app,
@@ -249,6 +257,7 @@ fn is_popup_mode(mode: &Mode) -> bool {
         Mode::Transition
             | Mode::Help
             | Mode::ProjectVersionBrowser
+            | Mode::ProjectSprintBrowser
             | Mode::ColumnPicker
             | Mode::AssigneePicker
             | Mode::ComponentPicker

@@ -38,6 +38,30 @@ pub(super) enum ModalKind {
         version_id: String,
         version_name: String,
     },
+    CreateSprint {
+        project_key: String,
+    },
+    EditSprint {
+        project_key: String,
+        sprint_id: u64,
+        sprint_name: String,
+    },
+    StartSprint {
+        project_key: String,
+        sprint_id: u64,
+        sprint_name: String,
+        current_goal: Option<String>,
+    },
+    CompleteSprint {
+        project_key: String,
+        sprint_id: u64,
+        sprint_name: String,
+    },
+    DeleteSprint {
+        project_key: String,
+        sprint_id: u64,
+        sprint_name: String,
+    },
     ChangeIssueType {
         key: String,
         current_project: String,
@@ -65,6 +89,29 @@ impl ModalKind {
                 version_name,
                 ..
             } => format!(" Edit Version: {project_key} / {version_name} "),
+            ModalKind::CreateSprint { project_key } => {
+                format!(" New Sprint: {project_key} ")
+            }
+            ModalKind::EditSprint {
+                project_key,
+                sprint_name,
+                ..
+            } => format!(" Edit Sprint: {project_key} / {sprint_name} "),
+            ModalKind::StartSprint {
+                project_key,
+                sprint_name,
+                ..
+            } => format!(" Start Sprint: {project_key} / {sprint_name} "),
+            ModalKind::CompleteSprint {
+                project_key,
+                sprint_name,
+                ..
+            } => format!(" Complete Sprint: {project_key} / {sprint_name} "),
+            ModalKind::DeleteSprint {
+                project_key,
+                sprint_name,
+                ..
+            } => format!(" Delete Sprint: {project_key} / {sprint_name} "),
             ModalKind::ChangeIssueType { key, .. } => format!(" Change Type: {key} "),
             ModalKind::MoveIssue { key, .. } => format!(" Move Issue: {key} "),
         }
@@ -87,6 +134,19 @@ impl ModalKind {
             }
             ModalKind::EditProjectVersion { .. } => {
                 " Tab: next field   Ctrl+S: save version   Esc: cancel "
+            }
+            ModalKind::CreateSprint { .. } => {
+                " Tab: next field   Ctrl+S: create sprint   Esc: cancel "
+            }
+            ModalKind::EditSprint { .. } => " Tab: next field   Ctrl+S: save sprint   Esc: cancel ",
+            ModalKind::StartSprint { .. } => {
+                " Tab: next field   Ctrl+S: start sprint   Esc: cancel "
+            }
+            ModalKind::CompleteSprint { .. } => {
+                " Tab: next field   Ctrl+S: complete sprint   Esc: cancel "
+            }
+            ModalKind::DeleteSprint { .. } => {
+                " Type sprint name   Ctrl+S: delete sprint   Esc: cancel "
             }
             ModalKind::ChangeIssueType { .. } => {
                 " Tab: next field   Ctrl+S: change type   Esc: cancel "
@@ -507,6 +567,266 @@ impl Modal {
             focus: 0,
             error: None,
             notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn create_sprint(project_key: String) -> Self {
+        let mut board_id = TextArea::default();
+        board_id.set_cursor_line_style(Style::default());
+        board_id.set_placeholder_text("optional if project has one scrum board");
+
+        let mut name = TextArea::default();
+        name.set_cursor_line_style(Style::default());
+        name.set_placeholder_text("Sprint 24");
+
+        let mut goal = TextArea::default();
+        goal.set_cursor_line_style(Style::default());
+        goal.set_placeholder_text("optional");
+
+        let mut start_date = TextArea::default();
+        start_date.set_cursor_line_style(Style::default());
+        start_date.set_placeholder_text("optional YYYY-MM-DD");
+
+        let mut end_date = TextArea::default();
+        end_date.set_cursor_line_style(Style::default());
+        end_date.set_placeholder_text("optional YYYY-MM-DD");
+
+        Self {
+            kind: ModalKind::CreateSprint { project_key },
+            fields: vec![
+                ModalField {
+                    label: "Board id  (optional)",
+                    area: board_id,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Name",
+                    area: name,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Goal  (optional)",
+                    area: goal,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Start date  (YYYY-MM-DD)",
+                    area: start_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "End date  (YYYY-MM-DD)",
+                    area: end_date,
+                    multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn edit_sprint(project_key: String, sprint: jira_core::model::Sprint) -> Self {
+        let mut name = TextArea::from(vec![sprint.name.clone()]);
+        name.set_cursor_line_style(Style::default());
+
+        let mut goal = TextArea::from(vec![sprint.goal.unwrap_or_default()]);
+        goal.set_cursor_line_style(Style::default());
+        goal.set_placeholder_text("blank = clear");
+
+        let mut start_date = TextArea::from(vec![sprint
+            .start_date
+            .as_deref()
+            .map(|value| value.chars().take(10).collect::<String>())
+            .unwrap_or_default()]);
+        start_date.set_cursor_line_style(Style::default());
+        start_date.set_placeholder_text("blank = clear");
+
+        let mut end_date = TextArea::from(vec![sprint
+            .end_date
+            .as_deref()
+            .map(|value| value.chars().take(10).collect::<String>())
+            .unwrap_or_default()]);
+        end_date.set_cursor_line_style(Style::default());
+        end_date.set_placeholder_text("blank = clear");
+
+        Self {
+            kind: ModalKind::EditSprint {
+                project_key,
+                sprint_id: sprint.id,
+                sprint_name: sprint.name,
+            },
+            fields: vec![
+                ModalField {
+                    label: "Name",
+                    area: name,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "Goal  (blank = clear)",
+                    area: goal,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Start date  (YYYY-MM-DD, blank = clear)",
+                    area: start_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "End date  (YYYY-MM-DD, blank = clear)",
+                    area: end_date,
+                    multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn start_sprint(project_key: String, sprint: jira_core::model::Sprint) -> Self {
+        let mut goal = TextArea::from(vec![sprint.goal.clone().unwrap_or_default()]);
+        goal.set_cursor_line_style(Style::default());
+        goal.set_placeholder_text("optional");
+
+        let mut start_date = TextArea::from(vec![String::new()]);
+        start_date.set_cursor_line_style(Style::default());
+        start_date.set_placeholder_text("default: today (YYYY-MM-DD)");
+
+        let mut end_date = TextArea::from(vec![sprint
+            .end_date
+            .as_deref()
+            .map(|value| value.chars().take(10).collect::<String>())
+            .unwrap_or_default()]);
+        end_date.set_cursor_line_style(Style::default());
+        end_date.set_placeholder_text("required YYYY-MM-DD");
+
+        Self {
+            kind: ModalKind::StartSprint {
+                project_key,
+                sprint_id: sprint.id,
+                sprint_name: sprint.name,
+                current_goal: sprint.goal,
+            },
+            fields: vec![
+                ModalField {
+                    label: "Goal  (optional)",
+                    area: goal,
+                    multiline: true,
+                },
+                ModalField {
+                    label: "Start date  (blank = today)",
+                    area: start_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "End date  (YYYY-MM-DD)",
+                    area: end_date,
+                    multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn complete_sprint(project_key: String, sprint: jira_core::model::Sprint) -> Self {
+        let mut complete_date = TextArea::from(vec![String::new()]);
+        complete_date.set_cursor_line_style(Style::default());
+        complete_date.set_placeholder_text("default: today (YYYY-MM-DD)");
+
+        let mut end_date = TextArea::from(vec![sprint
+            .end_date
+            .as_deref()
+            .map(|value| value.chars().take(10).collect::<String>())
+            .unwrap_or_default()]);
+        end_date.set_cursor_line_style(Style::default());
+        end_date.set_placeholder_text("blank = use complete date");
+
+        Self {
+            kind: ModalKind::CompleteSprint {
+                project_key,
+                sprint_id: sprint.id,
+                sprint_name: sprint.name,
+            },
+            fields: vec![
+                ModalField {
+                    label: "Complete date  (blank = today)",
+                    area: complete_date,
+                    multiline: false,
+                },
+                ModalField {
+                    label: "End date  (blank = complete date)",
+                    area: end_date,
+                    multiline: false,
+                },
+            ],
+            focus: 0,
+            error: None,
+            notice: None,
+            confirm_token: None,
+            busy: false,
+            mention_active: false,
+            mention_query: String::new(),
+            mention_options: Vec::new(),
+            mention_state: ListState::default(),
+            mention_map: Vec::new(),
+            mention_cache: HashMap::new(),
+        }
+    }
+
+    pub(super) fn delete_sprint(project_key: String, sprint: jira_core::model::Sprint) -> Self {
+        let mut confirm = TextArea::default();
+        confirm.set_cursor_line_style(Style::default());
+        confirm.set_placeholder_text(&sprint.name);
+
+        Self {
+            kind: ModalKind::DeleteSprint {
+                project_key,
+                sprint_id: sprint.id,
+                sprint_name: sprint.name,
+            },
+            fields: vec![ModalField {
+                label: "Type the sprint name to confirm delete",
+                area: confirm,
+                multiline: false,
+            }],
+            focus: 0,
+            error: None,
+            notice: Some("Deleting a sprint cannot be undone.".to_string()),
             confirm_token: None,
             busy: false,
             mention_active: false,

@@ -124,6 +124,13 @@ pub(super) struct App {
     pub(super) project_version_project_key: String,
     pub(super) project_version_catalog: Vec<jira_core::model::ProjectVersion>,
     pub(super) project_version_preview: Option<VersionBacklogPreview>,
+    pub(super) project_sprint_query: String,
+    pub(super) project_sprint_cursor: usize,
+    pub(super) project_sprint_options: Vec<PickerOption>,
+    pub(super) project_sprint_state: ListState,
+    pub(super) project_sprint_project_key: String,
+    pub(super) project_sprint_catalog: Vec<Sprint>,
+    pub(super) project_sprint_cache: HashMap<String, Vec<Sprint>>,
     pub(super) assignee_query: String,
     pub(super) assignee_cursor: usize,
     pub(super) assignee_options: Vec<PickerOption>,
@@ -184,6 +191,13 @@ pub(super) enum AppAction {
     OpenProjectVersionEditModal,
     RefreshProjectVersionBrowser,
     RefreshProjectVersionPreview,
+    OpenProjectSprintBrowser,
+    OpenProjectSprintCreateModal,
+    OpenProjectSprintEditModal,
+    OpenProjectSprintStartModal,
+    OpenProjectSprintCompleteModal,
+    OpenProjectSprintDeleteModal,
+    RefreshProjectSprintBrowser,
     EditIssue(String),
     AssignIssue(String),
     OpenAssigneePicker(String),
@@ -297,6 +311,13 @@ impl App {
             project_version_project_key: String::new(),
             project_version_catalog: Vec::new(),
             project_version_preview: None,
+            project_sprint_query: String::new(),
+            project_sprint_cursor: 0,
+            project_sprint_options: Vec::new(),
+            project_sprint_state: ListState::default(),
+            project_sprint_project_key: String::new(),
+            project_sprint_catalog: Vec::new(),
+            project_sprint_cache: HashMap::new(),
             assignee_query: String::new(),
             assignee_cursor: 0,
             assignee_options: Vec::new(),
@@ -415,6 +436,20 @@ impl App {
         self.project_version_catalog
             .iter()
             .find(|version| version.name == name)
+    }
+
+    pub(super) fn selected_project_sprint_id(&self) -> Option<u64> {
+        let idx = self.project_sprint_state.selected()?;
+        self.project_sprint_options
+            .get(idx)
+            .and_then(|option| option.value.parse::<u64>().ok())
+    }
+
+    pub(super) fn selected_project_sprint(&self) -> Option<&Sprint> {
+        let sprint_id = self.selected_project_sprint_id()?;
+        self.project_sprint_catalog
+            .iter()
+            .find(|sprint| sprint.id == sprint_id)
     }
 
     pub(super) fn next_issue(&mut self) {
@@ -1043,6 +1078,132 @@ pub async fn run_tui(
                 };
                 let project_key = app.project_version_project_key.clone();
                 app.open_modal(Modal::edit_project_version(project_key, version));
+            }
+
+            AppAction::OpenProjectSprintBrowser => {
+                let Some(project_key) = app.active_project_key() else {
+                    app.set_status(
+                        "Open a project-scoped TUI (`jirac tui -p PROJ`) or select an issue first",
+                        true,
+                    );
+                    continue;
+                };
+
+                app.project_sprint_project_key = project_key.clone();
+                app.project_sprint_query.clear();
+                app.project_sprint_cursor = 0;
+                app.project_sprint_options.clear();
+                app.project_sprint_catalog.clear();
+                app.project_sprint_state = ListState::default();
+                app.mode = Mode::ProjectSprintBrowser;
+                app.focus = Focus::List;
+
+                if let Some(cached) = app.project_sprint_cache.get(&project_key).cloned() {
+                    app.project_sprint_catalog = cached;
+                    sort_project_sprints(&mut app.project_sprint_catalog);
+                    app.project_sprint_options = build_project_sprint_options(
+                        &app.project_sprint_catalog,
+                        &app.project_sprint_query,
+                    );
+                    if !app.project_sprint_options.is_empty() {
+                        app.project_sprint_state.select(Some(0));
+                    }
+                    app.clear_status();
+                    continue;
+                }
+
+                app.set_status(format!("Loading sprints for {project_key}..."), false);
+                terminal.draw(|f| ui(f, &mut app))?;
+                match client
+                    .list_sprints_for_project_with_states(
+                        &project_key,
+                        &["active", "future", "closed"],
+                    )
+                    .await
+                {
+                    Ok(sprints) => {
+                        app.project_sprint_catalog = sprints.clone();
+                        sort_project_sprints(&mut app.project_sprint_catalog);
+                        app.project_sprint_options = build_project_sprint_options(
+                            &app.project_sprint_catalog,
+                            &app.project_sprint_query,
+                        );
+                        app.project_sprint_cache
+                            .insert(project_key.clone(), sprints);
+                        if !app.project_sprint_options.is_empty() {
+                            app.project_sprint_state.select(Some(0));
+                        }
+                        if app.project_sprint_options.is_empty() {
+                            app.set_status(format!("No sprints found for {project_key}"), false);
+                        } else {
+                            app.clear_status();
+                        }
+                    }
+                    Err(e) => app.set_status(format!("Sprint lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshProjectSprintBrowser => {
+                app.project_sprint_options = build_project_sprint_options(
+                    &app.project_sprint_catalog,
+                    &app.project_sprint_query,
+                );
+                app.project_sprint_state
+                    .select(if app.project_sprint_options.is_empty() {
+                        None
+                    } else {
+                        Some(0)
+                    });
+                if app.project_sprint_options.is_empty() {
+                    app.set_status("No matching sprints", false);
+                } else {
+                    app.clear_status();
+                }
+            }
+
+            AppAction::OpenProjectSprintCreateModal => {
+                let project_key = app.project_sprint_project_key.clone();
+                if project_key.trim().is_empty() {
+                    app.set_status("Open the sprint browser first", true);
+                    continue;
+                }
+                app.open_modal(Modal::create_sprint(project_key));
+            }
+
+            AppAction::OpenProjectSprintEditModal => {
+                let Some(sprint) = app.selected_project_sprint().cloned() else {
+                    app.set_status("Select a sprint first", true);
+                    continue;
+                };
+                let project_key = app.project_sprint_project_key.clone();
+                app.open_modal(Modal::edit_sprint(project_key, sprint));
+            }
+
+            AppAction::OpenProjectSprintStartModal => {
+                let Some(sprint) = app.selected_project_sprint().cloned() else {
+                    app.set_status("Select a sprint first", true);
+                    continue;
+                };
+                let project_key = app.project_sprint_project_key.clone();
+                app.open_modal(Modal::start_sprint(project_key, sprint));
+            }
+
+            AppAction::OpenProjectSprintCompleteModal => {
+                let Some(sprint) = app.selected_project_sprint().cloned() else {
+                    app.set_status("Select a sprint first", true);
+                    continue;
+                };
+                let project_key = app.project_sprint_project_key.clone();
+                app.open_modal(Modal::complete_sprint(project_key, sprint));
+            }
+
+            AppAction::OpenProjectSprintDeleteModal => {
+                let Some(sprint) = app.selected_project_sprint().cloned() else {
+                    app.set_status("Select a sprint first", true);
+                    continue;
+                };
+                let project_key = app.project_sprint_project_key.clone();
+                app.open_modal(Modal::delete_sprint(project_key, sprint));
             }
 
             AppAction::MarkNotificationsRead => match app.mark_selected_notifications_read() {
@@ -2456,6 +2617,488 @@ pub async fn run_tui(
                             }
                         }
                     }
+                    ModalKind::CreateSprint { project_key } => {
+                        let board_raw = modal.field_text(0);
+                        let name = modal.field_text(1).trim().to_string();
+                        let goal_raw = modal.field_text(2);
+                        let start_raw = modal.field_text(3);
+                        let end_raw = modal.field_text(4);
+
+                        if name.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Sprint name is required");
+                            }
+                            continue;
+                        }
+
+                        let board_id = match parse_optional_u64(&board_raw, "board id") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let board_id =
+                            match resolve_board_id_for_project_tui(&client, &project_key, board_id)
+                                .await
+                            {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                        let start_date = match optional_modal_date(&start_raw, "start date") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let end_date = match optional_modal_date(&end_raw, "end date") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let start_ts = match start_date
+                            .as_deref()
+                            .map(jira_datetime_from_ymd)
+                            .transpose()
+                        {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let end_ts =
+                            match end_date.as_deref().map(jira_datetime_from_ymd).transpose() {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client
+                            .create_sprint(
+                                board_id,
+                                &name,
+                                start_ts.as_deref(),
+                                end_ts.as_deref(),
+                                optional_modal_text(&goal_raw).as_deref(),
+                            )
+                            .await
+                        {
+                            Ok(created) => {
+                                app.close_modal();
+                                upsert_project_sprint(
+                                    &mut app.project_sprint_catalog,
+                                    created.clone(),
+                                );
+                                sync_project_sprint_cache(&mut app);
+                                app.project_sprint_options = build_project_sprint_options(
+                                    &app.project_sprint_catalog,
+                                    &app.project_sprint_query,
+                                );
+                                if let Some(index) = app
+                                    .project_sprint_options
+                                    .iter()
+                                    .position(|option| option.value == created.id.to_string())
+                                {
+                                    app.project_sprint_state.select(Some(index));
+                                }
+                                app.set_status(
+                                    format!("✓ Created sprint {} / {}", project_key, created.name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Sprint create failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::EditSprint {
+                        project_key,
+                        sprint_id,
+                        sprint_name,
+                    } => {
+                        let name = modal.field_text(0).trim().to_string();
+                        let goal_raw = modal.field_text(1);
+                        let start_raw = modal.field_text(2);
+                        let end_raw = modal.field_text(3);
+
+                        if name.is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("Sprint name is required");
+                            }
+                            continue;
+                        }
+
+                        let mut body = serde_json::Map::new();
+                        body.insert("name".into(), serde_json::Value::String(name.clone()));
+                        body.insert(
+                            "goal".into(),
+                            serde_json::Value::String(goal_raw.trim().to_string()),
+                        );
+
+                        if start_raw.trim().is_empty() {
+                            body.insert(
+                                "startDate".into(),
+                                serde_json::Value::String(String::new()),
+                            );
+                        } else {
+                            let value = match validate_modal_date(&start_raw, "start date") {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                            let value = match jira_datetime_from_ymd(&value) {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                            body.insert("startDate".into(), serde_json::Value::String(value));
+                        }
+
+                        if end_raw.trim().is_empty() {
+                            body.insert("endDate".into(), serde_json::Value::String(String::new()));
+                        } else {
+                            let value = match validate_modal_date(&end_raw, "end date") {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                            let value = match jira_datetime_from_ymd(&value) {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                            body.insert("endDate".into(), serde_json::Value::String(value));
+                        }
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client
+                            .update_sprint(sprint_id, serde_json::Value::Object(body))
+                            .await
+                        {
+                            Ok(updated) => {
+                                app.close_modal();
+                                upsert_project_sprint(
+                                    &mut app.project_sprint_catalog,
+                                    updated.clone(),
+                                );
+                                sync_project_sprint_cache(&mut app);
+                                app.project_sprint_options = build_project_sprint_options(
+                                    &app.project_sprint_catalog,
+                                    &app.project_sprint_query,
+                                );
+                                if let Some(index) = app
+                                    .project_sprint_options
+                                    .iter()
+                                    .position(|option| option.value == updated.id.to_string())
+                                {
+                                    app.project_sprint_state.select(Some(index));
+                                }
+                                app.set_status(
+                                    format!("✓ Updated sprint {} / {}", project_key, sprint_name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Sprint update failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::StartSprint {
+                        project_key,
+                        sprint_id,
+                        sprint_name,
+                        current_goal,
+                    } => {
+                        let goal_raw = modal.field_text(0);
+                        let start_raw = modal.field_text(1);
+                        let end_raw = modal.field_text(2);
+
+                        if end_raw.trim().is_empty() {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error("End date is required");
+                            }
+                            continue;
+                        }
+
+                        let start_date = if start_raw.trim().is_empty() {
+                            chrono::Utc::now()
+                                .date_naive()
+                                .format("%Y-%m-%d")
+                                .to_string()
+                        } else {
+                            match validate_modal_date(&start_raw, "start date") {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        };
+                        let end_date = match validate_modal_date(&end_raw, "end date") {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let start_ts = match jira_datetime_from_ymd(&start_date) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let end_ts = match jira_datetime_from_ymd(&end_date) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let goal = optional_modal_text(&goal_raw).or(current_goal.clone());
+                        let mut body = serde_json::json!({
+                            "state": "active",
+                            "startDate": start_ts,
+                            "endDate": end_ts,
+                        });
+                        if let Some(goal) = goal {
+                            body["goal"] = serde_json::Value::String(goal);
+                        }
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.update_sprint(sprint_id, body).await {
+                            Ok(updated) => {
+                                app.close_modal();
+                                upsert_project_sprint(
+                                    &mut app.project_sprint_catalog,
+                                    updated.clone(),
+                                );
+                                sync_project_sprint_cache(&mut app);
+                                app.project_sprint_options = build_project_sprint_options(
+                                    &app.project_sprint_catalog,
+                                    &app.project_sprint_query,
+                                );
+                                if let Some(index) = app
+                                    .project_sprint_options
+                                    .iter()
+                                    .position(|option| option.value == updated.id.to_string())
+                                {
+                                    app.project_sprint_state.select(Some(index));
+                                }
+                                app.set_status(
+                                    format!("✓ Started sprint {} / {}", project_key, sprint_name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Sprint start failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::CompleteSprint {
+                        project_key,
+                        sprint_id,
+                        sprint_name,
+                    } => {
+                        let complete_raw = modal.field_text(0);
+                        let end_raw = modal.field_text(1);
+                        let complete_date = if complete_raw.trim().is_empty() {
+                            chrono::Utc::now()
+                                .date_naive()
+                                .format("%Y-%m-%d")
+                                .to_string()
+                        } else {
+                            match validate_modal_date(&complete_raw, "complete date") {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        };
+                        let complete_ts = match jira_datetime_from_ymd(&complete_date) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("{e}"));
+                                }
+                                continue;
+                            }
+                        };
+                        let end_ts = if end_raw.trim().is_empty() {
+                            complete_ts.clone()
+                        } else {
+                            let value = match validate_modal_date(&end_raw, "end date") {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            };
+                            match jira_datetime_from_ymd(&value) {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    if let Some(m) = app.modal.as_mut() {
+                                        m.set_error(format!("{e}"));
+                                    }
+                                    continue;
+                                }
+                            }
+                        };
+                        let body = serde_json::json!({
+                            "state": "closed",
+                            "completeDate": complete_ts,
+                            "endDate": end_ts,
+                        });
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.update_sprint(sprint_id, body).await {
+                            Ok(updated) => {
+                                app.close_modal();
+                                upsert_project_sprint(
+                                    &mut app.project_sprint_catalog,
+                                    updated.clone(),
+                                );
+                                sync_project_sprint_cache(&mut app);
+                                app.project_sprint_options = build_project_sprint_options(
+                                    &app.project_sprint_catalog,
+                                    &app.project_sprint_query,
+                                );
+                                if let Some(index) = app
+                                    .project_sprint_options
+                                    .iter()
+                                    .position(|option| option.value == updated.id.to_string())
+                                {
+                                    app.project_sprint_state.select(Some(index));
+                                }
+                                app.set_status(
+                                    format!("✓ Completed sprint {} / {}", project_key, sprint_name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Sprint complete failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    ModalKind::DeleteSprint {
+                        project_key,
+                        sprint_id,
+                        sprint_name,
+                    } => {
+                        let confirm_raw = modal.field_text(0);
+                        if confirm_raw.trim() != sprint_name {
+                            if let Some(m) = app.modal.as_mut() {
+                                m.set_error(format!(
+                                    "Type '{}' exactly to confirm delete",
+                                    sprint_name
+                                ));
+                            }
+                            continue;
+                        }
+
+                        if let Some(m) = app.modal.as_mut() {
+                            m.busy = true;
+                        }
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        match client.delete_sprint(sprint_id).await {
+                            Ok(()) => {
+                                app.close_modal();
+                                remove_project_sprint(&mut app.project_sprint_catalog, sprint_id);
+                                sync_project_sprint_cache(&mut app);
+                                app.project_sprint_options = build_project_sprint_options(
+                                    &app.project_sprint_catalog,
+                                    &app.project_sprint_query,
+                                );
+                                app.project_sprint_state.select(
+                                    if app.project_sprint_options.is_empty() {
+                                        None
+                                    } else {
+                                        Some(0)
+                                    },
+                                );
+                                app.set_status(
+                                    format!("✓ Deleted sprint {} / {}", project_key, sprint_name),
+                                    false,
+                                );
+                            }
+                            Err(e) => {
+                                if let Some(m) = app.modal.as_mut() {
+                                    m.set_error(format!("Sprint delete failed: {e}"));
+                                }
+                            }
+                        }
+                    }
                     ModalKind::ChangeIssueType {
                         key,
                         current_project,
@@ -2839,6 +3482,158 @@ fn build_project_version_options(
             label: version.name.clone(),
         })
         .collect()
+}
+
+fn build_project_sprint_options(catalog: &[Sprint], query: &str) -> Vec<PickerOption> {
+    let query = query.to_lowercase();
+    catalog
+        .iter()
+        .filter(|sprint| {
+            query.is_empty()
+                || sprint.name.to_lowercase().contains(&query)
+                || sprint.state.to_lowercase().contains(&query)
+                || sprint
+                    .goal
+                    .as_deref()
+                    .map(|goal| goal.to_lowercase().contains(&query))
+                    .unwrap_or(false)
+        })
+        .map(|sprint| PickerOption {
+            value: sprint.id.to_string(),
+            label: format!("{}  [{}]", sprint.name, sprint.state),
+        })
+        .collect()
+}
+
+fn sort_project_sprints(catalog: &mut [Sprint]) {
+    catalog.sort_by_key(|sprint| {
+        (
+            match sprint.state.as_str() {
+                "active" => 0,
+                "future" => 1,
+                "closed" => 2,
+                _ => 3,
+            },
+            sprint.end_date.clone().unwrap_or_default(),
+            sprint.start_date.clone().unwrap_or_default(),
+            sprint.name.to_lowercase(),
+        )
+    });
+}
+
+fn upsert_project_sprint(catalog: &mut Vec<Sprint>, sprint: Sprint) {
+    if let Some(existing) = catalog.iter_mut().find(|item| item.id == sprint.id) {
+        *existing = sprint;
+    } else {
+        catalog.push(sprint);
+    }
+    sort_project_sprints(catalog);
+}
+
+fn remove_project_sprint(catalog: &mut Vec<Sprint>, sprint_id: u64) {
+    catalog.retain(|sprint| sprint.id != sprint_id);
+    sort_project_sprints(catalog);
+}
+
+fn sync_project_sprint_cache(app: &mut App) {
+    if !app.project_sprint_project_key.is_empty() {
+        app.project_sprint_cache.insert(
+            app.project_sprint_project_key.clone(),
+            app.project_sprint_catalog.clone(),
+        );
+    }
+}
+
+fn parse_optional_u64(raw: &str, label: &str) -> Result<Option<u64>> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    value
+        .parse::<u64>()
+        .map(Some)
+        .map_err(|_| anyhow::anyhow!("Invalid {} '{}'. Expected a numeric value", label, value))
+}
+
+fn jira_datetime_from_ymd(value: &str) -> Result<String> {
+    let date = chrono::NaiveDate::parse_from_str(value.trim(), "%Y-%m-%d").map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid sprint date '{}'. Expected format: YYYY-MM-DD",
+            value.trim()
+        )
+    })?;
+    Ok(format!("{}T00:00:00.000Z", date.format("%Y-%m-%d")))
+}
+
+async fn resolve_board_id_for_project_tui(
+    client: &JiraClient,
+    project_key: &str,
+    preferred: Option<u64>,
+) -> Result<u64> {
+    let response = client
+        .raw_request(
+            "GET",
+            &format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100"),
+            None,
+        )
+        .await?
+        .unwrap_or_default();
+
+    let boards = response
+        .get("values")
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| anyhow::anyhow!("Unexpected board response while resolving project board"))?
+        .iter()
+        .filter_map(|board| {
+            let id = board.get("id")?.as_u64()?;
+            let board_type = board.get("type")?.as_str()?;
+            if board_type != "scrum" {
+                return None;
+            }
+            let name = board
+                .get("name")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unnamed board")
+                .to_string();
+            Some((id, name))
+        })
+        .collect::<Vec<_>>();
+
+    if boards.is_empty() {
+        anyhow::bail!("No sprint-enabled boards found for project {}", project_key);
+    }
+
+    if let Some(preferred) = preferred {
+        if boards.iter().any(|(id, _)| *id == preferred) {
+            return Ok(preferred);
+        }
+        let options = boards
+            .iter()
+            .map(|(id, name)| format!("{} ({})", name, id))
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "Board {} is not available for project {}. Available boards: {}",
+            preferred,
+            project_key,
+            options
+        );
+    }
+
+    if boards.len() == 1 {
+        return Ok(boards[0].0);
+    }
+
+    let options = boards
+        .iter()
+        .map(|(id, name)| format!("{} ({})", name, id))
+        .collect::<Vec<_>>()
+        .join(", ");
+    anyhow::bail!(
+        "Project {} maps to multiple boards. Enter a board id. Available boards: {}",
+        project_key,
+        options
+    )
 }
 
 fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {

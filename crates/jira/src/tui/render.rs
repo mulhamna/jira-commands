@@ -66,6 +66,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::Transition => " Jira CLI — Select Transition ".to_string(),
         Mode::Help => " Jira CLI — Help ".to_string(),
         Mode::ProjectVersionBrowser => " Jira CLI — Project Versions ".to_string(),
+        Mode::ProjectSprintBrowser => " Jira CLI — Project Sprints ".to_string(),
         Mode::ColumnPicker => " Jira CLI — Columns ".to_string(),
         Mode::AssigneePicker => " Jira CLI — Assignee Picker ".to_string(),
         Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
@@ -105,6 +106,10 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ProjectVersionBrowser => {
             render_browse(f, app, chunks[1], palette);
             render_project_version_browser_popup(f, app, size, palette);
+        }
+        Mode::ProjectSprintBrowser => {
+            render_browse(f, app, chunks[1], palette);
+            render_project_sprint_browser_popup(f, app, size, palette);
         }
         Mode::ColumnPicker => {
             render_browse(f, app, chunks[1], palette);
@@ -157,11 +162,11 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
 fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
-            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
+            " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  P:sprints  V:versions  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  P:sprints  V:versions  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -169,6 +174,10 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         Mode::Help => " Any key: close".to_string(),
         Mode::ProjectVersionBrowser => {
             " type:filter  j/k:move  Enter:refresh  n:new  e:edit  Esc:close".to_string()
+        }
+        Mode::ProjectSprintBrowser => {
+            " type:filter  j/k:move  n:new  e:edit  s:start  c:complete  d:delete  Esc:close"
+                .to_string()
         }
         Mode::ColumnPicker => " ↑/↓:move  Space:toggle  type:filter  Tab:clear  Enter:save  Esc:cancel".to_string(),
         Mode::AssigneePicker => " type:search  j/k:move  Enter:assign  Esc:cancel".to_string(),
@@ -1028,6 +1037,157 @@ fn render_project_version_browser_popup(
     f.set_cursor_position((cursor_x, cursor_y));
 }
 
+fn render_project_sprint_browser_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let popup_area = centered_rect(86, 82, area);
+    let [left_area, right_area] = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
+        .areas(popup_area);
+
+    let left_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .split(left_area);
+
+    let query = Paragraph::new(app.project_sprint_query.clone())
+        .block(
+            Block::default()
+                .title(format!(
+                    " Sprints — {} ",
+                    if app.project_sprint_project_key.is_empty() {
+                        "project"
+                    } else {
+                        &app.project_sprint_project_key
+                    }
+                ))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .style(Style::default().fg(palette.header_fg));
+
+    let sprint_items: Vec<ListItem> = if app.project_sprint_options.is_empty() {
+        vec![ListItem::new("No sprints")]
+    } else {
+        app.project_sprint_options
+            .iter()
+            .map(|option| ListItem::new(option.label.clone()))
+            .collect()
+    };
+
+    let sprints = List::new(sprint_items)
+        .block(
+            Block::default()
+                .title(" Sprints ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(palette.header_fg)
+                .bg(palette.highlight)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
+
+    let mut right_lines: Vec<Line<'static>> = Vec::new();
+    if let Some(sprint) = app.selected_project_sprint() {
+        right_lines.push(Line::from(Span::styled(
+            sprint.name.clone(),
+            Style::default()
+                .fg(palette.tab_active)
+                .add_modifier(Modifier::BOLD),
+        )));
+        right_lines.push(Line::from(format!("State: {}", sprint.state)));
+        if let Some(board_id) = sprint.board_id {
+            right_lines.push(Line::from(format!("Board: {}", board_id)));
+        }
+        if let Some(goal) = sprint
+            .goal
+            .as_deref()
+            .map(str::trim)
+            .filter(|goal| !goal.is_empty())
+        {
+            right_lines.push(Line::from(""));
+            right_lines.push(Line::from(Span::styled(
+                "Goal:",
+                Style::default().add_modifier(Modifier::UNDERLINED),
+            )));
+            right_lines.push(Line::from(goal.to_string()));
+        }
+        right_lines.push(Line::from(""));
+        right_lines.push(Line::from(Span::styled(
+            "Dates:",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )));
+        right_lines.push(Line::from(format!(
+            "  Start: {}",
+            sprint
+                .start_date
+                .as_deref()
+                .map(|value| value.chars().take(10).collect::<String>())
+                .unwrap_or_else(|| "-".to_string())
+        )));
+        right_lines.push(Line::from(format!(
+            "  End: {}",
+            sprint
+                .end_date
+                .as_deref()
+                .map(|value| value.chars().take(10).collect::<String>())
+                .unwrap_or_else(|| "-".to_string())
+        )));
+        right_lines.push(Line::from(format!(
+            "  Complete: {}",
+            sprint
+                .complete_date
+                .as_deref()
+                .map(|value| value.chars().take(10).collect::<String>())
+                .unwrap_or_else(|| "-".to_string())
+        )));
+        right_lines.push(Line::from(""));
+        right_lines.push(Line::from(Span::styled(
+            "Actions:",
+            Style::default().add_modifier(Modifier::UNDERLINED),
+        )));
+        right_lines.push(Line::from("  n create sprint"));
+        right_lines.push(Line::from("  e edit name / goal / dates"));
+        right_lines.push(Line::from("  s start selected future sprint"));
+        right_lines.push(Line::from("  c complete selected active sprint"));
+        right_lines.push(Line::from("  d delete selected sprint"));
+    } else {
+        right_lines.push(Line::from("Select a sprint to inspect or manage it."));
+    }
+
+    let detail = Paragraph::new(right_lines)
+        .block(
+            Block::default()
+                .title(" Sprint Details ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(palette.focus_border)),
+        )
+        .wrap(Wrap { trim: false });
+
+    f.render_widget(Clear, popup_area);
+    f.render_widget(query, left_chunks[0]);
+    let sprint_count = app.project_sprint_options.len();
+    f.render_stateful_widget(sprints, left_chunks[1], &mut app.project_sprint_state);
+    f.render_widget(detail, right_area);
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        left_chunks[1],
+        app.project_sprint_state.offset(),
+        sprint_count,
+    ));
+
+    let before_cursor: String = app
+        .project_sprint_query
+        .chars()
+        .take(app.project_sprint_cursor)
+        .collect();
+    let cursor_x = left_chunks[0].x + 1 + before_cursor.len() as u16;
+    let cursor_y = left_chunks[0].y + 1;
+    f.set_cursor_position((cursor_x, cursor_y));
+}
+
 fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let title = format!(" Sprint: {} ", app.sprint_issue_key);
     let option_count = app.sprint_options.len();
@@ -1416,6 +1576,8 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
         Line::from("  p         Open saved queries (run/create/edit/delete)"),
+        Line::from("  P         Browse project sprints + manage lifecycle"),
+        Line::from("            n creates, e edits, s starts, c completes, d deletes"),
         Line::from("  V         Browse project fix versions + backlog preview"),
         Line::from("            Enter refreshes preview, n creates, e edits metadata"),
         Line::from("  T         Open theme picker"),

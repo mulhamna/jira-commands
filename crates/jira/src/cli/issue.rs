@@ -1886,6 +1886,7 @@ async fn list_sprints(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn create_sprint(
     client: JiraClient,
     project: Option<String>,

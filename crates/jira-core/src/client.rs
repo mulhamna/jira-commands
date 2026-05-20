@@ -948,6 +948,17 @@ impl JiraClient {
             })
     }
 
+    /// Delete a sprint.
+    pub async fn delete_sprint(&self, sprint_id: u64) -> Result<()> {
+        self.raw_request(
+            "DELETE",
+            &format!("/rest/agile/1.0/sprint/{sprint_id}"),
+            None,
+        )
+        .await?;
+        Ok(())
+    }
+
     /// Add an issue to a sprint (Agile API).
     pub async fn add_issue_to_sprint(&self, sprint_id: u64, issue_key: &str) -> Result<()> {
         let path = format!("/rest/agile/1.0/sprint/{sprint_id}/issue");
@@ -2182,6 +2193,25 @@ mod tests {
 
         assert_eq!(sprint.id, 42);
         assert_eq!(sprint.state, "active");
+    }
+
+    #[tokio::test]
+    async fn delete_sprint_uses_delete_endpoint() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("DELETE"))
+            .and(path("/rest/agile/1.0/sprint/42"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        client
+            .delete_sprint(42)
+            .await
+            .expect("delete sprint should succeed");
     }
 
     #[tokio::test]

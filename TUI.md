@@ -189,7 +189,7 @@ The TUI is fully keyboard-driven, but every pointer-friendly interaction is also
 | Double-click issue row  | Open split detail view (same as `Enter`)                                |
 | Click detail tab        | Switch to that tab; lazy-fetches comments/worklog/links as needed       |
 | Click detail pane       | Switch focus to detail when currently focused on the list               |
-| Click picker option     | Apply for single-select pickers (transition, assignee, sprint, saved JQL, theme, project versions browser); toggle for multi-select pickers (components, fix versions, columns) |
+| Click picker option     | Apply for single-select pickers and browsers (transition, assignee, sprint, saved JQL, theme, project versions, project sprints); toggle for multi-select pickers (components, fix versions, columns) |
 | Click outside a popup   | Close popup (equivalent to `Esc`)                                       |
 | Scroll wheel on list    | Previous / next issue                                                   |
 | Scroll wheel on picker  | Move picker selection up / down                                         |

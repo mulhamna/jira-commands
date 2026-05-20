@@ -144,6 +144,7 @@ Then verify:
 jirac auth status
 jirac auth profiles
 jirac --help
+jirac issue --help
 jirac tui --help
 ```
 

@@ -6,6 +6,8 @@ pub struct Sprint {
     pub name: String,
     pub state: String,
     pub board_id: Option<u64>,
+    pub goal: Option<String>,
     pub start_date: Option<String>,
     pub end_date: Option<String>,
+    pub complete_date: Option<String>,
 }

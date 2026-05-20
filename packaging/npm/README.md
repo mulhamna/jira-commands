@@ -15,8 +15,8 @@ This package is a thin installer that downloads the matching prebuilt release fo
 
 `jirac` is a fast Jira terminal client with:
 
-- interactive TUI for browsing and updating issues, with full mouse support (click rows, tabs, picker options; scroll wheel)
-- worklog flows, attachments, and comments
+- interactive TUI for browsing and updating issues, including project sprint/version browsers and full mouse support (click rows, tabs, picker/browser options; scroll wheel)
+- sprint lifecycle commands, worklog flows, attachments, and comments
 - bulk actions like bulk-comment, bulk-transition, and bulk-update
 - JQL builder and saved-query workflows
 - MCP-friendly tooling for editor and agent setups
@@ -41,6 +41,7 @@ jirac mcp install   # interactive picker, registers the server into your MCP cli
 
 ```bash
 jirac issue list
+jirac issue sprints -p PROJ
 jirac issue view PROJ-123
 jirac issue transition PROJ-123 --to "In Progress"
 jirac issue bulk-comment --jql 'project = PROJ AND sprint = openSprints()' --body 'Please post your update before standup'

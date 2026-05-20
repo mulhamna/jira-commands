@@ -12,7 +12,7 @@ A fast, polished Jira CLI and TUI built in Rust.
 `jirac` is an opinionated Jira terminal client for people who want terminal speed without giving up modern Jira workflows. It supports custom fields discovered at runtime, native attachment uploads, cursor-based pagination, Jira Cloud, and Jira Data Center.
 
 It ships as a single binary with no runtime dependencies, runs on macOS, Linux, and Windows, and includes:
-- an interactive terminal UI with split master-detail, saved JQLs, themes, native popups, and full mouse support (click rows, tabs, picker options; scroll wheel; click outside popup to dismiss)
+- sprint lifecycle commands plus an interactive terminal UI with split master-detail, saved JQLs, project sprint/version browsers, themes, native popups, and full mouse support (click rows, tabs, picker/browser options; scroll wheel; click outside popup to dismiss)
 - an MCP server for editor and agent integrations
 - a Claude Code plugin
 
@@ -239,6 +239,8 @@ Common shortcuts:
 | `j` / `k`   | Navigate up / down |
 | `Enter`     | Open split detail view |
 | `p`         | Open saved JQL queries |
+| `P`         | Open project sprint browser |
+| `V`         | Open project fix-version browser |
 | `T`         | Open theme picker |
 | `S`         | Show server summary |
 | `g`         | Show config summary |
@@ -257,7 +259,7 @@ Common shortcuts:
 | `?`         | Show in-app help |
 | `q` / `Esc` | Quit or go back, depending on context |
 
-The TUI also accepts mouse input: click rows to select, double-click to open detail, click detail tabs to switch, click picker options to apply or toggle, scroll the wheel to navigate, and click outside any popup to dismiss it. Form modals stay keyboard-only.
+The TUI also accepts mouse input: click rows to select, double-click to open detail, click detail tabs to switch, click picker and browser options to apply or toggle, scroll the wheel to navigate, and click outside any popup to dismiss it. Form modals stay keyboard-only.
 
 ## Configuration
 

@@ -796,8 +796,46 @@ impl JiraClient {
         Ok(version)
     }
 
-    /// List active and future sprints for a project via the Agile API.
-    pub async fn list_sprints_for_project(&self, project_key: &str) -> Result<Vec<Sprint>> {
+    fn parse_sprint_value(&self, value: &Value, board_id: Option<u64>) -> Option<Sprint> {
+        let id = value.get("id").and_then(|v| v.as_u64())?;
+        Some(Sprint {
+            id,
+            name: value
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            state: value
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            board_id,
+            goal: value
+                .get("goal")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+            start_date: value
+                .get("startDate")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+            end_date: value
+                .get("endDate")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+            complete_date: value
+                .get("completeDate")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned),
+        })
+    }
+
+    /// List project sprints for the given sprint states via the Agile API.
+    pub async fn list_sprints_for_project_with_states(
+        &self,
+        project_key: &str,
+        states: &[&str],
+    ) -> Result<Vec<Sprint>> {
         let boards_path =
             format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100");
         let boards_resp = self
@@ -818,51 +856,96 @@ impl JiraClient {
 
         let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
         let mut sprints: Vec<Sprint> = Vec::new();
+        let state_filter = states.join(",");
 
         for board_id in board_ids {
             let sprint_path = format!(
-                "/rest/agile/1.0/board/{board_id}/sprint?state=active,future&maxResults=200"
+                "/rest/agile/1.0/board/{board_id}/sprint?state={state_filter}&maxResults=200"
             );
             let Ok(Some(resp)) = self.raw_request("GET", &sprint_path, None).await else {
                 continue;
             };
             if let Some(values) = resp.get("values").and_then(|v| v.as_array()) {
-                for s in values {
-                    let id = s.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
-                    if id == 0 || !seen.insert(id) {
+                for value in values {
+                    let Some(sprint) = self.parse_sprint_value(value, Some(board_id)) else {
+                        continue;
+                    };
+                    if !seen.insert(sprint.id) {
                         continue;
                     }
-                    sprints.push(Sprint {
-                        id,
-                        name: s
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                        state: s
-                            .get("state")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string(),
-                        board_id: Some(board_id),
-                        start_date: s
-                            .get("startDate")
-                            .and_then(|v| v.as_str())
-                            .map(str::to_owned),
-                        end_date: s.get("endDate").and_then(|v| v.as_str()).map(str::to_owned),
-                    });
+                    sprints.push(sprint);
                 }
             }
         }
 
         sprints.sort_by(|a, b| {
-            let order = |s: &str| if s == "active" { 0u8 } else { 1u8 };
+            let order = |s: &str| match s {
+                "active" => 0u8,
+                "future" => 1u8,
+                _ => 2u8,
+            };
             order(&a.state)
                 .cmp(&order(&b.state))
                 .then(a.name.cmp(&b.name))
         });
 
         Ok(sprints)
+    }
+
+    /// List active and future sprints for a project via the Agile API.
+    pub async fn list_sprints_for_project(&self, project_key: &str) -> Result<Vec<Sprint>> {
+        self.list_sprints_for_project_with_states(project_key, &["active", "future"])
+            .await
+    }
+
+    /// Create a sprint on a Jira board.
+    pub async fn create_sprint(
+        &self,
+        board_id: u64,
+        name: &str,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        goal: Option<&str>,
+    ) -> Result<Sprint> {
+        let body = json!({
+            "name": name,
+            "originBoardId": board_id,
+            "startDate": start_date,
+            "endDate": end_date,
+            "goal": goal,
+        });
+        let value = self
+            .raw_request("POST", "/rest/agile/1.0/sprint", Some(body))
+            .await?
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Empty response when creating sprint".into(),
+            })?;
+        self.parse_sprint_value(&value, Some(board_id))
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Failed to parse created sprint".into(),
+            })
+    }
+
+    /// Update sprint metadata or lifecycle state.
+    pub async fn update_sprint(&self, sprint_id: u64, body: Value) -> Result<Sprint> {
+        let value = self
+            .raw_request(
+                "PUT",
+                &format!("/rest/agile/1.0/sprint/{sprint_id}"),
+                Some(body),
+            )
+            .await?
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Empty response when updating sprint".into(),
+            })?;
+        self.parse_sprint_value(&value, None)
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Failed to parse updated sprint".into(),
+            })
     }
 
     /// Add an issue to a sprint (Agile API).
@@ -2012,6 +2095,93 @@ mod tests {
         assert_eq!(sprints[0].id, 1);
         assert_eq!(sprints[0].state, "active");
         assert_eq!(sprints[59].id, 60);
+    }
+
+    #[tokio::test]
+    async fn create_sprint_posts_expected_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("POST"))
+            .and(path("/rest/agile/1.0/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "name": "Sprint 42",
+                "originBoardId": 7,
+                "startDate": "2026-05-20T00:00:00.000Z",
+                "endDate": "2026-05-27T00:00:00.000Z",
+                "goal": "Ship sprint lifecycle support"
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": 42,
+                "name": "Sprint 42",
+                "state": "future",
+                "goal": "Ship sprint lifecycle support",
+                "startDate": "2026-05-20T00:00:00.000Z",
+                "endDate": "2026-05-27T00:00:00.000Z"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprint = client
+            .create_sprint(
+                7,
+                "Sprint 42",
+                Some("2026-05-20T00:00:00.000Z"),
+                Some("2026-05-27T00:00:00.000Z"),
+                Some("Ship sprint lifecycle support"),
+            )
+            .await
+            .expect("create sprint should succeed");
+
+        assert_eq!(sprint.id, 42);
+        assert_eq!(sprint.board_id, Some(7));
+        assert_eq!(sprint.state, "future");
+        assert_eq!(
+            sprint.goal.as_deref(),
+            Some("Ship sprint lifecycle support")
+        );
+    }
+
+    #[tokio::test]
+    async fn update_sprint_puts_expected_payload() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/agile/1.0/sprint/42"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(body_json(json!({
+                "state": "active",
+                "startDate": "2026-05-20T00:00:00.000Z",
+                "endDate": "2026-05-27T00:00:00.000Z"
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": 42,
+                "name": "Sprint 42",
+                "state": "active",
+                "startDate": "2026-05-20T00:00:00.000Z",
+                "endDate": "2026-05-27T00:00:00.000Z"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprint = client
+            .update_sprint(
+                42,
+                json!({
+                    "state": "active",
+                    "startDate": "2026-05-20T00:00:00.000Z",
+                    "endDate": "2026-05-27T00:00:00.000Z"
+                }),
+            )
+            .await
+            .expect("update sprint should succeed");
+
+        assert_eq!(sprint.id, 42);
+        assert_eq!(sprint.state, "active");
     }
 
     #[tokio::test]

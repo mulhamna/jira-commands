@@ -13,7 +13,7 @@ use inquire::{MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
-        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, Issue,
+        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, Issue, Sprint,
         UpdateIssueRequest, UpdateProjectVersionRequest,
     },
     FieldCache, IssueType, JiraClient,
@@ -96,6 +96,102 @@ pub enum IssueCommand {
         #[arg(short, long, default_value = "100", value_name = "N")]
         limit: u32,
         /// Output the summary as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List project sprints and their lifecycle state
+    ///
+    /// Examples:
+    ///   jirac issue sprints -p PROJ
+    ///   jirac issue sprints -p PROJ --state active,future,closed
+    #[command(name = "sprints")]
+    Sprints {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Comma-separated sprint states: active,future,closed
+        #[arg(long, default_value = "active,future,closed", value_name = "STATES")]
+        state: String,
+        /// Output sprints as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Create a new sprint on a scrum board for the project
+    ///
+    /// Examples:
+    ///   jirac issue sprint-create -p PROJ --name "Sprint 24"
+    ///   jirac issue sprint-create -p PROJ --name "Sprint 24" --board-id 12 --goal "Stabilize release" --start-date 2026-05-20 --end-date 2026-06-03
+    #[command(name = "sprint-create")]
+    SprintCreate {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name
+        #[arg(long, value_name = "NAME")]
+        name: String,
+        /// Scrum board ID. Required only when the project maps to multiple boards.
+        #[arg(long, value_name = "BOARD_ID")]
+        board_id: Option<u64>,
+        /// Optional sprint goal
+        #[arg(long, value_name = "TEXT")]
+        goal: Option<String>,
+        /// Optional planned sprint start date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        start_date: Option<String>,
+        /// Optional planned sprint end date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        end_date: Option<String>,
+        /// Output the created sprint as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Start a future sprint
+    ///
+    /// Examples:
+    ///   jirac issue sprint-start -p PROJ --sprint "Sprint 24" --end-date 2026-06-03
+    ///   jirac issue sprint-start -p PROJ --sprint 42 --start-date 2026-05-20 --end-date 2026-06-03
+    #[command(name = "sprint-start")]
+    SprintStart {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name or numeric sprint ID
+        #[arg(long, value_name = "SPRINT")]
+        sprint: String,
+        /// Sprint start date (YYYY-MM-DD). Defaults to today (UTC).
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        start_date: Option<String>,
+        /// Sprint end date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        end_date: String,
+        /// Optional sprint goal override
+        #[arg(long, value_name = "TEXT")]
+        goal: Option<String>,
+        /// Output the updated sprint as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Complete/close an active sprint
+    ///
+    /// Examples:
+    ///   jirac issue sprint-complete -p PROJ --sprint "Sprint 24"
+    ///   jirac issue sprint-complete -p PROJ --sprint 42 --complete-date 2026-06-03
+    #[command(name = "sprint-complete")]
+    SprintComplete {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name or numeric sprint ID
+        #[arg(long, value_name = "SPRINT")]
+        sprint: String,
+        /// Completion date (YYYY-MM-DD). Defaults to today (UTC).
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        complete_date: Option<String>,
+        /// Output the updated sprint as JSON
         #[arg(long)]
         json: bool,
     },
@@ -968,6 +1064,66 @@ pub async fn handle(
             limit,
             json,
         } => sprint_summary(client, project.or(default_project), sprint, limit, json).await,
+        IssueCommand::Sprints {
+            project,
+            state,
+            json,
+        } => list_sprints(client, project.or(default_project), state, json).await,
+        IssueCommand::SprintCreate {
+            project,
+            name,
+            board_id,
+            goal,
+            start_date,
+            end_date,
+            json,
+        } => {
+            create_sprint(
+                client,
+                project.or(default_project),
+                name,
+                board_id,
+                goal,
+                start_date,
+                end_date,
+                json,
+            )
+            .await
+        }
+        IssueCommand::SprintStart {
+            project,
+            sprint,
+            start_date,
+            end_date,
+            goal,
+            json,
+        } => {
+            start_sprint(
+                client,
+                project.or(default_project),
+                sprint,
+                start_date,
+                end_date,
+                goal,
+                json,
+            )
+            .await
+        }
+        IssueCommand::SprintComplete {
+            project,
+            sprint,
+            complete_date,
+            json,
+        } => {
+            sprint_complete(
+                client,
+                project.or(default_project),
+                sprint,
+                complete_date,
+                json,
+            )
+            .await
+        }
         IssueCommand::Notifications {
             project,
             since,
@@ -1699,6 +1855,163 @@ async fn view_project_versions(
     Ok(())
 }
 
+async fn list_sprints(
+    client: JiraClient,
+    project: Option<String>,
+    state: String,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let states = parse_sprint_states(&state)?;
+    let sprints = client
+        .list_sprints_for_project_with_states(&project_key, &states)
+        .await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&sprints)?);
+        return Ok(());
+    }
+
+    if sprints.is_empty() {
+        println!("No sprints found for {} [{}].", project_key, state);
+        return Ok(());
+    }
+
+    println!("Project sprints — {}", project_key);
+    println!();
+    for sprint in &sprints {
+        print_sprint_metadata(sprint, true);
+    }
+    Ok(())
+}
+
+async fn create_sprint(
+    client: JiraClient,
+    project: Option<String>,
+    name: String,
+    board_id: Option<u64>,
+    goal: Option<String>,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let board_id = resolve_board_id_for_project(&client, &project_key, board_id).await?;
+    let start_date = start_date
+        .as_deref()
+        .map(|value| validate_ymd_date(value, "sprint start date"))
+        .transpose()?;
+    let end_date = end_date
+        .as_deref()
+        .map(|value| validate_ymd_date(value, "sprint end date"))
+        .transpose()?;
+    let start_ts = start_date
+        .as_deref()
+        .map(ymd_to_jira_datetime)
+        .transpose()?;
+    let end_ts = end_date.as_deref().map(ymd_to_jira_datetime).transpose()?;
+    let normalized_goal = normalize_optional_text(goal.as_deref());
+    let created = client
+        .create_sprint(
+            board_id,
+            name.trim(),
+            start_ts.as_deref(),
+            end_ts.as_deref(),
+            normalized_goal.as_deref(),
+        )
+        .await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&created)?);
+        return Ok(());
+    }
+
+    println!("✓ Created sprint — {} / board {}", project_key, board_id);
+    print_sprint_metadata(&created, false);
+    Ok(())
+}
+
+async fn start_sprint(
+    client: JiraClient,
+    project: Option<String>,
+    sprint: String,
+    start_date: Option<String>,
+    end_date: String,
+    goal: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let sprint_meta = resolve_sprint_for_project(&client, &project_key, &sprint).await?;
+    let start_date = match start_date {
+        Some(value) => validate_ymd_date(&value, "sprint start date")?,
+        None => Utc::now().date_naive().format("%Y-%m-%d").to_string(),
+    };
+    let end_date = validate_ymd_date(&end_date, "sprint end date")?;
+    let start_ts = ymd_to_jira_datetime(&start_date)?;
+    let end_ts = ymd_to_jira_datetime(&end_date)?;
+    let mut body = serde_json::json!({
+        "state": "active",
+        "startDate": start_ts,
+        "endDate": end_ts,
+    });
+    if let Some(goal) =
+        normalize_optional_text(goal.as_deref()).or_else(|| sprint_meta.goal.clone())
+    {
+        body["goal"] = Value::String(goal);
+    }
+    let updated = client.update_sprint(sprint_meta.id, body).await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&updated)?);
+        return Ok(());
+    }
+
+    println!("✓ Started sprint — {}", project_key);
+    print_sprint_metadata(&updated, false);
+    Ok(())
+}
+
+async fn sprint_complete(
+    client: JiraClient,
+    project: Option<String>,
+    sprint: String,
+    complete_date: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let sprint_meta = resolve_sprint_for_project(&client, &project_key, &sprint).await?;
+    let complete_date = match complete_date {
+        Some(value) => validate_ymd_date(&value, "sprint complete date")?,
+        None => Utc::now().date_naive().format("%Y-%m-%d").to_string(),
+    };
+    let complete_ts = ymd_to_jira_datetime(&complete_date)?;
+    let mut body = serde_json::json!({
+        "state": "closed",
+        "completeDate": complete_ts.clone(),
+    });
+    if let Some(end_date) = sprint_meta
+        .end_date
+        .clone()
+        .or_else(|| Some(complete_ts.clone()))
+    {
+        body["endDate"] = Value::String(end_date);
+    }
+    let updated = client.update_sprint(sprint_meta.id, body).await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&updated)?);
+        return Ok(());
+    }
+
+    println!("✓ Completed sprint — {}", project_key);
+    print_sprint_metadata(&updated, false);
+    Ok(())
+}
+
 fn print_project_version_metadata(
     project_key: &str,
     version: &jira_core::model::ProjectVersion,
@@ -1736,6 +2049,192 @@ fn validate_ymd_date(value: &str, label: &str) -> Result<String> {
         anyhow::anyhow!("Invalid {} '{}'. Expected format: YYYY-MM-DD", label, value)
     })?;
     Ok(value.to_string())
+}
+
+fn ymd_to_jira_datetime(value: &str) -> Result<String> {
+    let date = NaiveDate::parse_from_str(value.trim(), "%Y-%m-%d").map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid sprint date '{}'. Expected format: YYYY-MM-DD",
+            value.trim()
+        )
+    })?;
+    Ok(format!("{}T00:00:00.000Z", date.format("%Y-%m-%d")))
+}
+
+fn parse_sprint_states(value: &str) -> Result<Vec<&str>> {
+    let mut states = Vec::new();
+    for state in value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        match state {
+            "active" | "future" | "closed" => states.push(state),
+            other => anyhow::bail!(
+                "Unsupported sprint state '{}'. Use a comma-separated subset of: active,future,closed",
+                other
+            ),
+        }
+    }
+    if states.is_empty() {
+        anyhow::bail!("At least one sprint state is required")
+    }
+    Ok(states)
+}
+
+fn print_sprint_metadata(sprint: &Sprint, bullet: bool) {
+    let prefix = if bullet { "  •" } else { "  " };
+    let board = sprint
+        .board_id
+        .map(|id| format!(" | board {id}"))
+        .unwrap_or_default();
+    println!(
+        "{prefix} {} [id:{} | {}{}]",
+        sprint.name, sprint.id, sprint.state, board
+    );
+    if let Some(goal) = sprint
+        .goal
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        println!("    goal: {goal}");
+    }
+    if let Some(start) = sprint.start_date.as_deref() {
+        println!("    start: {}", &start[..10.min(start.len())]);
+    }
+    if let Some(end) = sprint.end_date.as_deref() {
+        println!("    end:   {}", &end[..10.min(end.len())]);
+    }
+    if let Some(complete) = sprint.complete_date.as_deref() {
+        println!("    done:  {}", &complete[..10.min(complete.len())]);
+    }
+}
+
+async fn resolve_board_id_for_project(
+    client: &JiraClient,
+    project_key: &str,
+    requested_board_id: Option<u64>,
+) -> Result<u64> {
+    let boards = client
+        .raw_request(
+            "GET",
+            &format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100"),
+            None,
+        )
+        .await
+        .context("Failed to list boards for sprint creation")?
+        .unwrap_or(Value::Null);
+
+    let board_values = boards
+        .get("values")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            anyhow::anyhow!("Unexpected board response while resolving project board")
+        })?;
+
+    let boards = board_values
+        .iter()
+        .filter_map(|board| {
+            Some((
+                board.get("id").and_then(Value::as_u64)?,
+                board
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Unnamed board")
+                    .to_string(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    if boards.is_empty() {
+        anyhow::bail!("No sprint-enabled boards found for project {}", project_key);
+    }
+
+    if let Some(board_id) = requested_board_id {
+        if boards.iter().any(|(id, _)| *id == board_id) {
+            return Ok(board_id);
+        }
+        let options = boards
+            .iter()
+            .map(|(id, name)| format!("{name} ({id})"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "Board {} is not available for project {}. Available boards: {}",
+            board_id,
+            project_key,
+            options
+        )
+    }
+
+    if boards.len() == 1 {
+        return Ok(boards[0].0);
+    }
+
+    let options = boards
+        .iter()
+        .map(|(id, name)| format!("{name} ({id})"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    anyhow::bail!(
+        "Project {} maps to multiple boards. Re-run with --board-id. Available boards: {}",
+        project_key,
+        options
+    )
+}
+
+async fn resolve_sprint_for_project(
+    client: &JiraClient,
+    project_key: &str,
+    sprint: &str,
+) -> Result<Sprint> {
+    let sprints = client
+        .list_sprints_for_project_with_states(project_key, &["active", "future", "closed"])
+        .await
+        .context("Failed to list project sprints")?;
+
+    if let Ok(id) = sprint.trim().parse::<u64>() {
+        return sprints
+            .into_iter()
+            .find(|item| item.id == id)
+            .ok_or_else(|| {
+                anyhow::anyhow!("Sprint id {} was not found in project {}", id, project_key)
+            });
+    }
+
+    let matches = sprints
+        .into_iter()
+        .filter(|item| item.name.eq_ignore_ascii_case(sprint.trim()))
+        .collect::<Vec<_>>();
+
+    match matches.len() {
+        0 => anyhow::bail!(
+            "Sprint '{}' was not found on any sprint-enabled board for project {}",
+            sprint,
+            project_key
+        ),
+        1 => Ok(matches.into_iter().next().expect("single sprint match")),
+        _ => {
+            let options = matches
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{} (id:{}, board:{})",
+                        item.name,
+                        item.id,
+                        item.board_id.unwrap_or_default()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            anyhow::bail!(
+                "Sprint '{}' matched multiple sprints. Use a numeric sprint ID instead: {}",
+                sprint,
+                options
+            )
+        }
+    }
 }
 
 fn normalize_optional_text(value: Option<&str>) -> Option<String> {

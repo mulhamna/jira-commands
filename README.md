@@ -141,7 +141,9 @@ jirac issue sprint-summary -p PROJ                   # current sprint summary
 jirac issue sprints -p PROJ                          # list project sprints
 jirac issue sprint-create -p PROJ --name "Sprint 24" --board-id 12
 jirac issue sprint-start -p PROJ --sprint "Sprint 24" --end-date 2026-06-03
+jirac issue sprint-update -p PROJ --sprint "Sprint 24" --name "Sprint 24A" --end-date 2026-06-04
 jirac issue sprint-complete -p PROJ --sprint "Sprint 24"
+jirac issue sprint-delete -p PROJ --sprint "Sprint 24A" --force
 
 jirac issue view PROJ-123                           # view detail
 jirac issue view PROJ-123 --versions                # include fix-version backlog preview

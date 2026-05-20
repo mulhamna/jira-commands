@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use clap::Subcommand;
 use indicatif::{ProgressBar, ProgressStyle};
-use inquire::{MultiSelect, Select, Text};
+use inquire::{Confirm, MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
@@ -194,6 +194,62 @@ pub enum IssueCommand {
         /// Output the updated sprint as JSON
         #[arg(long)]
         json: bool,
+    },
+
+    /// Update sprint metadata like name, goal, or planned dates
+    ///
+    /// Examples:
+    ///   jirac issue sprint-update -p PROJ --sprint "Sprint 24" --name "Sprint 24A"
+    ///   jirac issue sprint-update -p PROJ --sprint 42 --goal "Ship polish" --start-date 2026-05-20 --end-date 2026-06-03
+    #[command(name = "sprint-update")]
+    SprintUpdate {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name or numeric sprint ID
+        #[arg(long, value_name = "SPRINT")]
+        sprint: String,
+        /// Rename the sprint
+        #[arg(long, value_name = "NAME")]
+        name: Option<String>,
+        /// Set or replace the sprint goal
+        #[arg(long, value_name = "TEXT")]
+        goal: Option<String>,
+        /// Clear the sprint goal
+        #[arg(long, conflicts_with = "goal")]
+        clear_goal: bool,
+        /// Set or replace the sprint start date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        start_date: Option<String>,
+        /// Clear the sprint start date
+        #[arg(long, conflicts_with = "start_date")]
+        clear_start_date: bool,
+        /// Set or replace the sprint end date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        end_date: Option<String>,
+        /// Clear the sprint end date
+        #[arg(long, conflicts_with = "end_date")]
+        clear_end_date: bool,
+        /// Output the updated sprint as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Delete a sprint permanently
+    ///
+    /// Examples:
+    ///   jirac issue sprint-delete -p PROJ --sprint "Sprint 24" --force
+    #[command(name = "sprint-delete")]
+    SprintDelete {
+        /// Project key (e.g. PROJ). Defaults to configured project when present.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Sprint name or numeric sprint ID
+        #[arg(long, value_name = "SPRINT")]
+        sprint: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
     },
 
     /// Scan recent Jira @mentions from issue descriptions and comments
@@ -1124,6 +1180,34 @@ pub async fn handle(
             )
             .await
         }
+        IssueCommand::SprintUpdate {
+            project,
+            sprint,
+            name,
+            goal,
+            clear_goal,
+            start_date,
+            clear_start_date,
+            end_date,
+            clear_end_date,
+            json,
+        } => {
+            let update = SprintUpdateArgs {
+                name,
+                goal,
+                clear_goal,
+                start_date,
+                clear_start_date,
+                end_date,
+                clear_end_date,
+            };
+            update_sprint_command(client, project.or(default_project), sprint, update, json).await
+        }
+        IssueCommand::SprintDelete {
+            project,
+            sprint,
+            force,
+        } => sprint_delete(client, project.or(default_project), sprint, force).await,
         IssueCommand::Notifications {
             project,
             since,
@@ -1701,6 +1785,73 @@ impl ProjectVersionUpdateArgs {
     }
 }
 
+struct SprintUpdateArgs {
+    name: Option<String>,
+    goal: Option<String>,
+    clear_goal: bool,
+    start_date: Option<String>,
+    clear_start_date: bool,
+    end_date: Option<String>,
+    clear_end_date: bool,
+}
+
+impl SprintUpdateArgs {
+    fn has_changes(&self) -> bool {
+        self.name.is_some()
+            || self.goal.is_some()
+            || self.clear_goal
+            || self.start_date.is_some()
+            || self.clear_start_date
+            || self.end_date.is_some()
+            || self.clear_end_date
+    }
+
+    fn to_request(&self) -> Result<Value> {
+        let mut body = serde_json::Map::new();
+
+        if let Some(name) = self
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            body.insert("name".into(), Value::String(name.to_string()));
+        }
+
+        if self.clear_goal {
+            body.insert("goal".into(), Value::String(String::new()));
+        } else if let Some(goal) = normalize_optional_text(self.goal.as_deref()) {
+            body.insert("goal".into(), Value::String(goal));
+        }
+
+        if self.clear_start_date {
+            body.insert("startDate".into(), Value::String(String::new()));
+        } else if let Some(value) = self.start_date.as_deref() {
+            body.insert(
+                "startDate".into(),
+                Value::String(ymd_to_jira_datetime(&validate_ymd_date(
+                    value,
+                    "sprint start date",
+                )?)?),
+            );
+        }
+
+        if self.clear_end_date {
+            body.insert("endDate".into(), Value::String(String::new()));
+        } else if let Some(value) = self.end_date.as_deref() {
+            body.insert(
+                "endDate".into(),
+                Value::String(ymd_to_jira_datetime(&validate_ymd_date(
+                    value,
+                    "sprint end date",
+                )?)?),
+            );
+        }
+
+        Ok(Value::Object(body))
+    }
+}
+
 async fn view_project_versions(
     client: JiraClient,
     project: Option<String>,
@@ -2010,6 +2161,65 @@ async fn sprint_complete(
 
     println!("✓ Completed sprint — {}", project_key);
     print_sprint_metadata(&updated, false);
+    Ok(())
+}
+
+async fn update_sprint_command(
+    client: JiraClient,
+    project: Option<String>,
+    sprint: String,
+    update: SprintUpdateArgs,
+    json: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    if !update.has_changes() {
+        anyhow::bail!(
+            "Sprint update requires at least one change flag like --name, --goal, --start-date, or --end-date"
+        );
+    }
+    let sprint_meta = resolve_sprint_for_project(&client, &project_key, &sprint).await?;
+    let updated = client
+        .update_sprint(sprint_meta.id, update.to_request()?)
+        .await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&updated)?);
+        return Ok(());
+    }
+
+    println!("✓ Updated sprint — {}", project_key);
+    print_sprint_metadata(&updated, false);
+    Ok(())
+}
+
+async fn sprint_delete(
+    client: JiraClient,
+    project: Option<String>,
+    sprint: String,
+    force: bool,
+) -> Result<()> {
+    let project_key = project
+        .context("Project key is required. Pass --project or configure a default project.")?;
+    let sprint_meta = resolve_sprint_for_project(&client, &project_key, &sprint).await?;
+    if !force {
+        let confirmed = Confirm::new(&format!(
+            "Delete sprint '{}' (id:{}) in project {}? This cannot be undone.",
+            sprint_meta.name, sprint_meta.id, project_key
+        ))
+        .with_default(false)
+        .prompt()
+        .context("Sprint delete confirmation aborted")?;
+        if !confirmed {
+            println!("Canceled sprint deletion.");
+            return Ok(());
+        }
+    }
+    client.delete_sprint(sprint_meta.id).await?;
+    println!(
+        "✓ Deleted sprint — {} / {} (id:{})",
+        project_key, sprint_meta.name, sprint_meta.id
+    );
     Ok(())
 }
 

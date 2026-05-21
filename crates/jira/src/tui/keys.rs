@@ -39,10 +39,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         Mode::ComponentPicker => handle_component_picker_key(app, code),
         Mode::FixVersionPicker => handle_fix_version_picker_key(app, code),
         Mode::SprintPicker => handle_sprint_picker_key(app, code),
-        Mode::Help => {
-            app.mode = Mode::Browse;
-            AppAction::None
-        }
+        Mode::Help => handle_help_key(app, code),
         Mode::SavedJqlPicker => handle_saved_jql_key(app, code),
         Mode::ThemePicker => handle_theme_picker_key(app, code),
         Mode::ServerInfo | Mode::ConfigView => {
@@ -294,6 +291,41 @@ fn next_word_boundary(s: &str, cursor: usize) -> usize {
         i += 1;
     }
     i
+}
+
+fn handle_help_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.help_scroll = app.help_scroll.saturating_sub(1);
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.help_scroll = app.help_scroll.saturating_add(1);
+            AppAction::None
+        }
+        KeyCode::PageUp => {
+            app.help_scroll = app.help_scroll.saturating_sub(10);
+            AppAction::None
+        }
+        KeyCode::PageDown => {
+            app.help_scroll = app.help_scroll.saturating_add(10);
+            AppAction::None
+        }
+        KeyCode::Home => {
+            app.help_scroll = 0;
+            AppAction::None
+        }
+        KeyCode::End => {
+            app.help_scroll = u16::MAX; // clamped to max_scroll in render
+            AppAction::None
+        }
+        // Any other key closes Help. Reset scroll so next open starts at top.
+        _ => {
+            app.help_scroll = 0;
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+    }
 }
 
 fn handle_search_key(app: &mut App, event: KeyEvent) -> AppAction {

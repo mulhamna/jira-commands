@@ -86,6 +86,22 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 }
             }
 
+            // Footer notifications badge — synth `n` (only present when unread > 0).
+            if let Some(rect) = app.hit_zones.notif_button {
+                if contains(&rect, col, row) {
+                    return synth_press(app, KeyCode::Char('n'));
+                }
+            }
+
+            // Footer help button — synth `?`. Note: in Mode::Browse this opens
+            // the help overlay; in other modes the keypress is mostly ignored,
+            // which matches keyboard behaviour.
+            if let Some(rect) = app.hit_zones.help_button {
+                if contains(&rect, col, row) {
+                    return synth_press(app, KeyCode::Char('?'));
+                }
+            }
+
             // Modal form field click → focus that field.
             if app.mode == Mode::Modal {
                 if let Some(modal) = app.modal.as_mut() {
@@ -256,6 +272,15 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
             AppAction::None
         }
         MouseEventKind::ScrollUp => {
+            // Wheel over the Help popup → scroll up.
+            if app.mode == Mode::Help {
+                if let Some(popup) = app.hit_zones.popup {
+                    if contains(&popup, col, row) {
+                        app.help_scroll = app.help_scroll.saturating_sub(3);
+                        return AppAction::None;
+                    }
+                }
+            }
             // Wheel over a picker → move selection up.
             if let Some(picker) = app.hit_zones.picker {
                 if contains(&picker.area, col, row) {
@@ -272,6 +297,14 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
             AppAction::None
         }
         MouseEventKind::ScrollDown => {
+            if app.mode == Mode::Help {
+                if let Some(popup) = app.hit_zones.popup {
+                    if contains(&popup, col, row) {
+                        app.help_scroll = app.help_scroll.saturating_add(3);
+                        return AppAction::None;
+                    }
+                }
+            }
             if let Some(picker) = app.hit_zones.picker {
                 if contains(&picker.area, col, row) {
                     return synth_press(app, KeyCode::Down);

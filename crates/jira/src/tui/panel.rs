@@ -93,6 +93,11 @@ pub(super) struct HitZones {
     pub(super) splitter: Option<Rect>,
     /// Full master-detail area. Needed to recompute split percentage on drag.
     pub(super) master_detail_area: Option<Rect>,
+    /// Footer "[?]" help button. Click synthesizes a `?` keypress.
+    pub(super) help_button: Option<Rect>,
+    /// Footer "[🔔 n]" notifications button — only set when unread > 0.
+    /// Click synthesizes an `n` keypress.
+    pub(super) notif_button: Option<Rect>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -114,6 +119,8 @@ impl HitZones {
         self.popup = None;
         self.splitter = None;
         self.master_detail_area = None;
+        self.help_button = None;
+        self.notif_button = None;
     }
 }
 

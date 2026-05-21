@@ -173,6 +173,8 @@ pub(super) struct App {
     pub(super) split_pct: u16,
     /// True while the user is mid-drag on the vertical splitter.
     pub(super) dragging_splitter: bool,
+    /// Vertical scroll offset (in lines) for the Help popup.
+    pub(super) help_scroll: u16,
 }
 
 pub(super) enum AppAction {
@@ -348,6 +350,7 @@ impl App {
             last_click: None,
             split_pct,
             dragging_splitter: false,
+            help_scroll: 0,
         }
     }
 

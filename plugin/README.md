@@ -7,9 +7,9 @@ This plugin is versioned and released independently from the main CLI/MCP worksp
 
 > **jirac** is an independent Claude Code plugin for the Jira ecosystem. Not affiliated with or endorsed by Atlassian.
 
-> **Requires** the `jirac` CLI to be installed: `cargo install jira-commands`
+> **Requires** the `jirac` CLI to be installed: `cargo install jira-commands` (crates.io) or `cargo install --path crates/jira --locked` from a local checkout.
 >
-> You can also install `jirac` from the workspace shell installer on macOS/Linux, the PowerShell installer on Windows, or GitHub Releases.
+> You can also install `jirac` from Homebrew (`brew install mulhamna/tap/jira-commands`), npm (`npm install -g @mulham28/jirac`), the workspace shell installer on macOS/Linux, the PowerShell installer on Windows, or GitHub Releases.
 >
 > **Compatibility note:** the next release requires `jirac`. If you still have old scripts or aliases that call `jira`, update them before upgrading.
 
@@ -55,6 +55,14 @@ jirac auth login
 | `/jira:jql` | Build and run a JQL query interactively |
 | `/jira:daily-standup` | Generate a markdown-ready daily standup summary from assigned Jira issues |
 | `/jira:sprint-summary` | Summarize the current or named sprint by status and assignee |
+| `/jira:sprint-lifecycle` | List, create, start, complete, update, or delete sprints on a project board |
+| `/jira:notifications` | Scan recent Jira `@mention` events from descriptions and comments |
+| `/jira:versions` | Browse project fix versions, backlog previews, and version metadata |
+| `/jira:render` | Preview Markdown → Jira ADF conversion before posting descriptions or comments |
+| `/jira:link` | Manage issue links (Blocks, Relates, Duplicates, etc.) |
+| `/jira:change-type` | Change an issue's type within the same project (native Jira move semantics) |
+| `/jira:move-issue` | Move an issue across projects (native Jira move; history preserved, key changes) |
+| `/jira:archive` | Archive issues matching a JQL query (destructive — confirm first) |
 | `/jira:api` | Execute any raw Jira REST API call (GET, POST, PUT, DELETE, PATCH) |
 
 ---

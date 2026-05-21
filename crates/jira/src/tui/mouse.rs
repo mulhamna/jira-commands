@@ -77,6 +77,46 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 .unwrap_or(false);
             app.last_click = Some((now, col, row));
 
+            // Splitter grab — start drag. Checked first so it wins over the
+            // adjacent list/detail panes that share the border column.
+            if let Some(splitter) = app.hit_zones.splitter {
+                if contains(&splitter, col, row) {
+                    app.dragging_splitter = true;
+                    return AppAction::None;
+                }
+            }
+
+            // Footer notifications badge — synth `n` (only present when unread > 0).
+            if let Some(rect) = app.hit_zones.notif_button {
+                if contains(&rect, col, row) {
+                    return synth_press(app, KeyCode::Char('n'));
+                }
+            }
+
+            // Footer help button — synth `?`. Note: in Mode::Browse this opens
+            // the help overlay; in other modes the keypress is mostly ignored,
+            // which matches keyboard behaviour.
+            if let Some(rect) = app.hit_zones.help_button {
+                if contains(&rect, col, row) {
+                    return synth_press(app, KeyCode::Char('?'));
+                }
+            }
+
+            // Modal form field click → focus that field.
+            if app.mode == Mode::Modal {
+                if let Some(modal) = app.modal.as_mut() {
+                    for (idx, rect) in modal.field_rects.iter().enumerate() {
+                        if contains(rect, col, row) {
+                            modal.focus = idx;
+                            return AppAction::None;
+                        }
+                    }
+                }
+                // Click anywhere else inside an open modal: swallow so we don't
+                // accidentally trigger list/detail handlers behind the popup.
+                return AppAction::None;
+            }
+
             // Picker option click — dispatch per-mode.
             if let Some(picker) = app.hit_zones.picker {
                 if let Some(idx) = picker.row_to_index(row) {
@@ -209,7 +249,38 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
 
             AppAction::None
         }
+        MouseEventKind::Drag(MouseButton::Left) => {
+            if app.dragging_splitter {
+                if let Some(area) = app.hit_zones.master_detail_area {
+                    if area.width > 0 && col >= area.x {
+                        let rel = (col - area.x) as u32;
+                        let pct = (rel * 100 / area.width as u32) as u16;
+                        app.split_pct = pct.clamp(20, 80);
+                    }
+                }
+            }
+            AppAction::None
+        }
+        MouseEventKind::Up(MouseButton::Left) => {
+            if app.dragging_splitter {
+                app.dragging_splitter = false;
+                if app.prefs.split_pct != app.split_pct {
+                    app.prefs.split_pct = app.split_pct;
+                    let _ = app.prefs.save();
+                }
+            }
+            AppAction::None
+        }
         MouseEventKind::ScrollUp => {
+            // Wheel over the Help popup → scroll up.
+            if app.mode == Mode::Help {
+                if let Some(popup) = app.hit_zones.popup {
+                    if contains(&popup, col, row) {
+                        app.help_scroll = app.help_scroll.saturating_sub(3);
+                        return AppAction::None;
+                    }
+                }
+            }
             // Wheel over a picker → move selection up.
             if let Some(picker) = app.hit_zones.picker {
                 if contains(&picker.area, col, row) {
@@ -226,6 +297,14 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
             AppAction::None
         }
         MouseEventKind::ScrollDown => {
+            if app.mode == Mode::Help {
+                if let Some(popup) = app.hit_zones.popup {
+                    if contains(&popup, col, row) {
+                        app.help_scroll = app.help_scroll.saturating_add(3);
+                        return AppAction::None;
+                    }
+                }
+            }
             if let Some(picker) = app.hit_zones.picker {
                 if contains(&picker.area, col, row) {
                     return synth_press(app, KeyCode::Down);

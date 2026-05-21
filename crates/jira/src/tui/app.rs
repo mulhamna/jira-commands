@@ -10,7 +10,10 @@ use crate::notifications::{
 };
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -166,6 +169,12 @@ pub(super) struct App {
     pub(super) hit_zones: HitZones,
     /// (when, column, row) of the last left-click. Used to detect double-click.
     pub(super) last_click: Option<(Instant, u16, u16)>,
+    /// Master-detail split percentage [20, 80]. Width of list pane as % of total.
+    pub(super) split_pct: u16,
+    /// True while the user is mid-drag on the vertical splitter.
+    pub(super) dragging_splitter: bool,
+    /// Vertical scroll offset (in lines) for the Help popup.
+    pub(super) help_scroll: u16,
 }
 
 pub(super) enum AppAction {
@@ -259,6 +268,7 @@ impl App {
 
     fn new(jql: String, base_url: String, default_project: Option<String>) -> Self {
         let prefs = TuiPreferences::load();
+        let split_pct = prefs.split_pct;
         let mut column_picker_state = ListState::default();
         column_picker_state.select(Some(0));
         let mut saved_jql_state = ListState::default();
@@ -338,6 +348,9 @@ impl App {
             notification_entries: Vec::new(),
             hit_zones: HitZones::default(),
             last_click: None,
+            split_pct,
+            dragging_splitter: false,
+            help_scroll: 0,
         }
     }
 
@@ -802,6 +815,16 @@ pub async fn run_tui(
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // Best-effort: ask for Kitty keyboard protocol so SUPER (Cmd) modifier and
+    // distinct shifted keys reach the app. Terminals that don't implement it
+    // ignore the sequence — failure is silent on purpose.
+    let _ = execute!(
+        stdout,
+        PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+        )
+    );
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -2764,6 +2787,9 @@ pub async fn run_tui(
     }
 
     disable_raw_mode()?;
+    // Pop only if we successfully pushed (silent failure either way — pairs
+    // with the best-effort push above).
+    let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,

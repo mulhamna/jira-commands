@@ -86,6 +86,8 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
     );
     f.render_widget(header, chunks[0]);
     render_footer(f, app, chunks[2], palette);
+    // Footer buttons are recorded into hit_zones after the footer text is laid
+    // out — see the end of render_footer.
 
     match app.mode {
         Mode::Browse => render_browse(f, app, chunks[1], palette),
@@ -99,7 +101,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         }
         Mode::Help => {
             render_browse(f, app, chunks[1], palette);
-            let popup = render_help_popup(f, size, palette);
+            let popup = render_help_popup(f, size, palette, app.help_scroll);
             app.hit_zones.popup = Some(popup);
         }
         Mode::ProjectVersionBrowser => {
@@ -154,7 +156,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
     }
 }
 
-fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
+fn render_footer(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let text = match &app.mode {
         Mode::Browse if app.focus == Focus::Detail => {
             " ↑/↓:scroll  PgUp/PgDn:fast scroll  Home:top  ←/→:tab  Esc:back  t:transition  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  m:comps  v:versions  u:upload  o:browser  ?:help  q:quit"
@@ -204,10 +206,67 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect, palette: Palette) {
         return;
     }
 
+    // Split the footer row: hint text fills the left side, two button rects
+    // sit at the right edge so they can be hit-tested by the mouse handler.
+    let unread = app.notification_entries.iter().filter(|e| !e.read).count();
+    let help_label = " [?] ";
+    let notif_label = format!(" [🔔 {unread}] ");
+    let help_w = help_label.chars().count() as u16;
+    // emoji + digits — use string width approximation via char count + 1 for
+    // the 2-cell wide bell glyph. Conservative: pad by 1.
+    let notif_w = (notif_label.chars().count() as u16).saturating_add(1);
+
+    let mut buttons_w = help_w;
+    if unread > 0 {
+        buttons_w = buttons_w.saturating_add(notif_w);
+    }
+
+    // Reserve room for the buttons; everything else is hint text.
+    let text_w = area.width.saturating_sub(buttons_w);
+    let text_rect = Rect {
+        x: area.x,
+        y: area.y,
+        width: text_w,
+        height: area.height,
+    };
+
     let footer = Paragraph::new(text)
         .style(Style::default().fg(palette.muted))
         .wrap(Wrap { trim: false });
-    f.render_widget(footer, area);
+    f.render_widget(footer, text_rect);
+
+    // Right-align: help button is rightmost, notif button (if any) sits just
+    // to its left.
+    let help_rect = Rect {
+        x: area.x.saturating_add(area.width).saturating_sub(help_w),
+        y: area.y,
+        width: help_w,
+        height: 1,
+    };
+    f.render_widget(
+        Paragraph::new(help_label).style(
+            Style::default()
+                .fg(palette.tab_active)
+                .add_modifier(Modifier::BOLD),
+        ),
+        help_rect,
+    );
+    app.hit_zones.help_button = Some(help_rect);
+
+    if unread > 0 {
+        let notif_rect = Rect {
+            x: help_rect.x.saturating_sub(notif_w),
+            y: area.y,
+            width: notif_w,
+            height: 1,
+        };
+        let notif_style = Style::default()
+            .fg(Color::Black)
+            .bg(Color::Yellow)
+            .add_modifier(Modifier::BOLD);
+        f.render_widget(Paragraph::new(notif_label).style(notif_style), notif_rect);
+        app.hit_zones.notif_button = Some(notif_rect);
+    }
 }
 
 fn render_browse(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
@@ -219,10 +278,24 @@ fn render_browse(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
 }
 
 fn render_master_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let pct = app.split_pct.clamp(20, 80);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
+        .constraints([
+            Constraint::Percentage(pct),
+            Constraint::Percentage(100 - pct),
+        ])
         .split(area);
+    app.hit_zones.master_detail_area = Some(area);
+    // Splitter = rightmost column of the list pane (where the border is drawn).
+    // Width 1, full height. Mouse hit-tests + drag updates split_pct.
+    let splitter_x = cols[0].x.saturating_add(cols[0].width).saturating_sub(1);
+    app.hit_zones.splitter = Some(Rect {
+        x: splitter_x,
+        y: area.y,
+        width: 1,
+        height: area.height,
+    });
     render_list(f, app, cols[0], palette);
     render_detail(f, app, cols[1], palette);
 }
@@ -1399,15 +1472,21 @@ fn render_text_popup(
     popup_area
 }
 
-fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
+fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset: u16) -> Rect {
     let popup_area = centered_rect(70, 95, area);
 
-    let lines = vec![
+    // Header (rendered separately, always at top of popup).
+    let header_lines: Vec<Line<'static>> = vec![
         Line::from(Span::styled(
             "Keyboard Shortcuts",
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
+    ];
+
+    // Sections — each is rendered atomically (never split across columns).
+    // Order matters: first section ends up in first column.
+    let issue_list_section: Vec<Line<'static>> = vec![
         Line::from(Span::styled(
             "Issue List:",
             Style::default().fg(palette.tab_active),
@@ -1415,36 +1494,38 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         Line::from("  ↑/k       Move up"),
         Line::from("  ↓/j       Move down"),
         Line::from("  Enter     Open split detail view"),
-        Line::from("  p         Open saved queries (run/create/edit/delete)"),
-        Line::from("  V         Browse project fix versions + backlog preview"),
-        Line::from("            Enter refreshes preview, n creates, e edits metadata"),
-        Line::from("  T         Open theme picker"),
-        Line::from("  S         Show server info"),
-        Line::from("  g         Show config file"),
-        Line::from("  t         Transition issue"),
-        Line::from("  C         Column settings"),
-        Line::from("  c         Create new issue"),
-        Line::from("  e         Edit selected issue"),
-        Line::from("  y         Change issue type (native Jira move semantics)"),
-        Line::from("  M         Move issue to another project (native, not clone+delete)"),
         Line::from("  a         Assign selected issue"),
-        Line::from("  ;         Add comment"),
-        Line::from("  :         Add the same comment to many issues (JQL or explicit keys)"),
-        Line::from("  w         Add single worklog"),
         Line::from("  b         Add bulk worklog (confirm before submit)"),
+        Line::from("  c         Create new issue"),
+        Line::from("  C         Column settings"),
+        Line::from("  e         Edit selected issue"),
+        Line::from("  g         Show config file"),
         Line::from("  l         Set labels"),
         Line::from("  m         Edit components"),
-        Line::from("  v         Edit fix versions"),
-        Line::from("  s         Add to sprint"),
-        Line::from("  u         Upload attachment"),
-        Line::from("  o         Open issue in browser"),
-        Line::from("  r         Refresh list"),
+        Line::from("  M         Move issue to another project (native, not clone+delete)"),
         Line::from("  n         Scan and open Jira mention notifications"),
-        Line::from("  R         Mark selected notification issue as read"),
-        Line::from("  /         Search with JQL"),
-        Line::from("  ?         Show help"),
+        Line::from("  o         Open issue in browser"),
+        Line::from("  p         Open saved queries (run/create/edit/delete)"),
         Line::from("  q         Quit the TUI"),
-        Line::from(""),
+        Line::from("  r         Refresh list"),
+        Line::from("  R         Mark selected notification issue as read"),
+        Line::from("  s         Add to sprint"),
+        Line::from("  S         Show server info"),
+        Line::from("  t         Transition issue"),
+        Line::from("  T         Open theme picker"),
+        Line::from("  u         Upload attachment"),
+        Line::from("  v         Edit fix versions"),
+        Line::from("  V         Browse project fix versions + backlog preview"),
+        Line::from("            Enter refreshes preview, n creates, e edits metadata"),
+        Line::from("  w         Add single worklog"),
+        Line::from("  y         Change issue type (native Jira move semantics)"),
+        Line::from("  /         Search with JQL"),
+        Line::from("  :         Add the same comment to many issues (JQL or explicit keys)"),
+        Line::from("  ;         Add comment"),
+        Line::from("  ?         Show help"),
+    ];
+
+    let detail_view_section: Vec<Line<'static>> = vec![
         Line::from(Span::styled(
             "Detail View:",
             Style::default().fg(palette.tab_active),
@@ -1453,7 +1534,9 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         Line::from("  ←/→ / Tab Switch detail tabs"),
         Line::from("  Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links"),
         Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
-        Line::from(""),
+    ];
+
+    let mouse_section: Vec<Line<'static>> = vec![
         Line::from(Span::styled(
             "Mouse:",
             Style::default().fg(palette.tab_active),
@@ -1464,7 +1547,47 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         Line::from("  Click detail pane     Focus detail (from list)"),
         Line::from("  Click picker option   Apply (single-select) / toggle (multi-select)"),
         Line::from("  Click outside popup   Close popup (same as Esc)"),
+        Line::from("  Click [?] / [🔔]      Open help / notifications"),
+        Line::from("  Drag splitter         Resize list/detail (saved in prefs)"),
         Line::from("  Scroll wheel          Move selection in list or picker"),
+    ];
+
+    let sections: Vec<Vec<Line<'static>>> =
+        vec![issue_list_section, detail_view_section, mouse_section];
+
+    // Flat single-column form (header + sections joined by blank lines + footer).
+    let mut single_col: Vec<Line<'static>> = header_lines.clone();
+    for (i, sec) in sections.iter().enumerate() {
+        single_col.extend(sec.iter().cloned());
+        if i + 1 < sections.len() {
+            single_col.push(Line::from(""));
+        }
+    }
+    single_col.push(Line::from(""));
+    single_col.push(Line::from(Span::styled(
+        "Press any key to close",
+        Style::default().fg(palette.muted),
+    )));
+    let lines = single_col;
+
+    f.render_widget(Clear, popup_area);
+    let total_lines = lines.len() as u16;
+
+    // Decide layout: if the single-column form fits, use it. Otherwise try a
+    // 2-column section-aware split (sections stay atomic). If even that
+    // overflows, fall back to scroll on single column.
+    let probe_block = Block::default().borders(Borders::ALL);
+    let probe_inner = probe_block.inner(popup_area);
+    let inner_h = probe_inner.height;
+
+    let needs_layout = total_lines > inner_h;
+
+    // Greedy 2-col packing: keep header in col1, then fill col1 with whole
+    // sections until the next one would overflow; remaining sections + the
+    // close hint go to col2. Each section is followed by 1 blank separator
+    // line in its column.
+    let header_h = header_lines.len() as u16;
+    let close_hint = [
         Line::from(""),
         Line::from(Span::styled(
             "Press any key to close",
@@ -1472,17 +1595,67 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette) -> Rect {
         )),
     ];
 
-    f.render_widget(Clear, popup_area);
-    let paragraph = Paragraph::new(lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(palette.focus_border))
-                .title(" Help ")
-                .style(Style::default().bg(Color::Black)),
-        )
-        .wrap(Wrap { trim: false });
-    f.render_widget(paragraph, popup_area);
+    let mut two_col_fits = false;
+    let mut col1: Vec<Line<'static>> = header_lines.clone();
+    let mut col2: Vec<Line<'static>> = Vec::new();
+    if needs_layout {
+        let mut col1_h: u16 = header_h;
+        let mut split_at: usize = sections.len();
+        for (i, sec) in sections.iter().enumerate() {
+            let sec_h = sec.len() as u16 + 1; // +1 for blank separator
+            if col1_h.saturating_add(sec_h) > inner_h {
+                split_at = i;
+                break;
+            }
+            col1.extend(sec.iter().cloned());
+            col1.push(Line::from(""));
+            col1_h = col1_h.saturating_add(sec_h);
+        }
+        if split_at < sections.len() && split_at > 0 {
+            for (i, sec) in sections[split_at..].iter().enumerate() {
+                col2.extend(sec.iter().cloned());
+                if i + 1 < sections.len() - split_at {
+                    col2.push(Line::from(""));
+                }
+            }
+            col2.extend(close_hint.iter().cloned());
+            let col2_h = col2.len() as u16;
+            two_col_fits = col2_h <= inner_h;
+        }
+    }
+
+    let title_bottom = if needs_layout && !two_col_fits {
+        " ↑/↓ PgUp/PgDn: scroll   Esc/?: close "
+    } else {
+        " Esc / ?: close "
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(palette.focus_border))
+        .title(" Help ")
+        .title_bottom(title_bottom)
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(popup_area);
+    f.render_widget(block, popup_area);
+
+    if two_col_fits {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(inner);
+        let left = Paragraph::new(col1).wrap(Wrap { trim: false });
+        let right = Paragraph::new(col2).wrap(Wrap { trim: false });
+        f.render_widget(left, cols[0]);
+        f.render_widget(right, cols[1]);
+    } else {
+        let max_scroll = total_lines.saturating_sub(inner.height);
+        let scroll = scroll_offset.min(max_scroll);
+        let paragraph = Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0));
+        f.render_widget(paragraph, inner);
+    }
     popup_area
 }
 

@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 
 use super::app::{App, AppAction};
@@ -31,7 +31,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
                 handle_browse_key(app, code)
             }
         }
-        Mode::Search => handle_search_key(app, code),
+        Mode::Search => handle_search_key(app, event),
         Mode::Transition => handle_transition_key(app, code),
         Mode::ProjectVersionBrowser => handle_project_version_browser_key(app, code),
         Mode::ColumnPicker => handle_column_picker_key(app, code),
@@ -39,10 +39,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         Mode::ComponentPicker => handle_component_picker_key(app, code),
         Mode::FixVersionPicker => handle_fix_version_picker_key(app, code),
         Mode::SprintPicker => handle_sprint_picker_key(app, code),
-        Mode::Help => {
-            app.mode = Mode::Browse;
-            AppAction::None
-        }
+        Mode::Help => handle_help_key(app, code),
         Mode::SavedJqlPicker => handle_saved_jql_key(app, code),
         Mode::ThemePicker => handle_theme_picker_key(app, code),
         Mode::ServerInfo | Mode::ConfigView => {
@@ -260,7 +257,172 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
     }
 }
 
-fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
+/// Byte offset in `s` for the given char cursor position. Clamps to `s.len()`.
+fn char_to_byte(s: &str, char_pos: usize) -> usize {
+    s.char_indices()
+        .nth(char_pos)
+        .map(|(i, _)| i)
+        .unwrap_or(s.len())
+}
+
+/// Find the char index of the previous word boundary from `cursor` (going left).
+/// Mirrors readline/bash word-erase: skip trailing whitespace then skip word chars.
+fn prev_word_boundary(s: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = cursor;
+    while i > 0 && chars[i - 1].is_whitespace() {
+        i -= 1;
+    }
+    while i > 0 && !chars[i - 1].is_whitespace() {
+        i -= 1;
+    }
+    i
+}
+
+/// Find the char index of the next word boundary from `cursor` (going right).
+fn next_word_boundary(s: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    let mut i = cursor;
+    while i < len && chars[i].is_whitespace() {
+        i += 1;
+    }
+    while i < len && !chars[i].is_whitespace() {
+        i += 1;
+    }
+    i
+}
+
+fn handle_help_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.help_scroll = app.help_scroll.saturating_sub(1);
+            AppAction::None
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.help_scroll = app.help_scroll.saturating_add(1);
+            AppAction::None
+        }
+        KeyCode::PageUp => {
+            app.help_scroll = app.help_scroll.saturating_sub(10);
+            AppAction::None
+        }
+        KeyCode::PageDown => {
+            app.help_scroll = app.help_scroll.saturating_add(10);
+            AppAction::None
+        }
+        KeyCode::Home => {
+            app.help_scroll = 0;
+            AppAction::None
+        }
+        KeyCode::End => {
+            app.help_scroll = u16::MAX; // clamped to max_scroll in render
+            AppAction::None
+        }
+        // Any other key closes Help. Reset scroll so next open starts at top.
+        _ => {
+            app.help_scroll = 0;
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+    }
+}
+
+fn handle_search_key(app: &mut App, event: KeyEvent) -> AppAction {
+    let code = event.code;
+    let mods = event.modifiers;
+    let ctrl = mods.contains(KeyModifiers::CONTROL);
+    let alt = mods.contains(KeyModifiers::ALT);
+    // SUPER = Cmd on macOS, Win key on Windows. Only forwarded by terminals
+    // that implement the Kitty keyboard protocol (Kitty, WezTerm with
+    // enable_kitty_keyboard, foot, alacritty 0.13+). macOS Terminal.app and
+    // iTerm2 intercept Cmd at the terminal level — those users should fall
+    // back to Ctrl+U / Ctrl+W which work everywhere.
+    let sup = mods.contains(KeyModifiers::SUPER);
+
+    // Cmd+Backspace → delete to line start (Mac-style).
+    // Cmd+Delete   → delete to line end.
+    if sup {
+        match code {
+            KeyCode::Backspace => {
+                let to_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(0..to_b);
+                app.search_cursor = 0;
+                return AppAction::None;
+            }
+            KeyCode::Delete => {
+                let from_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(from_b..);
+                return AppAction::None;
+            }
+            KeyCode::Left => {
+                app.search_cursor = 0;
+                return AppAction::None;
+            }
+            KeyCode::Right => {
+                app.search_cursor = app.search_input.chars().count();
+                return AppAction::None;
+            }
+            _ => {}
+        }
+    }
+
+    // Ctrl/Alt shortcut handling (readline/bash convention). Cross-platform:
+    // - Ctrl+W / Alt+Backspace: delete word back
+    // - Ctrl+U: delete to line start
+    // - Ctrl+K: delete to line end
+    // - Alt+D: delete word forward
+    // - Ctrl+A / Ctrl+E: cursor to start / end
+    if ctrl || alt {
+        match code {
+            KeyCode::Char('w') if ctrl => {
+                let start = prev_word_boundary(&app.search_input, app.search_cursor);
+                let from_b = char_to_byte(&app.search_input, start);
+                let to_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(from_b..to_b);
+                app.search_cursor = start;
+                return AppAction::None;
+            }
+            KeyCode::Backspace if alt => {
+                let start = prev_word_boundary(&app.search_input, app.search_cursor);
+                let from_b = char_to_byte(&app.search_input, start);
+                let to_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(from_b..to_b);
+                app.search_cursor = start;
+                return AppAction::None;
+            }
+            KeyCode::Char('u') if ctrl => {
+                let to_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(0..to_b);
+                app.search_cursor = 0;
+                return AppAction::None;
+            }
+            KeyCode::Char('k') if ctrl => {
+                let from_b = char_to_byte(&app.search_input, app.search_cursor);
+                app.search_input.drain(from_b..);
+                return AppAction::None;
+            }
+            KeyCode::Char('d') if alt => {
+                let end = next_word_boundary(&app.search_input, app.search_cursor);
+                let from_b = char_to_byte(&app.search_input, app.search_cursor);
+                let to_b = char_to_byte(&app.search_input, end);
+                app.search_input.drain(from_b..to_b);
+                return AppAction::None;
+            }
+            KeyCode::Char('a') if ctrl => {
+                app.search_cursor = 0;
+                return AppAction::None;
+            }
+            KeyCode::Char('e') if ctrl => {
+                app.search_cursor = app.search_input.chars().count();
+                return AppAction::None;
+            }
+            // Fall through for unrelated Ctrl/Alt combos (don't insert as text).
+            KeyCode::Char(_) => return AppAction::None,
+            _ => {}
+        }
+    }
+
     match code {
         KeyCode::Esc => {
             app.mode = Mode::Browse;
@@ -298,12 +460,7 @@ fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Backspace => {
             if app.search_cursor > 0 {
                 app.search_cursor -= 1;
-                let byte_pos = app
-                    .search_input
-                    .char_indices()
-                    .nth(app.search_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(app.search_input.len());
+                let byte_pos = char_to_byte(&app.search_input, app.search_cursor);
                 let char_len = app.search_input[byte_pos..]
                     .chars()
                     .next()
@@ -316,12 +473,7 @@ fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Delete => {
             let len = app.search_input.chars().count();
             if app.search_cursor < len {
-                let byte_pos = app
-                    .search_input
-                    .char_indices()
-                    .nth(app.search_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(app.search_input.len());
+                let byte_pos = char_to_byte(&app.search_input, app.search_cursor);
                 let char_len = app.search_input[byte_pos..]
                     .chars()
                     .next()
@@ -332,12 +484,7 @@ fn handle_search_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::None
         }
         KeyCode::Char(c) => {
-            let byte_pos = app
-                .search_input
-                .char_indices()
-                .nth(app.search_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.search_input.len());
+            let byte_pos = char_to_byte(&app.search_input, app.search_cursor);
             app.search_input.insert(byte_pos, c);
             app.search_cursor += 1;
             AppAction::None

@@ -77,6 +77,15 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 .unwrap_or(false);
             app.last_click = Some((now, col, row));
 
+            // Splitter grab — start drag. Checked first so it wins over the
+            // adjacent list/detail panes that share the border column.
+            if let Some(splitter) = app.hit_zones.splitter {
+                if contains(&splitter, col, row) {
+                    app.dragging_splitter = true;
+                    return AppAction::None;
+                }
+            }
+
             // Picker option click — dispatch per-mode.
             if let Some(picker) = app.hit_zones.picker {
                 if let Some(idx) = picker.row_to_index(row) {
@@ -207,6 +216,28 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 }
             }
 
+            AppAction::None
+        }
+        MouseEventKind::Drag(MouseButton::Left) => {
+            if app.dragging_splitter {
+                if let Some(area) = app.hit_zones.master_detail_area {
+                    if area.width > 0 && col >= area.x {
+                        let rel = (col - area.x) as u32;
+                        let pct = (rel * 100 / area.width as u32) as u16;
+                        app.split_pct = pct.clamp(20, 80);
+                    }
+                }
+            }
+            AppAction::None
+        }
+        MouseEventKind::Up(MouseButton::Left) => {
+            if app.dragging_splitter {
+                app.dragging_splitter = false;
+                if app.prefs.split_pct != app.split_pct {
+                    app.prefs.split_pct = app.split_pct;
+                    let _ = app.prefs.save();
+                }
+            }
             AppAction::None
         }
         MouseEventKind::ScrollUp => {

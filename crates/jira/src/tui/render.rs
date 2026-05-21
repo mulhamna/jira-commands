@@ -219,10 +219,24 @@ fn render_browse(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
 }
 
 fn render_master_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let pct = app.split_pct.clamp(20, 80);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
+        .constraints([
+            Constraint::Percentage(pct),
+            Constraint::Percentage(100 - pct),
+        ])
         .split(area);
+    app.hit_zones.master_detail_area = Some(area);
+    // Splitter = rightmost column of the list pane (where the border is drawn).
+    // Width 1, full height. Mouse hit-tests + drag updates split_pct.
+    let splitter_x = cols[0].x.saturating_add(cols[0].width).saturating_sub(1);
+    app.hit_zones.splitter = Some(Rect {
+        x: splitter_x,
+        y: area.y,
+        width: 1,
+        height: area.height,
+    });
     render_list(f, app, cols[0], palette);
     render_detail(f, app, cols[1], palette);
 }

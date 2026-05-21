@@ -21,6 +21,12 @@ pub(super) struct TuiPreferences {
     pub(super) saved_jqls: Vec<SavedJql>,
     #[serde(default)]
     pub(super) theme: ThemeName,
+    #[serde(default = "default_split_pct")]
+    pub(super) split_pct: u16,
+}
+
+fn default_split_pct() -> u16 {
+    46
 }
 
 impl Default for TuiPreferences {
@@ -44,6 +50,7 @@ impl Default for TuiPreferences {
                 },
             ],
             theme: ThemeName::Default,
+            split_pct: default_split_pct(),
         }
     }
 }
@@ -90,6 +97,8 @@ impl TuiPreferences {
 
         self.saved_jqls
             .retain(|saved| !saved.name.trim().is_empty() && !saved.jql.trim().is_empty());
+
+        self.split_pct = self.split_pct.clamp(20, 80);
     }
 }
 

@@ -166,6 +166,10 @@ pub(super) struct App {
     pub(super) hit_zones: HitZones,
     /// (when, column, row) of the last left-click. Used to detect double-click.
     pub(super) last_click: Option<(Instant, u16, u16)>,
+    /// Master-detail split percentage [20, 80]. Width of list pane as % of total.
+    pub(super) split_pct: u16,
+    /// True while the user is mid-drag on the vertical splitter.
+    pub(super) dragging_splitter: bool,
 }
 
 pub(super) enum AppAction {
@@ -259,6 +263,7 @@ impl App {
 
     fn new(jql: String, base_url: String, default_project: Option<String>) -> Self {
         let prefs = TuiPreferences::load();
+        let split_pct = prefs.split_pct;
         let mut column_picker_state = ListState::default();
         column_picker_state.select(Some(0));
         let mut saved_jql_state = ListState::default();
@@ -338,6 +343,8 @@ impl App {
             notification_entries: Vec::new(),
             hit_zones: HitZones::default(),
             last_click: None,
+            split_pct,
+            dragging_splitter: false,
         }
     }
 

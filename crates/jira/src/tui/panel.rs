@@ -89,6 +89,10 @@ pub(super) struct HitZones {
     /// The currently visible popup bounding box. Clicks *outside* this
     /// rect while a popup mode is active should close the popup.
     pub(super) popup: Option<Rect>,
+    /// Vertical splitter column between list + detail panes (1-col-wide rect).
+    pub(super) splitter: Option<Rect>,
+    /// Full master-detail area. Needed to recompute split percentage on drag.
+    pub(super) master_detail_area: Option<Rect>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,6 +112,8 @@ impl HitZones {
         self.detail_tabs.clear();
         self.picker = None;
         self.popup = None;
+        self.splitter = None;
+        self.master_detail_area = None;
     }
 }
 

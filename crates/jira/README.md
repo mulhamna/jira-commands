@@ -14,11 +14,18 @@
 ## Install
 
 ```bash
-cargo install jira-commands
+# Cargo (crates.io)
+cargo install jira-commands       # jirac CLI
+cargo install jira-mcp            # jirac-mcp MCP server (optional)
+
+# From a local checkout
+cargo install --path crates/jira --locked
+cargo install --path crates/jira-mcp --locked
 ```
 
 Or use one of the workspace-level install options from the root README:
-- Homebrew
+- Homebrew (`brew tap mulhamna/tap && brew install jira-commands jira-mcp`)
+- npm (`npm install -g @mulham28/jirac` / `@mulham28/jirac-mcp`)
 - shell installer on macOS/Linux
 - PowerShell installer on Windows
 - GitHub Releases archives and packaged binaries

@@ -10,6 +10,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | Install script       | ✅    | ✅    | ❌      | Downloads latest release asset                  |
 | PowerShell installer | ❌    | ❌    | ✅      | Installs `jirac.exe` to user-local bin          |
 | Cargo                | ✅    | ✅    | ✅      | Best for Rust users                             |
+| From source          | ✅    | ✅    | ✅      | `cargo install --path` from a local checkout    |
 | npm                  | ✅    | ✅    | ✅      | Downloads prebuilt release binary               |
 | GitHub Releases      | ✅    | ✅    | ✅      | Manual download of archives/binaries            |
 | Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket`           |
@@ -68,6 +69,17 @@ scoop install mulhamna/jirac
 
 ```bash
 cargo install jira-commands
+```
+
+## From source (local checkout)
+
+For contributors or anyone tracking `main`:
+
+```bash
+git clone https://github.com/mulhamna/jira-commands
+cd jira-commands
+cargo install --path crates/jira --locked      # installs `jirac`
+cargo install --path crates/jira-mcp --locked  # installs `jirac-mcp`
 ```
 
 ## npm

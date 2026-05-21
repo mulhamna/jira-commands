@@ -35,6 +35,8 @@ Choose the installer that fits your environment. For detailed step-by-step instr
 | Install script | Yes | Yes | No | Downloads latest release asset |
 | PowerShell installer | No | No | Yes | Installs `jirac.exe` to user-local bin |
 | Cargo | Yes | Yes | Yes | Best for Rust users |
+| npm | Yes | Yes | Yes | `@mulham28/jirac` and `@mulham28/jirac-mcp` |
+| From source | Yes | Yes | Yes | `cargo install --path` from a local checkout |
 | GitHub Releases | Yes | Yes | Yes | Manual archive/binary download |
 | Winget | No | No | Yes | Windows package manager |
 | Chocolatey | No | No | Yes | Windows package manager |
@@ -69,6 +71,27 @@ Installs `jirac.exe` to `%LOCALAPPDATA%\Programs\jirac\bin` and adds that direct
 
 ```bash
 cargo install jira-commands
+
+# Optional MCP server
+cargo install jira-mcp
+```
+
+#### npm
+
+```bash
+npm install -g @mulham28/jirac
+
+# Optional MCP server
+npm install -g @mulham28/jirac-mcp
+```
+
+#### From source (local checkout)
+
+```bash
+git clone https://github.com/mulhamna/jira-commands
+cd jira-commands
+cargo install --path crates/jira --locked
+cargo install --path crates/jira-mcp --locked
 ```
 
 #### Winget (Windows)

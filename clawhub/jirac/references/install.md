@@ -18,6 +18,18 @@ brew install jira-mcp
 
 ```bash
 cargo install jira-commands
+
+# Optional MCP server
+cargo install jira-mcp
+```
+
+### npm
+
+```bash
+npm install -g @mulham28/jirac
+
+# Optional MCP server
+npm install -g @mulham28/jirac-mcp
 ```
 
 ### GitHub Releases

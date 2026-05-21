@@ -16,11 +16,14 @@
 brew tap mulhamna/tap
 brew install jira-mcp
 
-# Cargo
+# Cargo (crates.io)
 cargo install jira-mcp
 
 # npm (Node 18+)
 npm install -g @mulham28/jirac-mcp
+
+# From a local checkout
+cargo install --path crates/jira-mcp --locked
 ```
 
 You can also use the workspace shell installer on macOS/Linux, the PowerShell installer flow on Windows, or download packaged release archives from GitHub Releases.

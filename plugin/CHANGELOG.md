@@ -2,6 +2,14 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.17.0] - 2026-05-21
+
+### Added
+- New skills covering the full current CLI surface: `/jira:change-type`, `/jira:move-issue`, `/jira:link`, `/jira:archive`, `/jira:notifications`, `/jira:versions`, `/jira:render`, `/jira:sprint-lifecycle`.
+
+### Changed
+- Expand the install hint in `plugin/README.md` to cover source install (`cargo install --path crates/jira --locked`), Homebrew, and npm options.
+
 ## [0.16.0] - 2026-05-15
 
 ### Added

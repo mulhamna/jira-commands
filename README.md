@@ -6,7 +6,7 @@ Jira on the command line.
 [![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
 [![npm](https://img.shields.io/npm/v/%40mulham28%2Fjirac)](https://www.npmjs.com/package/@mulham28/jirac)
 
-[![Homebrew](https://img.shields.io/badge/homebrew-v1.0.0-orange)](https://github.com/mulhamna/homebrew-tap)
+[![Homebrew](https://img.shields.io/github/v/release/mulhamna/jira-commands?label=homebrew&color=fbb040)](https://github.com/mulhamna/homebrew-tap)
 [![Winget](https://img.shields.io/winget/v/mulhamna.jirac)](https://github.com/mulhamna/winget-pkgs/tree/main/manifests/m/mulhamna/jirac)
 [![Chocolatey](https://img.shields.io/chocolatey/v/jirac)](https://community.chocolatey.org/packages/jirac)
 [![Scoop](https://img.shields.io/badge/dynamic/json?label=scoop&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fmulhamna%2Fscoop-bucket%2Fmain%2Fbucket%2Fjirac.json&color=00b4ff)](https://github.com/mulhamna/scoop-bucket)
@@ -346,6 +346,13 @@ make build       # or: cargo build --all
 make test        # or: cargo test --all
 make smoke       # fmt-check + clippy + test + build (CI gate)
 make help        # list all targets
+```
+
+### Installing from a local checkout
+
+```bash
+cargo install --path crates/jira --locked      # installs `jirac`
+cargo install --path crates/jira-mcp --locked  # installs `jirac-mcp`
 ```
 
 ### Workspace layout

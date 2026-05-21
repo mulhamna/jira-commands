@@ -7,7 +7,7 @@ const binName = process.platform === 'win32' ? 'jirac.exe' : 'jirac';
 const installedBin = path.join(__dirname, '..', 'lib', 'bin', binName);
 
 if (!fs.existsSync(installedBin)) {
-  console.error('jirac binary not installed yet. Re-run: npm rebuild -g jira-commands');
+  console.error('jirac binary not installed yet. Re-run: npm rebuild -g @mulham28/jirac');
   process.exit(1);
 }
 

@@ -23,7 +23,7 @@ body:
         - jirac-mcp (MCP server)
         - jira-core (library)
         - Claude Code plugin / skill
-        - Packaging (Homebrew / Chocolatey / Winget)
+        - Packaging (Homebrew / Scoop / Winget)
         - Documentation
         - Other / cross-cutting
     validations:

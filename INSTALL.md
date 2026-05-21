@@ -15,7 +15,6 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | GitHub Releases      | ✅    | ✅    | ✅      | Manual download of archives/binaries            |
 | Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket`           |
 | Winget               | ❌    | ❌    | ✅      | Windows package manager                         |
-| Chocolatey           | ❌    | ❌    | ✅      | Windows package manager                         |
 
 ## Homebrew (macOS / Linux)
 
@@ -126,12 +125,6 @@ If you prefer Scoop, use the custom bucket instead:
 ```powershell
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac
-```
-
-## Chocolatey (Windows)
-
-```powershell
-choco install jirac
 ```
 
 ## After install

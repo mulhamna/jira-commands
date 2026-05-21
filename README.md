@@ -8,7 +8,6 @@ Jira on the command line.
 
 [![Homebrew](https://img.shields.io/github/v/release/mulhamna/jira-commands?label=homebrew&color=fbb040)](https://github.com/mulhamna/homebrew-tap)
 [![Winget](https://img.shields.io/winget/v/mulhamna.jirac)](https://github.com/mulhamna/winget-pkgs/tree/main/manifests/m/mulhamna/jirac)
-[![Chocolatey](https://img.shields.io/chocolatey/v/jirac)](https://community.chocolatey.org/packages/jirac)
 [![Scoop](https://img.shields.io/badge/dynamic/json?label=scoop&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fmulhamna%2Fscoop-bucket%2Fmain%2Fbucket%2Fjirac.json&color=00b4ff)](https://github.com/mulhamna/scoop-bucket)
 
 [![License: MIT + Apache-2.0](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue.svg)](LICENSE-MIT)
@@ -95,8 +94,6 @@ scoop install mulhamna/jirac
 # Windows (winget)
 winget install mulhamna.jirac
 
-# Windows (Chocolatey)
-choco install jirac
 ```
 
 More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL.md)

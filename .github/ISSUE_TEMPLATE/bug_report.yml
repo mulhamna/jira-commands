@@ -33,7 +33,7 @@ body:
         - jirac-mcp (MCP server)
         - jira-core (library)
         - Claude Code plugin / skill
-        - Homebrew / Chocolatey / Winget packaging
+        - Homebrew / Scoop / Winget packaging
         - Other / not sure
     validations:
       required: true
@@ -44,8 +44,10 @@ body:
       label: Install method
       options:
         - Homebrew
-        - Chocolatey
+        - Scoop
         - Winget
+        - PowerShell installer
+        - npm
         - cargo install
         - Built from source
         - GitHub release binary

@@ -70,4 +70,4 @@ Supported targets:
 
 - Requires Node.js 18+ for the installer wrapper.
 - The downloaded CLI itself is a standalone native binary.
-- If you prefer Cargo, Homebrew, Scoop, Winget, Chocolatey, or direct releases, see the docs site for the full install matrix.
+- If you prefer Cargo, Homebrew, Scoop, Winget, or direct releases, see the docs site for the full install matrix.

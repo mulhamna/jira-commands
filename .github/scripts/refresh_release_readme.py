@@ -86,8 +86,6 @@ scoop install mulhamna/jirac
 # Windows (winget)
 winget install mulhamna.jirac
 
-# Windows (Chocolatey)
-choco install jirac
 ```
 
 More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL.md)"""
@@ -129,8 +127,8 @@ def replace_footer(text: str, contributors: list[dict[str, str]]) -> str:
 def refresh_install_md(text: str) -> str:
     if "Custom bucket `mulhamna/scoop-bucket`" not in text:
         text = re.sub(
-            r"\| Winget\s+\| ❌\s+\| ❌\s+\| ✅\s+\| Windows package manager\s+\|\n\| Chocolatey",
-            "| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |\n| Winget               | ❌     | ❌     | ✅       | Windows package manager                |\n| Chocolatey",
+            r"\| Winget\s+\| ❌\s+\| ❌\s+\| ✅\s+\| Windows package manager\s+\|",
+            "| Scoop                | ❌     | ❌     | ✅       | Custom bucket `mulhamna/scoop-bucket`  |\n| Winget               | ❌     | ❌     | ✅       | Windows package manager                |",
             text,
             count=1,
         )

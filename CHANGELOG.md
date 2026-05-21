@@ -6,6 +6,21 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.2.0](https://github.com/mulhamna/jira-commands/compare/v1.1.0...v1.2.0) (2026-05-21)
+
+
+### Features
+
+* add sprint lifecycle commands ([35f5820](https://github.com/mulhamna/jira-commands/commit/35f5820ca2bea3429872577c0ef5aa7b1303c46c))
+* add sprint update and delete commands ([dec2dae](https://github.com/mulhamna/jira-commands/commit/dec2daefc2778d68a07e14805fbce24da16cc3f1))
+* **plugin:** 8 new skills + clawhub SKILL refresh + install docs sync ([#266](https://github.com/mulhamna/jira-commands/issues/266)) ([f34ad5e](https://github.com/mulhamna/jira-commands/commit/f34ad5e646187a2de126775b972e5c5d5cb63873))
+* **tui:** mouse interactions, splitter drag, readline shortcuts ([#265](https://github.com/mulhamna/jira-commands/issues/265)) ([38e1e4a](https://github.com/mulhamna/jira-commands/commit/38e1e4ae3876f98a2e702de74cb0bc2e5441e09b))
+
+
+### Bug Fixes
+
+* satisfy clippy for sprint command ([f686387](https://github.com/mulhamna/jira-commands/commit/f68638709481653df876b31db6f852bb2fd352f6))
+
 ## [1.1.0](https://github.com/mulhamna/jira-commands/compare/v1.0.0...v1.1.0) (2026-05-18)
 
 

@@ -116,6 +116,10 @@ pub(super) struct Modal {
     pub mention_state: ListState,
     pub mention_map: Vec<(String, String)>,
     pub mention_cache: HashMap<String, Vec<PickerOption>>,
+    /// Per-field hit rects captured by the previous render. Same length as
+    /// `fields` after a render pass; empty before the first render. Mouse
+    /// clicks inside a field rect set `focus` to that field's index.
+    pub field_rects: Vec<Rect>,
 }
 
 impl Modal {
@@ -155,6 +159,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -191,6 +196,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -237,6 +243,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -261,6 +268,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -306,6 +314,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -361,6 +370,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -434,6 +444,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -515,6 +526,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -547,6 +559,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -591,6 +604,7 @@ impl Modal {
             mention_state: ListState::default(),
             mention_map: Vec::new(),
             mention_cache: HashMap::new(),
+            field_rects: Vec::new(),
         }
     }
 
@@ -779,7 +793,9 @@ pub(super) fn render_modal(f: &mut Frame, modal: &mut Modal, palette: Palette, a
         .constraints(constraints)
         .split(inner);
 
+    modal.field_rects.clear();
     for (idx, field) in modal.fields.iter().enumerate() {
+        modal.field_rects.push(chunks[idx]);
         let focused = idx == modal.focus;
         let border_style = if focused {
             Style::default()

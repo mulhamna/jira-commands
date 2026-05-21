@@ -86,6 +86,21 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                 }
             }
 
+            // Modal form field click → focus that field.
+            if app.mode == Mode::Modal {
+                if let Some(modal) = app.modal.as_mut() {
+                    for (idx, rect) in modal.field_rects.iter().enumerate() {
+                        if contains(rect, col, row) {
+                            modal.focus = idx;
+                            return AppAction::None;
+                        }
+                    }
+                }
+                // Click anywhere else inside an open modal: swallow so we don't
+                // accidentally trigger list/detail handlers behind the popup.
+                return AppAction::None;
+            }
+
             // Picker option click — dispatch per-mode.
             if let Some(picker) = app.hit_zones.picker {
                 if let Some(idx) = picker.row_to_index(row) {

@@ -10,7 +10,10 @@ use crate::notifications::{
 };
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
+        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -809,6 +812,16 @@ pub async fn run_tui(
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // Best-effort: ask for Kitty keyboard protocol so SUPER (Cmd) modifier and
+    // distinct shifted keys reach the app. Terminals that don't implement it
+    // ignore the sequence — failure is silent on purpose.
+    let _ = execute!(
+        stdout,
+        PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+        )
+    );
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -2771,6 +2784,9 @@ pub async fn run_tui(
     }
 
     disable_raw_mode()?;
+    // Pop only if we successfully pushed (silent failure either way — pairs
+    // with the best-effort push above).
+    let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,

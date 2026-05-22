@@ -297,7 +297,7 @@ export JIRA_TOKEN=your_api_token
 
 ## MCP server
 
-`jirac-mcp` exposes Jira as typed [Model Context Protocol](https://modelcontextprotocol.io) tools for editors, agents, and desktop apps. See the [jirac-mcp README](crates/jira-mcp/README.md) for setup and available tools.
+`jirac-mcp` exposes Jira as typed [Model Context Protocol](https://modelcontextprotocol.io) tools for editors, agents, and desktop apps. See the [jirac-mcp README](crates/jira-mcp/README.md) for setup and available tools, and [`docs/mcp-roadmap.md`](docs/mcp-roadmap.md) for parity goals plus release-lane direction.
 
 ### MCP install helpers
 

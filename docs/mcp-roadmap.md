@@ -7,8 +7,9 @@ Current server focus is **typed tools over MCP**; it does **not** currently expo
 
 Implemented today:
 - auth status / set credentials / logout
-- issue list / view / create / update / delete / transition
-- issue type, field, and transition discovery
+- issue list / view / create / update / delete / clone / transition
+- issue type, field, transition, and issue-link-type discovery
+- issue link create / delete
 - attachment upload
 - comment list / add
 - worklog list / add / delete
@@ -20,10 +21,8 @@ Implemented today:
 - install helpers for Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, OpenCode, generic JSON, and Zed
 
 Not yet at CLI parity:
-- issue clone
 - batch manifest runner
 - bulk create
-- issue link operations
 - sprint lifecycle tools
 - standup / sprint summary helpers
 - fix version browsing / create / update flows
@@ -60,12 +59,8 @@ Done:
 Goal: close the highest-value capability gaps so an MCP client can handle the same day-to-day Jira workflows as the CLI without falling back to shelling out.
 
 Priority 1:
-- `jira_issue_clone`
 - `jira_issue_bulk_create`
 - `jira_issue_batch`
-- `jira_issue_link_list_types`
-- `jira_issue_link_add`
-- `jira_issue_link_delete`
 
 Priority 2:
 - sprint tools:

@@ -20,9 +20,10 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
-        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs,
-        IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
+        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
+        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs, IssueLinkDeleteArgs,
+        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, WorklogAddArgs,
+        WorklogDeleteArgs,
     },
 };
 
@@ -268,6 +269,81 @@ impl JiraApp {
         }))
     }
 
+    pub async fn issue_clone(&self, args: IssueCloneArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let source = client.get_issue(&args.key).await?;
+        let target_project = args
+            .project_key
+            .unwrap_or_else(|| source.project_key.clone());
+        let summary = args.summary.unwrap_or_else(|| source.summary.clone());
+
+        let labels: Vec<String> = source
+            .fields
+            .get("labels")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|s| s.as_str())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let components: Vec<String> = source
+            .fields
+            .get("components")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|c| c.get("name").and_then(|n| n.as_str()))
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let fix_versions: Vec<String> = source
+            .fields
+            .get("fixVersions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.get("name").and_then(|n| n.as_str()))
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let cloned = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: target_project,
+                summary,
+                description: None,
+                description_adf: source.description.clone(),
+                issue_type: source.issue_type.clone(),
+                assignee: args.assignee,
+                priority: source.priority.clone(),
+                labels,
+                components,
+                parent: None,
+                fix_versions,
+                custom_fields: HashMap::new(),
+            })
+            .await?;
+
+        let moved = args.move_issue.unwrap_or(false);
+        if moved {
+            require_confirm(args.confirm)?;
+            client.delete_issue(&args.key).await?;
+        }
+
+        Ok(json!({
+            "source_key": args.key,
+            "target_key": cloned.key,
+            "moved": moved,
+            "issue": cloned
+        }))
+    }
+
     pub async fn issue_transition(&self, args: IssueTransitionArgs) -> AppResult<Value> {
         let client = self.build_client()?;
         let resolved = resolve_transition(&client, &args.key, &args.transition).await?;
@@ -329,6 +405,42 @@ impl JiraApp {
         let client = self.build_client()?;
         let comment = client.add_comment(&args.key, &args.body).await?;
         to_value(comment)
+    }
+
+    pub async fn issue_link_list_types(&self) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let link_types = client.list_issue_link_types().await?;
+        Ok(json!({
+            "link_types": link_types
+        }))
+    }
+
+    pub async fn issue_link_add(&self, args: IssueLinkAddArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        client
+            .link_issues(
+                &args.outward_key,
+                &args.inward_key,
+                &args.link_type,
+                args.comment.as_deref(),
+            )
+            .await?;
+        Ok(json!({
+            "outward_key": args.outward_key,
+            "inward_key": args.inward_key,
+            "link_type": args.link_type,
+            "linked": true
+        }))
+    }
+
+    pub async fn issue_link_delete(&self, args: IssueLinkDeleteArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+        client.delete_issue_link(&args.id).await?;
+        Ok(json!({
+            "id": args.id,
+            "deleted": true
+        }))
     }
 
     pub async fn worklog_list(&self, args: IssueKeyArgs) -> AppResult<Value> {

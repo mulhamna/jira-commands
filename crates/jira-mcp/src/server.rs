@@ -18,9 +18,10 @@ use crate::{
     error::AppResult,
     models::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
-        ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
+        CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs,
+        IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ToolResponse, WorklogAddArgs,
+        WorklogDeleteArgs,
     },
 };
 
@@ -181,6 +182,17 @@ impl JiraMcpServer {
     }
 
     #[tool(
+        name = "jira_issue_clone",
+        description = "Clone a Jira issue, optionally into another project; moving the issue requires confirm=true"
+    )]
+    pub async fn jira_issue_clone(
+        &self,
+        Parameters(args): Parameters<IssueCloneArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_clone(args).await)
+    }
+
+    #[tool(
         name = "jira_issue_transition",
         description = "Transition a Jira issue by workflow transition name or ID"
     )]
@@ -222,6 +234,36 @@ impl JiraMcpServer {
         Parameters(args): Parameters<CommentAddArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.comment_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_list_types",
+        description = "List available Jira issue link types"
+    )]
+    pub async fn jira_issue_link_list_types(&self) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_list_types().await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_add",
+        description = "Create a link between two Jira issues"
+    )]
+    pub async fn jira_issue_link_add(
+        &self,
+        Parameters(args): Parameters<IssueLinkAddArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_delete",
+        description = "Delete a Jira issue link by ID; requires confirm=true"
+    )]
+    pub async fn jira_issue_link_delete(
+        &self,
+        Parameters(args): Parameters<IssueLinkDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_delete(args).await)
     }
 
     #[tool(
@@ -422,6 +464,8 @@ mod tests {
         let client = TestClient.serve(client_transport).await?;
         let tools = client.list_all_tools().await?;
         assert!(tools.iter().any(|tool| tool.name == "jira_auth_status"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_clone"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_link_add"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))
@@ -480,6 +524,10 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool.name == "jira_auth_set_credentials"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_clone"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_link_delete"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

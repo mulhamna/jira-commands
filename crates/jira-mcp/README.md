@@ -61,9 +61,10 @@ The MCP server includes tools for:
 - auth status and credential updates
 - issue list, view, create, update, delete, and clone
 - field and transition discovery
+- issue link type discovery plus link create/delete
 - attachment upload
 - worklog operations
-- bulk transition, bulk update, batch, and archive flows
+- bulk transition, bulk update, and archive flows
 - plans
 - raw Jira REST API requests
 

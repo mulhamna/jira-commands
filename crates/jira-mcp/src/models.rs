@@ -108,9 +108,33 @@ pub struct IssueDeleteArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueCloneArgs {
+    pub key: String,
+    pub project_key: Option<String>,
+    pub summary: Option<String>,
+    pub assignee: Option<String>,
+    pub move_issue: Option<bool>,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueTransitionArgs {
     pub key: String,
     pub transition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueLinkAddArgs {
+    pub outward_key: String,
+    pub inward_key: String,
+    pub link_type: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueLinkDeleteArgs {
+    pub id: String,
+    pub confirm: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

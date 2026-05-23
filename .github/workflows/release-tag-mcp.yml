@@ -1,0 +1,453 @@
+name: Release jira-mcp
+
+# ── HOW THIS WORKS ───────────────────────────────────────────────────────────
+# Triggered by tags shaped `jira-mcp-vX.Y.Z` (release-please publishes them
+# from the jira-mcp release PR). Builds the `jirac-mcp` binary across the same
+# matrix as `release-tag.yml`, publishes the `jira-mcp` crate to crates.io,
+# publishes `@mulham28/jirac-mcp` to npm, then creates a GitHub release that
+# carries only the MCP artifacts.
+# ─────────────────────────────────────────────────────────────────────────────
+
+"on":
+  push:
+    tags:
+      - 'jira-mcp-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release manually, for example jira-mcp-v0.5.0.'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-mcp-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-tag:
+    name: Validate tag vs Cargo.toml
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Verify tag matches jira-mcp VERSION file
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            TAG="${{ inputs.release_tag }}"
+          fi
+          VER=$(cat crates/jira-mcp/VERSION | tr -d '[:space:]')
+          EXPECTED_TAG="jira-mcp-v${VER}"
+
+          echo "Git tag:                 $TAG"
+          echo "crates/jira-mcp/VERSION: $VER  (expected tag: $EXPECTED_TAG)"
+
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo ""
+            echo "ERROR: Tag '${TAG}' does not match jira-mcp VERSION file '${VER}'."
+            echo "  Either bump crates/jira-mcp/VERSION to match the tag,"
+            echo "  or push tag '${EXPECTED_TAG}' instead."
+            exit 1
+          fi
+
+      - name: Verify jira-mcp crate version matches
+        run: |
+          VER=$(cat crates/jira-mcp/VERSION | tr -d '[:space:]')
+          MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+
+          if [ "$VER" != "$MCP_VER" ]; then
+            echo "ERROR: jira-mcp version mismatch before release!"
+            echo "  VERSION:   $VER"
+            echo "  jira-mcp:  $MCP_VER"
+            exit 1
+          fi
+
+      - name: Verify CHANGELOG has entry for this version
+        run: |
+          VERSION=$(cat crates/jira-mcp/VERSION | tr -d '[:space:]')
+          if grep -qF "[${VERSION}]" CHANGELOG.md 2>/dev/null \
+            || grep -qF "[${VERSION}]" crates/jira-mcp/CHANGELOG.md 2>/dev/null; then
+            echo "✓ CHANGELOG entry found for jira-mcp v${VERSION}"
+          else
+            echo "ERROR: No CHANGELOG entry for jira-mcp v${VERSION}."
+            exit 1
+          fi
+
+  build-binaries:
+    name: Build (${{ matrix.target }})
+    needs: validate-tag
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: jirac-mcp-linux-x86_64
+            archive_artifact: jirac-mcp-linux-x86_64.tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: jirac-mcp-linux-aarch64
+            archive_artifact: jirac-mcp-linux-aarch64.tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: jirac-mcp-macos-x86_64
+            archive_artifact: jirac-mcp-macos-x86_64.tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: jirac-mcp-macos-aarch64
+            archive_artifact: jirac-mcp-macos-aarch64.tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: jirac-mcp-windows-x86_64.exe
+            archive_artifact: jirac-mcp-windows-x86_64.zip
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Install Zig + cargo-zigbuild (Linux)
+        if: startsWith(matrix.target, 'x86_64-unknown-linux-gnu') || startsWith(matrix.target, 'aarch64-unknown-linux-gnu')
+        run: |
+          pip3 install --require-hashes --break-system-packages -r .github/requirements/ziglang-release.txt
+          cargo install cargo-zigbuild --locked
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Build (zigbuild — Linux x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-mcp
+
+      - name: Build (zigbuild — Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-mcp
+
+      - name: Build (native)
+        if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-gnu'
+        run: cargo build --release --target ${{ matrix.target }} -p jira-mcp
+
+      - name: Copy binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.artifact }}
+
+      - name: Copy binary (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.artifact }}
+
+      - name: Package archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p dist/jirac-mcp
+          cp ${{ matrix.artifact }} dist/jirac-mcp/
+          cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
+          tar -czf ${{ matrix.archive_artifact }} -C dist/jirac-mcp .
+
+      - name: Package archive (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/jirac-mcp | Out-Null
+          Copy-Item ${{ matrix.artifact }} dist/jirac-mcp/
+          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
+          Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.archive_artifact }}
+
+      - name: Generate build provenance attestation (jirac-mcp)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: ${{ matrix.artifact }}
+
+      - name: Upload artifact (jirac-mcp)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.archive_artifact }}
+          if-no-files-found: error
+
+  publish-crates:
+    name: Publish jira-mcp to crates.io
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+
+      # jira-mcp depends on jira-core. The version of jira-core in this commit
+      # must already be on crates.io (published by the jira-commands lane).
+      - name: Verify jira-core is on crates.io
+        run: |
+          CORE_VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          echo "Checking jira-core v${CORE_VERSION} on crates.io..."
+          if ! curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${CORE_VERSION}\""; then
+            echo "ERROR: jira-core v${CORE_VERSION} not found on crates.io."
+            echo "  Publish jira-commands lane first (tag 'v${CORE_VERSION}')."
+            exit 1
+          fi
+          echo "✓ jira-core v${CORE_VERSION} present"
+
+      - name: Publish jira-mcp (skip if already published)
+        run: |
+          VERSION=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          if curl -sf "https://index.crates.io/ji/ra/jira-mcp" | grep -q "\"vers\":\"${VERSION}\""; then
+            echo "✓ jira-mcp v${VERSION} already on crates.io — skipping publish"
+          else
+            echo "Publishing jira-mcp v${VERSION}..."
+            cargo publish -p jira-mcp --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          fi
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-binaries, publish-crates]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts/
+
+      - name: Generate SHA-256 checksums
+        run: |
+          set -euo pipefail
+          : > checksums.txt
+          find artifacts -type f \( \
+            -name 'jirac-mcp-*' -o \
+            -name 'jirac-mcp-*.exe' -o \
+            -name 'jirac-mcp-*.tar.gz' -o \
+            -name 'jirac-mcp-*.zip' \
+          \) -print0 | sort -z | while IFS= read -r -d '' file; do
+            sha256sum "$file" >> checksums.txt
+          done
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+      - name: Build release notes footer
+        run: |
+          cat > release-notes-footer.md <<'EOF'
+          ## Packaging notes
+
+          - This release ships `jirac-mcp` only. The `jirac` CLI is released on the `v*` tag lane (see `jira-commands` releases).
+          - jira-mcp depends on jira-core. Ensure your installed jira-core version is compatible.
+          EOF
+
+      - name: Create release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          generate_release_notes: true
+          append_body: true
+          body_path: release-notes-footer.md
+          files: |
+            artifacts/**/*
+            checksums.txt
+
+  publish-npm:
+    name: Publish npm package (jirac-mcp)
+    runs-on: ubuntu-latest
+    needs: create-release
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Sync npm-mcp package version from crates/jira-mcp/VERSION
+        run: |
+          VERSION=$(cat crates/jira-mcp/VERSION | tr -d '[:space:]')
+          VERSION="$VERSION" node - <<'EOF'
+          const fs = require('fs');
+          const path = 'packaging/npm-mcp/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.version = process.env.VERSION;
+          if (!pkg.version) throw new Error('VERSION env missing for npm-mcp sync');
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
+          console.log(`synced ${pkg.name} -> ${pkg.version}`);
+          EOF
+          echo "synced npm-mcp package.json to $VERSION"
+
+      - name: Verify npm-mcp version matches release tag
+        run: |
+          VERSION=$(cat crates/jira-mcp/VERSION | tr -d '[:space:]')
+          NPM_MCP_VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
+          EXPECTED_TAG="jira-mcp-v${VERSION}"
+          TAG="${GITHUB_REF_NAME}"
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            TAG="${{ inputs.release_tag }}"
+          fi
+
+          echo "tag:           $TAG"
+          echo "mcp VERSION:   $VERSION"
+          echo "npm jirac-mcp: $NPM_MCP_VERSION"
+
+          test "$TAG" = "$EXPECTED_TAG"
+          test "$NPM_MCP_VERSION" = "$VERSION"
+
+      - name: Publish @mulham28/jirac-mcp (skip if already published)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
+          if npm view @mulham28/jirac-mcp@"$VERSION" version >/dev/null 2>&1; then
+            echo "✓ @mulham28/jirac-mcp npm v$VERSION already published, skipping"
+          else
+            npm publish ./packaging/npm-mcp --access public
+          fi
+
+  collect-release-metadata:
+    name: Collect release metadata
+    runs-on: ubuntu-latest
+    needs: create-release
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      sha_mcp_macos_arm: ${{ steps.vars.outputs.sha_mcp_macos_arm }}
+      sha_mcp_macos_x86: ${{ steps.vars.outputs.sha_mcp_macos_x86 }}
+      sha_mcp_linux_arm: ${{ steps.vars.outputs.sha_mcp_linux_arm }}
+      sha_mcp_linux_x86: ${{ steps.vars.outputs.sha_mcp_linux_x86 }}
+    steps:
+      - name: Download checksums from release
+        id: vars
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          VERSION="${RELEASE_TAG#jira-mcp-v}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${{ inputs.release_tag }}" ]; then
+            RELEASE_TAG="${{ inputs.release_tag }}"
+            VERSION="${RELEASE_TAG#jira-mcp-v}"
+          fi
+          curl -fsSL "https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/checksums.txt" -o checksums.txt
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+          SHA_MCP_MACOS_ARM=$(grep -E '(^|/)jirac-mcp-macos-aarch64\.tar\.gz$' checksums.txt | awk '{print $1}')
+          SHA_MCP_MACOS_X86=$(grep -E '(^|/)jirac-mcp-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_MCP_LINUX_ARM=$(grep -E '(^|/)jirac-mcp-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
+          SHA_MCP_LINUX_X86=$(grep -E '(^|/)jirac-mcp-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
+
+          test -n "$SHA_MCP_MACOS_ARM"
+          test -n "$SHA_MCP_MACOS_X86"
+          test -n "$SHA_MCP_LINUX_ARM"
+          test -n "$SHA_MCP_LINUX_X86"
+
+          {
+            echo "version=$VERSION"
+            echo "sha_mcp_macos_arm=$SHA_MCP_MACOS_ARM"
+            echo "sha_mcp_macos_x86=$SHA_MCP_MACOS_X86"
+            echo "sha_mcp_linux_arm=$SHA_MCP_LINUX_ARM"
+            echo "sha_mcp_linux_x86=$SHA_MCP_LINUX_X86"
+          } >> "$GITHUB_OUTPUT"
+
+  update-homebrew:
+    name: Update Homebrew formula (jira-mcp)
+    runs-on: ubuntu-latest
+    needs: collect-release-metadata
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+      SHA_MCP_MACOS_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_arm }}
+      SHA_MCP_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_x86 }}
+      SHA_MCP_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_arm }}
+      SHA_MCP_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_x86 }}
+    steps:
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: mulhamna/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Verify formula exists
+        run: test -f homebrew-tap/Formula/jira-mcp.rb
+
+      - name: Update formula version and SHA256
+        run: |
+          python3 - <<'EOF'
+          import re, os
+
+          version  = os.environ["VERSION"]
+          formula_path = "homebrew-tap/Formula/jira-mcp.rb"
+          sha_map = {
+              "jirac-mcp-macos-aarch64": os.environ["SHA_MCP_MACOS_ARM"],
+              "jirac-mcp-macos-x86_64":  os.environ["SHA_MCP_MACOS_X86"],
+              "jirac-mcp-linux-aarch64": os.environ["SHA_MCP_LINUX_ARM"],
+              "jirac-mcp-linux-x86_64":  os.environ["SHA_MCP_LINUX_X86"],
+          }
+
+          with open(formula_path) as f:
+              content = f.read()
+
+          content = re.sub(r'version "[^"]+"', f'version "{version}"', content)
+
+          for binary, sha in sha_map.items():
+              content = re.sub(
+                  rf'(url "[^"]*{re.escape(binary)}[^"]*"\n\s+sha256 ")[^"]+"',
+                  rf'\g<1>{sha}"',
+                  content,
+              )
+
+          with open(formula_path, "w") as f:
+              f.write(content)
+
+          print(f"Updated {formula_path} to v{version}")
+          EOF
+
+      - name: Commit and push to homebrew-tap
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/jira-mcp.rb
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: bump jira-mcp to v${VERSION}"
+          git push

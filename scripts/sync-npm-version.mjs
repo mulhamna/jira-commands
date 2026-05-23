@@ -2,18 +2,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const versionPath = path.join(root, 'VERSION');
-const version = fs.readFileSync(versionPath, 'utf8').trim();
 
-const pkgPaths = [
-  path.join(root, 'packaging', 'npm', 'package.json'),
-  path.join(root, 'packaging', 'npm-mcp', 'package.json'),
+function readVersion(relPath) {
+  return fs.readFileSync(path.join(root, relPath), 'utf8').trim();
+}
+
+const cliVersion = readVersion('VERSION');
+const mcpVersion = readVersion('crates/jira-mcp/VERSION');
+
+const targets = [
+  { pkg: 'packaging/npm/package.json', version: cliVersion },
+  { pkg: 'packaging/npm-mcp/package.json', version: mcpVersion },
 ];
 
-for (const pkgPath of pkgPaths) {
+for (const { pkg, version } of targets) {
+  const pkgPath = path.join(root, pkg);
   if (!fs.existsSync(pkgPath)) continue;
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  pkg.version = version;
-  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`synced ${pkg.name} -> ${version}`);
+  const data = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  data.version = version;
+  fs.writeFileSync(pkgPath, JSON.stringify(data, null, 2) + '\n');
+  console.log(`synced ${data.name} -> ${version}`);
 }

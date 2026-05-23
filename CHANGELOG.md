@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.2.1](https://github.com/mulhamna/jira-commands/compare/v1.2.0...v1.2.1) (2026-05-23)
+
+
+### Bug Fixes
+
+* **ci:** allow split jira-mcp release lane ([#272](https://github.com/mulhamna/jira-commands/issues/272)) ([17715bf](https://github.com/mulhamna/jira-commands/commit/17715bfe2149eb0e2e4373645ea3391923553966))
+
 ## [1.2.0](https://github.com/mulhamna/jira-commands/compare/v1.1.0...v1.2.0) (2026-05-21)
 
 

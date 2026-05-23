@@ -58,20 +58,18 @@ jobs:
             exit 1
           fi
 
-      - name: Verify workspace crate versions match
+      - name: Verify jira-commands + jira-core crate versions match
         run: |
           VER=$(cat VERSION | tr -d '[:space:]')
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
-          MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           WS_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
 
-          if [ "$VER" != "$CORE_VER" ] || [ "$VER" != "$MCP_VER" ] || [ "$VER" != "$BIN_VER" ] || [ "$VER" != "$WS_VER" ]; then
+          if [ "$VER" != "$CORE_VER" ] || [ "$VER" != "$BIN_VER" ] || [ "$VER" != "$WS_VER" ]; then
             echo "ERROR: Workspace version mismatch before release!"
             echo "  VERSION:        $VER"
             echo "  workspace:      $WS_VER"
             echo "  jira-core:      $CORE_VER"
-            echo "  jira-mcp:       $MCP_VER"
             echo "  jira-commands:  $BIN_VER"
             exit 1
           fi
@@ -108,33 +106,23 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-x86_64
-            mcp_artifact: jirac-mcp-linux-x86_64
             archive_artifact: jirac-linux-x86_64.tar.gz
-            mcp_archive_artifact: jirac-mcp-linux-x86_64.tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-aarch64
-            mcp_artifact: jirac-mcp-linux-aarch64
             archive_artifact: jirac-linux-aarch64.tar.gz
-            mcp_archive_artifact: jirac-mcp-linux-aarch64.tar.gz
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-x86_64
-            mcp_artifact: jirac-mcp-macos-x86_64
             archive_artifact: jirac-macos-x86_64.tar.gz
-            mcp_archive_artifact: jirac-mcp-macos-x86_64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-aarch64
-            mcp_artifact: jirac-mcp-macos-aarch64
             archive_artifact: jirac-macos-aarch64.tar.gz
-            mcp_archive_artifact: jirac-mcp-macos-aarch64.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact: jirac-windows-x86_64.exe
-            mcp_artifact: jirac-mcp-windows-x86_64.exe
             archive_artifact: jirac-windows-x86_64.zip
-            mcp_archive_artifact: jirac-mcp-windows-x86_64.zip
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -158,61 +146,48 @@ jobs:
 
       - name: Build (zigbuild — Linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-commands
 
       - name: Build (zigbuild — Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands
 
       - name: Build (native)
         if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-gnu'
-        run: cargo build --release --target ${{ matrix.target }} -p jira-commands -p jira-mcp
+        run: cargo build --release --target ${{ matrix.target }} -p jira-commands
 
       - name: Copy binaries (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
-          cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.mcp_artifact }}
 
       - name: Copy binaries (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
-          Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.mcp_artifact }}
 
       - name: Package archives (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          mkdir -p dist/jirac dist/jirac-mcp
+          mkdir -p dist/jirac
           cp ${{ matrix.artifact }} dist/jirac/
-          cp ${{ matrix.mcp_artifact }} dist/jirac-mcp/
           cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac/
-          cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
           tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
-          tar -czf ${{ matrix.mcp_archive_artifact }} -C dist/jirac-mcp .
 
       - name: Package archives (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp | Out-Null
+          New-Item -ItemType Directory -Force -Path dist/jirac | Out-Null
           Copy-Item ${{ matrix.artifact }} dist/jirac/
-          Copy-Item ${{ matrix.mcp_artifact }} dist/jirac-mcp/
           Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac/
-          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
           Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
-          Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.mcp_archive_artifact }}
 
       - name: Generate build provenance attestation (jirac)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: ${{ matrix.artifact }}
-
-      - name: Generate build provenance attestation (jirac-mcp)
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-path: ${{ matrix.mcp_artifact }}
 
       - name: Upload artifact (jirac)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -221,15 +196,6 @@ jobs:
           path: |
             ${{ matrix.artifact }}
             ${{ matrix.archive_artifact }}
-          if-no-files-found: error
-
-      - name: Upload artifact (jirac-mcp)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ matrix.mcp_artifact }}
-          path: |
-            ${{ matrix.mcp_artifact }}
-            ${{ matrix.mcp_archive_artifact }}
           if-no-files-found: error
 
 
@@ -286,16 +252,6 @@ jobs:
           echo "ERROR: jira-core v${VERSION} not found in sparse index after 5 minutes."
           exit 1
 
-      - name: Publish jira-mcp (skip if already published)
-        run: |
-          VERSION=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
-          if curl -sf "https://index.crates.io/ji/ra/jira-mcp" | grep -q "\"vers\":\"${VERSION}\""; then
-            echo "✓ jira-mcp v${VERSION} already on crates.io — skipping publish"
-          else
-            echo "Publishing jira-mcp v${VERSION}..."
-            cargo publish -p jira-mcp --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          fi
-
       - name: Publish jira-commands (skip if already published)
         run: |
           VERSION=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
@@ -332,12 +288,8 @@ jobs:
             -name 'jirac-*' -o \
             -name 'jirac-*.exe' -o \
             -name 'jirac-*.tar.gz' -o \
-            -name 'jirac-*.zip' -o \
-            -name 'jirac-mcp-*' -o \
-            -name 'jirac-mcp-*.exe' -o \
-            -name 'jirac-mcp-*.tar.gz' -o \
-            -name 'jirac-mcp-*.zip' \
-          \) -print0 | sort -z | while IFS= read -r -d '' file; do
+            -name 'jirac-*.zip' \
+          \) ! -name 'jirac-mcp-*' -print0 | sort -z | while IFS= read -r -d '' file; do
             sha256sum "$file" >> checksums.txt
           done
           echo "=== checksums.txt ==="
@@ -348,7 +300,7 @@ jobs:
           cat > release-notes-footer.md <<'EOF'
           ## Packaging notes
 
-          - Release artifacts ship `jirac` and `jirac-mcp`.
+          - Release artifacts ship `jirac` (CLI). `jirac-mcp` (MCP server) is released on a separate `jira-mcp-v*` tag lane.
           - Windows installer entrypoint: `install.ps1`.
           - Winget source manifests live in `packaging/winget/` and should be updated from the published release artifacts before submission.
           - If you still have scripts that call `jira`, update them to `jirac` before using this release.
@@ -382,27 +334,24 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Sync npm package versions from release version
+      - name: Sync npm package version from VERSION
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           VERSION="$VERSION" node - <<'EOF'
           const fs = require('fs');
-          for (const path of ['packaging/npm/package.json', 'packaging/npm-mcp/package.json']) {
-            if (!fs.existsSync(path)) continue;
-            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-            pkg.version = process.env.VERSION;
-            if (!pkg.version) throw new Error('VERSION env missing for npm package sync');
-            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
-            console.log(`synced ${pkg.name} -> ${pkg.version}`);
-          }
+          const path = 'packaging/npm/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.version = process.env.VERSION;
+          if (!pkg.version) throw new Error('VERSION env missing for npm package sync');
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + String.fromCharCode(10));
+          console.log(`synced ${pkg.name} -> ${pkg.version}`);
           EOF
-          echo "synced npm package.json versions to $VERSION"
+          echo "synced npm package.json to $VERSION"
 
-      - name: Verify npm package versions match release tag
+      - name: Verify npm package version matches release tag
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
-          NPM_MCP_VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
           EXPECTED_TAG="v${VERSION}"
           TAG="${GITHUB_REF_NAME}"
 
@@ -413,11 +362,9 @@ jobs:
           echo "tag:           $TAG"
           echo "workspace:     $VERSION"
           echo "npm jirac:     $NPM_VERSION"
-          echo "npm jirac-mcp: $NPM_MCP_VERSION"
 
           test "$TAG" = "$EXPECTED_TAG"
           test "$NPM_VERSION" = "$VERSION"
-          test "$NPM_MCP_VERSION" = "$VERSION"
 
       - name: Publish @mulham28/jirac (skip if already published)
         env:
@@ -428,17 +375,6 @@ jobs:
             echo "✓ @mulham28/jirac npm v$VERSION already published, skipping"
           else
             npm publish ./packaging/npm --access public
-          fi
-
-      - name: Publish @mulham28/jirac-mcp (skip if already published)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
-          if npm view @mulham28/jirac-mcp@"$VERSION" version >/dev/null 2>&1; then
-            echo "✓ @mulham28/jirac-mcp npm v$VERSION already published, skipping"
-          else
-            npm publish ./packaging/npm-mcp --access public
           fi
 
 
@@ -457,10 +393,6 @@ jobs:
       sha_macos_x86: ${{ steps.vars.outputs.sha_macos_x86 }}
       sha_linux_arm: ${{ steps.vars.outputs.sha_linux_arm }}
       sha_linux_x86: ${{ steps.vars.outputs.sha_linux_x86 }}
-      sha_mcp_macos_arm: ${{ steps.vars.outputs.sha_mcp_macos_arm }}
-      sha_mcp_macos_x86: ${{ steps.vars.outputs.sha_mcp_macos_x86 }}
-      sha_mcp_linux_arm: ${{ steps.vars.outputs.sha_mcp_linux_arm }}
-      sha_mcp_linux_x86: ${{ steps.vars.outputs.sha_mcp_linux_x86 }}
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
     steps:
       - name: Download checksums from release
@@ -482,20 +414,12 @@ jobs:
           SHA_MACOS_X86=$(grep -E '(^|/)jirac-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_LINUX_ARM=$(grep -E '(^|/)jirac-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_LINUX_X86=$(grep -E '(^|/)jirac-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
-          SHA_MCP_MACOS_ARM=$(grep -E '(^|/)jirac-mcp-macos-aarch64\.tar\.gz$' checksums.txt | awk '{print $1}')
-          SHA_MCP_MACOS_X86=$(grep -E '(^|/)jirac-mcp-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
-          SHA_MCP_LINUX_ARM=$(grep -E '(^|/)jirac-mcp-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
-          SHA_MCP_LINUX_X86=$(grep -E '(^|/)jirac-mcp-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
           SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"
           test -n "$SHA_LINUX_ARM"
           test -n "$SHA_LINUX_X86"
-          test -n "$SHA_MCP_MACOS_ARM"
-          test -n "$SHA_MCP_MACOS_X86"
-          test -n "$SHA_MCP_LINUX_ARM"
-          test -n "$SHA_MCP_LINUX_X86"
           test -n "$SHA_WINDOWS_X86"
 
           {
@@ -504,10 +428,6 @@ jobs:
             echo "sha_macos_x86=$SHA_MACOS_X86"
             echo "sha_linux_arm=$SHA_LINUX_ARM"
             echo "sha_linux_x86=$SHA_LINUX_X86"
-            echo "sha_mcp_macos_arm=$SHA_MCP_MACOS_ARM"
-            echo "sha_mcp_macos_x86=$SHA_MCP_MACOS_X86"
-            echo "sha_mcp_linux_arm=$SHA_MCP_LINUX_ARM"
-            echo "sha_mcp_linux_x86=$SHA_MCP_LINUX_X86"
             echo "sha_windows_x86=$SHA_WINDOWS_X86"
             echo "release_date=$RELEASE_DATE"
           } >> "$GITHUB_OUTPUT"
@@ -613,10 +533,6 @@ jobs:
       SHA_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_macos_x86 }}
       SHA_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_linux_arm }}
       SHA_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_linux_x86 }}
-      SHA_MCP_MACOS_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_arm }}
-      SHA_MCP_MACOS_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_macos_x86 }}
-      SHA_MCP_LINUX_ARM: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_arm }}
-      SHA_MCP_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_x86 }}
       SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
     steps:
       - name: Checkout homebrew-tap
@@ -626,12 +542,11 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
-      - name: Verify formulas exist
+      - name: Verify formula exists
         run: |
           test -f homebrew-tap/Formula/jira-commands.rb
-          test -f homebrew-tap/Formula/jira-mcp.rb
 
-      - name: Update formula versions and SHA256
+      - name: Update formula version and SHA256
         run: |
           python3 - <<'EOF'
           import re, os
@@ -643,12 +558,6 @@ jobs:
                   "jirac-macos-x86_64":  os.environ["SHA_MACOS_X86"],
                   "jirac-linux-aarch64": os.environ["SHA_LINUX_ARM"],
                   "jirac-linux-x86_64":  os.environ["SHA_LINUX_X86"],
-              },
-              "homebrew-tap/Formula/jira-mcp.rb": {
-                  "jirac-mcp-macos-aarch64": os.environ["SHA_MCP_MACOS_ARM"],
-                  "jirac-mcp-macos-x86_64":  os.environ["SHA_MCP_MACOS_X86"],
-                  "jirac-mcp-linux-aarch64": os.environ["SHA_MCP_LINUX_ARM"],
-                  "jirac-mcp-linux-x86_64":  os.environ["SHA_MCP_LINUX_X86"],
               },
           }
 
@@ -676,7 +585,7 @@ jobs:
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/jira-commands.rb Formula/jira-mcp.rb
+          git add Formula/jira-commands.rb
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump jira-commands to v${VERSION}"
           git push

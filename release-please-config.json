@@ -1,54 +1,36 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "include-component-in-tag": false,
+  "separate-pull-requests": true,
   "packages": {
     ".": {
       "release-type": "simple",
+      "include-component-in-tag": false,
       "component": "jira-commands",
       "package-name": "jira-commands",
       "version-file": "VERSION",
-      "changelog-path": "/CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        {
-          "type": "generic",
-          "path": "/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "/crates/jira/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "/crates/jira-core/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "/crates/jira-mcp/Cargo.toml"
-        },
-        {
-          "type": "generic",
-          "path": "/README.md"
-        },
-        {
-          "type": "generic",
-          "path": "/INSTALL.md"
-        },
-        {
-          "type": "generic",
-          "path": "/packaging/winget/jirac.yaml"
-        },
-        {
-          "type": "generic",
-          "path": "/packaging/winget/jirac.locale.en-US.yaml"
-        },
-        {
-          "type": "generic",
-          "path": "/packaging/winget/jirac.installer.yaml"
-        },
-        {
-          "type": "generic",
-          "path": "/packaging/npm/package.json"
-        }
+        { "type": "generic", "path": "/Cargo.toml" },
+        { "type": "generic", "path": "/crates/jira/Cargo.toml" },
+        { "type": "generic", "path": "/crates/jira-core/Cargo.toml" },
+        { "type": "generic", "path": "/README.md" },
+        { "type": "generic", "path": "/INSTALL.md" },
+        { "type": "generic", "path": "/packaging/winget/jirac.yaml" },
+        { "type": "generic", "path": "/packaging/winget/jirac.locale.en-US.yaml" },
+        { "type": "generic", "path": "/packaging/winget/jirac.installer.yaml" },
+        { "type": "generic", "path": "/packaging/npm/package.json" }
+      ]
+    },
+    "crates/jira-mcp": {
+      "release-type": "simple",
+      "include-component-in-tag": true,
+      "component": "jira-mcp",
+      "package-name": "jira-mcp",
+      "version-file": "VERSION",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        { "type": "generic", "path": "Cargo.toml" },
+        { "type": "generic", "path": "/packaging/npm-mcp/package.json" }
       ]
     }
   }

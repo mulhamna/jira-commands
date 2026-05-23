@@ -8,7 +8,8 @@ use jira_core::{
     },
     model::{
         field::{Field, FieldValue},
-        CreateIssueRequestV2, UpdateIssueRequest,
+        CreateIssueRequestV2, CreateProjectVersionRequest, UpdateIssueRequest,
+        UpdateProjectVersionRequest,
     },
     JiraClient,
 };
@@ -22,7 +23,9 @@ use crate::{
         ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
         BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs,
         IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
+        IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs,
+        SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs,
+        WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -182,6 +185,167 @@ impl JiraApp {
             "project_key": args.project_key,
             "fields": fields
         }))
+    }
+
+    pub async fn sprint_list(&self, args: SprintListArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let sprints = if let Some(states) = args.states.as_ref().filter(|states| !states.is_empty())
+        {
+            let normalized: Vec<String> = states
+                .iter()
+                .map(|state| normalize_sprint_state(state))
+                .collect::<AppResult<_>>()?;
+            let state_refs: Vec<&str> = normalized.iter().map(String::as_str).collect();
+            client
+                .list_sprints_for_project_with_states(&args.project_key, &state_refs)
+                .await?
+        } else {
+            client.list_sprints_for_project(&args.project_key).await?
+        };
+
+        Ok(json!({
+            "project_key": args.project_key,
+            "sprints": sprints
+        }))
+    }
+
+    pub async fn sprint_create(&self, args: SprintCreateArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let sprint = client
+            .create_sprint(
+                args.board_id,
+                &args.name,
+                args.start_date.as_deref(),
+                args.end_date.as_deref(),
+                args.goal.as_deref(),
+            )
+            .await?;
+        to_value(sprint)
+    }
+
+    pub async fn sprint_update(&self, args: SprintUpdateArgs) -> AppResult<Value> {
+        let has_changes = args.name.is_some()
+            || args.state.is_some()
+            || args.start_date.is_some()
+            || args.end_date.is_some()
+            || args.goal.is_some();
+        if !has_changes {
+            return Err(AppError::validation(
+                "Provide at least one sprint field to update",
+            ));
+        }
+
+        let mut body = serde_json::Map::new();
+        if let Some(name) = args.name {
+            body.insert("name".into(), Value::String(name));
+        }
+        if let Some(state) = args.state {
+            body.insert(
+                "state".into(),
+                Value::String(normalize_sprint_state(&state)?),
+            );
+        }
+        if let Some(start_date) = args.start_date {
+            body.insert("startDate".into(), Value::String(start_date));
+        }
+        if let Some(end_date) = args.end_date {
+            body.insert("endDate".into(), Value::String(end_date));
+        }
+        if let Some(goal) = args.goal {
+            body.insert("goal".into(), Value::String(goal));
+        }
+
+        let client = self.build_client()?;
+        let sprint = client
+            .update_sprint(args.sprint_id, Value::Object(body))
+            .await?;
+        to_value(sprint)
+    }
+
+    pub async fn sprint_delete(&self, args: SprintDeleteArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+        client.delete_sprint(args.sprint_id).await?;
+        Ok(json!({
+            "sprint_id": args.sprint_id,
+            "deleted": true
+        }))
+    }
+
+    pub async fn sprint_add_issue(&self, args: SprintAddIssueArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        client
+            .add_issue_to_sprint(args.sprint_id, &args.issue_key)
+            .await?;
+        Ok(json!({
+            "sprint_id": args.sprint_id,
+            "issue_key": args.issue_key,
+            "added": true
+        }))
+    }
+
+    pub async fn project_component_list(&self, args: ProjectKeyArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let components = client.get_project_components(&args.project_key).await?;
+        Ok(json!({
+            "project_key": args.project_key,
+            "components": components
+        }))
+    }
+
+    pub async fn project_version_list(&self, args: ProjectKeyArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let versions = client.get_project_versions(&args.project_key).await?;
+        Ok(json!({
+            "project_key": args.project_key,
+            "versions": versions
+        }))
+    }
+
+    pub async fn project_version_create(&self, args: ProjectVersionCreateArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let version = client
+            .create_project_version(&CreateProjectVersionRequest {
+                name: args.name,
+                project: args.project_key,
+                description: args.description,
+                archived: args.archived.unwrap_or(false),
+                released: args.released.unwrap_or(false),
+                release_date: args.release_date,
+                start_date: args.start_date,
+            })
+            .await?;
+        to_value(version)
+    }
+
+    pub async fn project_version_update(&self, args: ProjectVersionUpdateArgs) -> AppResult<Value> {
+        let has_changes = args.name.is_some()
+            || args.description.is_some()
+            || args.archived.is_some()
+            || args.released.is_some()
+            || args.release_date.is_some()
+            || args.start_date.is_some();
+        if !has_changes {
+            return Err(AppError::validation(
+                "Provide at least one project version field to update",
+            ));
+        }
+
+        let client = self.build_client()?;
+        let version = client
+            .update_project_version(
+                &args.version_id,
+                &UpdateProjectVersionRequest {
+                    name: args.name,
+                    description: args.description,
+                    archived: args.archived,
+                    released: args.released,
+                    release_date: args.release_date,
+                    start_date: args.start_date,
+                },
+            )
+            .await?;
+        to_value(version)
     }
 
     pub async fn issue_transitions_list(&self, args: IssueKeyArgs) -> AppResult<Value> {
@@ -528,6 +692,16 @@ struct ResolvedTransition {
     name: String,
 }
 
+fn normalize_sprint_state(state: &str) -> AppResult<String> {
+    let normalized = state.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "active" | "future" | "closed" => Ok(normalized),
+        _ => Err(AppError::validation(
+            "sprint state must be one of active, future, or closed",
+        )),
+    }
+}
+
 async fn resolve_transition(
     client: &JiraClient,
     key: &str,
@@ -821,6 +995,122 @@ mod tests {
         assert_eq!(response["body"]["ok"], Value::Bool(true));
 
         clear_test_env();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn project_component_list_returns_components() {
+        let temp_dir = TempDir::new().expect("tempdir");
+        let mock_server = MockServer::start().await;
+        set_test_env(&temp_dir, Some(&mock_server.uri()));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/project/PROJ/components"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {
+                    "id": "1001",
+                    "name": "Platform",
+                    "description": "Core services"
+                }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        let result = JiraApp
+            .project_component_list(ProjectKeyArgs {
+                project_key: "PROJ".into(),
+            })
+            .await
+            .expect("component list");
+
+        assert_eq!(result["project_key"], Value::String("PROJ".into()));
+        assert_eq!(result["components"].as_array().map(Vec::len), Some(1));
+
+        clear_test_env();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn sprint_list_uses_requested_states() {
+        let temp_dir = TempDir::new().expect("tempdir");
+        let mock_server = MockServer::start().await;
+        set_test_env(&temp_dir, Some(&mock_server.uri()));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(query_param("projectKeyOrId", "PROJ"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 77 }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/77/sprint"))
+            .and(query_param("state", "active,closed"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{
+                    "id": 55,
+                    "name": "Sprint 55",
+                    "state": "active",
+                    "goal": "Ship metadata tools"
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = JiraApp
+            .sprint_list(SprintListArgs {
+                project_key: "PROJ".into(),
+                states: Some(vec!["active".into(), "closed".into()]),
+            })
+            .await
+            .expect("sprint list");
+
+        assert_eq!(result["project_key"], Value::String("PROJ".into()));
+        assert_eq!(result["sprints"].as_array().map(Vec::len), Some(1));
+        assert_eq!(result["sprints"][0]["id"], Value::Number(55u64.into()));
+
+        clear_test_env();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn sprint_update_requires_at_least_one_field() {
+        let err = JiraApp
+            .sprint_update(SprintUpdateArgs {
+                sprint_id: 42,
+                name: None,
+                state: None,
+                start_date: None,
+                end_date: None,
+                goal: None,
+            })
+            .await
+            .expect_err("missing sprint changes should fail");
+
+        assert_eq!(err.to_mcp().message, "validation_error");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn project_version_update_requires_changes() {
+        let err = JiraApp
+            .project_version_update(ProjectVersionUpdateArgs {
+                version_id: "1000".into(),
+                name: None,
+                description: None,
+                archived: None,
+                released: None,
+                release_date: None,
+                start_date: None,
+            })
+            .await
+            .expect_err("missing version changes should fail");
+
+        assert_eq!(err.to_mcp().message, "validation_error");
     }
 
     #[test]

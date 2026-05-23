@@ -9,6 +9,10 @@
       "package-name": "jira-commands",
       "version-file": "VERSION",
       "changelog-path": "CHANGELOG.md",
+      "exclude-paths": [
+        "crates/jira-mcp",
+        "packaging/npm-mcp"
+      ],
       "extra-files": [
         { "type": "generic", "path": "/Cargo.toml" },
         { "type": "generic", "path": "/crates/jira/Cargo.toml" },

@@ -20,7 +20,9 @@ use crate::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
         CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
         IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
-        ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
+        ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs, SprintAddIssueArgs,
+        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs, ToolResponse,
+        WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -137,6 +139,105 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueFieldsArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_fields(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_list",
+        description = "List Jira sprints for a project, optionally filtered by sprint state"
+    )]
+    pub async fn jira_sprint_list(
+        &self,
+        Parameters(args): Parameters<SprintListArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_create",
+        description = "Create a sprint on a Jira board"
+    )]
+    pub async fn jira_sprint_create(
+        &self,
+        Parameters(args): Parameters<SprintCreateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_create(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_update",
+        description = "Update Jira sprint metadata or lifecycle state"
+    )]
+    pub async fn jira_sprint_update(
+        &self,
+        Parameters(args): Parameters<SprintUpdateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_update(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_delete",
+        description = "Delete a Jira sprint; requires confirm=true"
+    )]
+    pub async fn jira_sprint_delete(
+        &self,
+        Parameters(args): Parameters<SprintDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_delete(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_add_issue",
+        description = "Add an issue to a Jira sprint"
+    )]
+    pub async fn jira_sprint_add_issue(
+        &self,
+        Parameters(args): Parameters<SprintAddIssueArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_add_issue(args).await)
+    }
+
+    #[tool(
+        name = "jira_project_components_list",
+        description = "List Jira components for a project"
+    )]
+    pub async fn jira_project_components_list(
+        &self,
+        Parameters(args): Parameters<ProjectKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.project_component_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_project_versions_list",
+        description = "List Jira project versions / fix versions"
+    )]
+    pub async fn jira_project_versions_list(
+        &self,
+        Parameters(args): Parameters<ProjectKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.project_version_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_project_version_create",
+        description = "Create a Jira project version"
+    )]
+    pub async fn jira_project_version_create(
+        &self,
+        Parameters(args): Parameters<ProjectVersionCreateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.project_version_create(args).await)
+    }
+
+    #[tool(
+        name = "jira_project_version_update",
+        description = "Update Jira project version metadata"
+    )]
+    pub async fn jira_project_version_update(
+        &self,
+        Parameters(args): Parameters<ProjectVersionUpdateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.project_version_update(args).await)
     }
 
     #[tool(

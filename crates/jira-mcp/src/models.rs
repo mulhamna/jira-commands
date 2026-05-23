@@ -56,10 +56,74 @@ pub struct IssueTypesListArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectKeyArgs {
+    pub project_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueFieldsArgs {
     pub project_key: String,
     pub issue_type_id: Option<String>,
     pub required_only: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintListArgs {
+    pub project_key: String,
+    pub states: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintCreateArgs {
+    pub board_id: u64,
+    pub name: String,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub goal: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintUpdateArgs {
+    pub sprint_id: u64,
+    pub name: Option<String>,
+    pub state: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub goal: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintDeleteArgs {
+    pub sprint_id: u64,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintAddIssueArgs {
+    pub sprint_id: u64,
+    pub issue_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectVersionCreateArgs {
+    pub project_key: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub archived: Option<bool>,
+    pub released: Option<bool>,
+    pub release_date: Option<String>,
+    pub start_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectVersionUpdateArgs {
+    pub version_id: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub archived: Option<bool>,
+    pub released: Option<bool>,
+    pub release_date: Option<String>,
+    pub start_date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

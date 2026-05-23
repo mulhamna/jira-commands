@@ -17,11 +17,11 @@ use crate::{
     app::JiraApp,
     error::AppResult,
     models::{
-        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs,
-        IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs, IssueLinkDeleteArgs, IssueListArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ToolResponse, WorklogAddArgs,
-        WorklogDeleteArgs,
+        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BatchArgs, BulkCreateArgs,
+        BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
+        IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs,
+        IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -168,6 +168,28 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_update(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_bulk_create",
+        description = "Create multiple Jira issues from typed entries; requires confirm=true"
+    )]
+    pub async fn jira_issue_bulk_create(
+        &self,
+        Parameters(args): Parameters<BulkCreateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_bulk_create(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_batch",
+        description = "Run typed create, update, transition, and archive issue operations in sequence; requires confirm=true"
+    )]
+    pub async fn jira_issue_batch(
+        &self,
+        Parameters(args): Parameters<BatchArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_batch(args).await)
     }
 
     #[tool(
@@ -466,6 +488,10 @@ mod tests {
         assert!(tools.iter().any(|tool| tool.name == "jira_auth_status"));
         assert!(tools.iter().any(|tool| tool.name == "jira_issue_clone"));
         assert!(tools.iter().any(|tool| tool.name == "jira_issue_link_add"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_bulk_create"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_batch"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))
@@ -528,6 +554,10 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool.name == "jira_issue_link_delete"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_bulk_create"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_batch"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

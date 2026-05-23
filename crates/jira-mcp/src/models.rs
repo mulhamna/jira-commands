@@ -83,6 +83,32 @@ pub struct IssueCreateArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BulkCreateEntry {
+    pub project_key: String,
+    pub summary: String,
+    pub issue_type: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
+    pub description_adf: Option<Value>,
+    pub assignee: Option<String>,
+    pub priority: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub components: Option<Vec<String>>,
+    pub parent: Option<String>,
+    pub fix_versions: Option<Vec<String>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
+    pub custom_fields: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BulkCreateArgs {
+    pub issues: Vec<BulkCreateEntry>,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueUpdateArgs {
     pub key: String,
     pub summary: Option<String>,
@@ -194,6 +220,71 @@ pub struct BulkUpdateArgs {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ArchiveArgs {
     pub jql: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchCreateOp {
+    pub project_key: String,
+    pub summary: String,
+    pub issue_type: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
+    pub description_adf: Option<Value>,
+    pub assignee: Option<String>,
+    pub priority: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub components: Option<Vec<String>>,
+    pub parent: Option<String>,
+    pub fix_versions: Option<Vec<String>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
+    pub custom_fields: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchUpdateOp {
+    pub key: String,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object")]
+    pub description_adf: Option<Value>,
+    pub assignee: Option<String>,
+    pub priority: Option<String>,
+    pub labels: Option<Vec<String>>,
+    pub components: Option<Vec<String>>,
+    pub parent: Option<String>,
+    pub fix_versions: Option<Vec<String>>,
+    #[serde(default)]
+    #[schemars(schema_with = "any_json_object_map")]
+    pub custom_fields: Option<BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchTransitionOp {
+    pub key: String,
+    pub transition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchArchiveOp {
+    pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum BatchOperation {
+    Create(BatchCreateOp),
+    Update(BatchUpdateOp),
+    Transition(BatchTransitionOp),
+    Archive(BatchArchiveOp),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BatchArgs {
+    pub operations: Vec<BatchOperation>,
     pub confirm: Option<bool>,
 }
 

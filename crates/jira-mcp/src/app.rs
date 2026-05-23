@@ -19,11 +19,12 @@ use url::form_urlencoded;
 use crate::{
     error::{AppError, AppResult},
     models::{
-        ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
-        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
-        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs, IssueLinkDeleteArgs,
-        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, WorklogAddArgs,
-        WorklogDeleteArgs,
+        ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BatchArgs,
+        BatchCreateOp, BatchOperation, BatchUpdateOp, BulkCreateArgs, BulkCreateEntry,
+        BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
+        IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkAddArgs,
+        IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -197,66 +198,193 @@ impl JiraApp {
     pub async fn issue_create(&self, args: IssueCreateArgs) -> AppResult<Value> {
         let client = self.build_client()?;
         let issue = client
-            .create_issue_v2(CreateIssueRequestV2 {
-                project_key: args.project_key,
-                summary: args.summary,
-                description: args.description,
-                description_adf: args.description_adf,
-                issue_type: args.issue_type,
-                assignee: args.assignee,
-                priority: args.priority,
-                labels: args.labels.unwrap_or_default(),
-                components: args.components.unwrap_or_default(),
-                parent: args.parent,
-                fix_versions: args.fix_versions.unwrap_or_default(),
-                custom_fields: map_custom_fields(args.custom_fields),
-            })
+            .create_issue_v2(create_issue_request_from_args(args))
             .await?;
 
         to_value(issue)
     }
 
-    pub async fn issue_update(&self, args: IssueUpdateArgs) -> AppResult<Value> {
+    pub async fn issue_bulk_create(&self, args: BulkCreateArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
         let client = self.build_client()?;
-        let custom_fields = map_custom_fields(args.custom_fields);
-        let has_changes = args.summary.is_some()
-            || args.description.is_some()
-            || args.description_adf.is_some()
-            || args.assignee.is_some()
-            || args.priority.is_some()
-            || args.labels.is_some()
-            || args.components.is_some()
-            || args.parent.is_some()
-            || args.fix_versions.is_some()
-            || !custom_fields.is_empty();
 
-        if !has_changes {
-            return Err(AppError::validation(
-                "Provide at least one field to update on the issue",
-            ));
+        if args.issues.is_empty() {
+            return Ok(json!({
+                "total": 0,
+                "created_count": 0,
+                "failed_count": 0,
+                "created": [],
+                "failed": []
+            }));
         }
 
-        let key = args.key;
-        client
-            .update_issue(
-                &key,
-                UpdateIssueRequest {
-                    summary: args.summary,
-                    description: args.description,
-                    description_adf: args.description_adf,
-                    assignee: args.assignee,
-                    priority: args.priority,
-                    labels: args.labels,
-                    components: args.components,
-                    fix_versions: args.fix_versions,
-                    parent: args.parent,
-                    custom_fields,
-                    ..Default::default()
-                },
-            )
-            .await?;
+        let total = args.issues.len();
+        let mut created = Vec::new();
+        let mut failed = Vec::new();
+
+        for entry in args.issues {
+            let summary = entry.summary.clone();
+            match client
+                .create_issue_v2(create_issue_request_from_bulk_entry(entry))
+                .await
+            {
+                Ok(issue) => created.push(issue),
+                Err(err) => failed.push(json!({
+                    "summary": summary,
+                    "error": err.to_string()
+                })),
+            }
+        }
+
+        Ok(json!({
+            "total": total,
+            "created_count": created.len(),
+            "failed_count": failed.len(),
+            "created": created,
+            "failed": failed
+        }))
+    }
+
+    pub async fn issue_update(&self, args: IssueUpdateArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let key = args.key.clone();
+        let request = build_update_issue_request_from_issue(args)?;
+
+        client.update_issue(&key, request).await?;
         let issue = client.get_issue(&key).await?;
         to_value(issue)
+    }
+
+    pub async fn issue_batch(&self, args: BatchArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+
+        if args.operations.is_empty() {
+            return Ok(json!({
+                "total": 0,
+                "succeeded": 0,
+                "failed_count": 0,
+                "results": []
+            }));
+        }
+
+        let total = args.operations.len();
+        let mut results = Vec::new();
+        let mut succeeded = 0usize;
+
+        for operation in args.operations {
+            let result = match operation {
+                BatchOperation::Create(entry) => {
+                    let summary = entry.summary.clone();
+                    match client
+                        .create_issue_v2(create_issue_request_from_batch_create(entry))
+                        .await
+                    {
+                        Ok(issue) => {
+                            succeeded += 1;
+                            json!({
+                                "op": "create",
+                                "key": issue.key,
+                                "status": "created",
+                                "issue": issue
+                            })
+                        }
+                        Err(err) => json!({
+                            "op": "create",
+                            "summary": summary,
+                            "status": "failed",
+                            "error": err.to_string()
+                        }),
+                    }
+                }
+                BatchOperation::Update(entry) => {
+                    let key = entry.key.clone();
+                    match build_update_issue_request_from_batch(entry) {
+                        Ok(request) => match client.update_issue(&key, request).await {
+                            Ok(_) => {
+                                succeeded += 1;
+                                json!({
+                                    "op": "update",
+                                    "key": key,
+                                    "status": "updated"
+                                })
+                            }
+                            Err(err) => json!({
+                                "op": "update",
+                                "key": key,
+                                "status": "failed",
+                                "error": err.to_string()
+                            }),
+                        },
+                        Err(err) => json!({
+                            "op": "update",
+                            "key": key,
+                            "status": "failed",
+                            "error": err.to_string()
+                        }),
+                    }
+                }
+                BatchOperation::Transition(entry) => {
+                    let key = entry.key.clone();
+                    let transition = entry.transition.clone();
+                    match resolve_transition(&client, &key, &transition).await {
+                        Ok(resolved) => match client.transition_issue(&key, &resolved.id).await {
+                            Ok(_) => {
+                                succeeded += 1;
+                                json!({
+                                    "op": "transition",
+                                    "key": key,
+                                    "status": "transitioned",
+                                    "transition": {
+                                        "id": resolved.id,
+                                        "name": resolved.name
+                                    }
+                                })
+                            }
+                            Err(err) => json!({
+                                "op": "transition",
+                                "key": key,
+                                "status": "failed",
+                                "error": err.to_string()
+                            }),
+                        },
+                        Err(err) => json!({
+                            "op": "transition",
+                            "key": key,
+                            "status": "failed",
+                            "error": err.to_string()
+                        }),
+                    }
+                }
+                BatchOperation::Archive(entry) => {
+                    let key = entry.key;
+                    match client.archive_issues(std::slice::from_ref(&key)).await {
+                        Ok(_) => {
+                            succeeded += 1;
+                            json!({
+                                "op": "archive",
+                                "key": key,
+                                "status": "archived"
+                            })
+                        }
+                        Err(err) => json!({
+                            "op": "archive",
+                            "key": key,
+                            "status": "failed",
+                            "error": err.to_string()
+                        }),
+                    }
+                }
+            };
+            results.push(result);
+        }
+
+        Ok(json!({
+            "total": total,
+            "succeeded": succeeded,
+            "failed_count": total - succeeded,
+            "results": results
+        }))
     }
 
     pub async fn issue_delete(&self, args: IssueDeleteArgs) -> AppResult<Value> {
@@ -670,6 +798,125 @@ fn map_custom_fields(
         .into_iter()
         .map(|(key, value)| (key, FieldValue::Raw(value)))
         .collect()
+}
+
+fn create_issue_request_from_args(args: IssueCreateArgs) -> CreateIssueRequestV2 {
+    CreateIssueRequestV2 {
+        project_key: args.project_key,
+        summary: args.summary,
+        description: args.description,
+        description_adf: args.description_adf,
+        issue_type: args.issue_type,
+        assignee: args.assignee,
+        priority: args.priority,
+        labels: args.labels.unwrap_or_default(),
+        components: args.components.unwrap_or_default(),
+        parent: args.parent,
+        fix_versions: args.fix_versions.unwrap_or_default(),
+        custom_fields: map_custom_fields(args.custom_fields),
+    }
+}
+
+fn create_issue_request_from_bulk_entry(entry: BulkCreateEntry) -> CreateIssueRequestV2 {
+    CreateIssueRequestV2 {
+        project_key: entry.project_key,
+        summary: entry.summary,
+        description: entry.description,
+        description_adf: entry.description_adf,
+        issue_type: entry.issue_type.unwrap_or_else(|| "Task".to_string()),
+        assignee: entry.assignee,
+        priority: entry.priority,
+        labels: entry.labels.unwrap_or_default(),
+        components: entry.components.unwrap_or_default(),
+        parent: entry.parent,
+        fix_versions: entry.fix_versions.unwrap_or_default(),
+        custom_fields: map_custom_fields(entry.custom_fields),
+    }
+}
+
+fn create_issue_request_from_batch_create(entry: BatchCreateOp) -> CreateIssueRequestV2 {
+    CreateIssueRequestV2 {
+        project_key: entry.project_key,
+        summary: entry.summary,
+        description: entry.description,
+        description_adf: entry.description_adf,
+        issue_type: entry.issue_type.unwrap_or_else(|| "Task".to_string()),
+        assignee: entry.assignee,
+        priority: entry.priority,
+        labels: entry.labels.unwrap_or_default(),
+        components: entry.components.unwrap_or_default(),
+        parent: entry.parent,
+        fix_versions: entry.fix_versions.unwrap_or_default(),
+        custom_fields: map_custom_fields(entry.custom_fields),
+    }
+}
+
+fn build_update_issue_request_from_issue(args: IssueUpdateArgs) -> AppResult<UpdateIssueRequest> {
+    let custom_fields = map_custom_fields(args.custom_fields);
+    let has_changes = args.summary.is_some()
+        || args.description.is_some()
+        || args.description_adf.is_some()
+        || args.assignee.is_some()
+        || args.priority.is_some()
+        || args.labels.is_some()
+        || args.components.is_some()
+        || args.parent.is_some()
+        || args.fix_versions.is_some()
+        || !custom_fields.is_empty();
+
+    if !has_changes {
+        return Err(AppError::validation(
+            "Provide at least one field to update on the issue",
+        ));
+    }
+
+    Ok(UpdateIssueRequest {
+        summary: args.summary,
+        description: args.description,
+        description_adf: args.description_adf,
+        assignee: args.assignee,
+        priority: args.priority,
+        labels: args.labels,
+        components: args.components,
+        fix_versions: args.fix_versions,
+        parent: args.parent,
+        custom_fields,
+        ..Default::default()
+    })
+}
+
+fn build_update_issue_request_from_batch(entry: BatchUpdateOp) -> AppResult<UpdateIssueRequest> {
+    let custom_fields = map_custom_fields(entry.custom_fields);
+    let has_changes = entry.summary.is_some()
+        || entry.description.is_some()
+        || entry.description_adf.is_some()
+        || entry.assignee.is_some()
+        || entry.priority.is_some()
+        || entry.labels.is_some()
+        || entry.components.is_some()
+        || entry.parent.is_some()
+        || entry.fix_versions.is_some()
+        || !custom_fields.is_empty();
+
+    if !has_changes {
+        return Err(AppError::validation(
+            "Provide at least one field to update on the issue",
+        ));
+    }
+
+    Ok(UpdateIssueRequest {
+        summary: entry.summary,
+        description: entry.description,
+        description_adf: entry.description_adf,
+        assignee: entry.assignee,
+        priority: entry.priority,
+        labels: entry.labels,
+        components: entry.components,
+        fix_versions: entry.fix_versions,
+        parent: entry.parent,
+        custom_fields,
+        ..Default::default()
+    })
 }
 
 fn require_confirm(confirm: Option<bool>) -> AppResult<()> {

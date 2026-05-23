@@ -120,3 +120,11 @@ impl From<base64::DecodeError> for AppError {
         Self::validation(format!("Invalid base64 attachment payload: {value}"))
     }
 }
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.detail)
+    }
+}
+
+impl std::error::Error for AppError {}

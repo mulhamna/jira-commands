@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.2.2](https://github.com/mulhamna/jira-commands/compare/v1.2.1...v1.2.2) (2026-05-23)
+
+
+### Bug Fixes
+
+* **ci:** align npm checks with split release lanes ([#274](https://github.com/mulhamna/jira-commands/issues/274)) ([e8e5d89](https://github.com/mulhamna/jira-commands/commit/e8e5d89b46f959273cb437762996853c06fe69fd))
+
 ## [1.2.1](https://github.com/mulhamna/jira-commands/compare/v1.2.0...v1.2.1) (2026-05-23)
 
 

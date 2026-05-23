@@ -400,34 +400,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Verify npm package versions match workspace version
+      - name: Verify npm package versions match release lanes
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
+          MCP_LANE_VERSION=$(tr -d '[:space:]' < crates/jira-mcp/VERSION)
           NPM_VERSION=$(node -p "require('./packaging/npm/package.json').version")
           NPM_MCP_VERSION=$(node -p "require('./packaging/npm-mcp/package.json').version")
-          HEAD_REF="${GITHUB_HEAD_REF:-}"
 
           echo "workspace:     $VERSION"
+          echo "mcp lane:      $MCP_LANE_VERSION"
           echo "npm jirac:     $NPM_VERSION"
           echo "npm jirac-mcp: $NPM_MCP_VERSION"
-          echo "head_ref:      $HEAD_REF"
 
-          mismatch=0
-          [ "$VERSION" = "$NPM_VERSION" ] || mismatch=1
-          [ "$VERSION" = "$NPM_MCP_VERSION" ] || mismatch=1
-
-          if [ "$mismatch" != "0" ]; then
-            if [[ "$HEAD_REF" == release-please--branches--* ]]; then
-              echo "Release Please branch version mismatch detected."
-              echo "This branch is expected to lag because release-please does not rewrite packaging/npm*/package.json in this repo's current setup."
-              echo "The publish workflows still resync packaging/npm*/package.json from VERSION before npm publish."
-              exit 0
-            fi
-
-            echo "ERROR: one or more packaging/npm*/package.json versions are out of sync."
-            echo "Run: node scripts/sync-npm-version.mjs"
-            exit 1
-          fi
+          test "$VERSION" = "$NPM_VERSION"
+          test "$MCP_LANE_VERSION" = "$NPM_MCP_VERSION"
 
       - name: npm pack smoke test (jirac)
         run: |

@@ -133,14 +133,22 @@ jobs:
           CORE_VER=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           MCP_VER=$(grep '^version' crates/jira-mcp/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           BIN_VER=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
+          MCP_LANE_VER=$(tr -d '[:space:]' < crates/jira-mcp/VERSION)
 
           echo "jira-core:     $CORE_VER"
           echo "jira-mcp:      $MCP_VER"
+          echo "jira-mcp lane: $MCP_LANE_VER"
           echo "jira-commands: $BIN_VER"
 
-          if [ "$CORE_VER" != "$MCP_VER" ] || [ "$CORE_VER" != "$BIN_VER" ]; then
+          if [ "$CORE_VER" != "$BIN_VER" ]; then
             echo ""
-            echo "ERROR: Version mismatch! Workspace crates must stay aligned."
+            echo "ERROR: jira-core and jira-commands workspace versions must stay aligned."
+            exit 1
+          fi
+
+          if [ "$MCP_VER" != "$MCP_LANE_VER" ]; then
+            echo ""
+            echo "ERROR: jira-mcp crate version must match crates/jira-mcp/VERSION."
             exit 1
           fi
 

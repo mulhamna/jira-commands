@@ -488,27 +488,31 @@ jobs:
         run: |
           mkdir -p bucket/bucket
           if [ ! -f bucket/bucket/jirac-mcp.json ]; then
-            cat > bucket/bucket/jirac-mcp.json <<'EOF'
-{
-  "version": "0.0.0",
-  "description": "Typed Jira MCP server built in Rust.",
-  "homepage": "https://github.com/mulhamna/jira-commands",
-  "license": [
-    "MIT",
-    "Apache-2.0"
-  ],
-  "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-x86_64.zip",
-  "hash": "",
-  "bin": "jirac-mcp.exe",
-  "checkver": {
-    "url": "https://api.github.com/repos/mulhamna/jira-commands/releases?per_page=20",
-    "regex": "\"tag_name\":\\s*\"jira-mcp-v([^\"]+)\""
-  },
-  "autoupdate": {
-    "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-x86_64.zip"
-  }
-}
-EOF
+            python3 - <<'PY'
+            import json
+            from pathlib import Path
+
+            manifest = {
+                "version": "0.0.0",
+                "description": "Typed Jira MCP server built in Rust.",
+                "homepage": "https://github.com/mulhamna/jira-commands",
+                "license": ["MIT", "Apache-2.0"],
+                "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-x86_64.zip",
+                "hash": "",
+                "bin": "jirac-mcp.exe",
+                "checkver": {
+                    "url": "https://api.github.com/repos/mulhamna/jira-commands/releases?per_page=20",
+                    "regex": "\"tag_name\":\\s*\"jira-mcp-v([^\"]+)\"",
+                },
+                "autoupdate": {
+                    "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-x86_64.zip",
+                },
+            }
+
+            Path("bucket/bucket/jirac-mcp.json").write_text(
+                json.dumps(manifest, indent=2) + "\n"
+            )
+            PY
           fi
 
       - name: Update Scoop manifest

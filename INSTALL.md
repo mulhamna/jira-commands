@@ -13,7 +13,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | From source          | ✅    | ✅    | ✅      | `cargo install --path` from a local checkout    |
 | npm                  | ✅    | ✅    | ✅      | Downloads prebuilt release binary               |
 | GitHub Releases      | ✅    | ✅    | ✅      | Manual download of archives/binaries            |
-| Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket`           |
+| Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket` for `jirac` + `jirac-mcp` |
 | Winget               | ❌    | ❌    | ✅      | Windows package manager                         |
 
 ## Homebrew (macOS / Linux)
@@ -62,6 +62,7 @@ powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-We
 ```powershell
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac
+scoop install mulhamna/jirac-mcp
 ```
 
 ## Cargo
@@ -125,6 +126,7 @@ If you prefer Scoop, use the custom bucket instead:
 ```powershell
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac
+scoop install mulhamna/jirac-mcp
 ```
 
 ## After install

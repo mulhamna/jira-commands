@@ -26,6 +26,7 @@ cargo install --path crates/jira-mcp --locked
 Or use one of the workspace-level install options from the root README:
 - Homebrew (`brew tap mulhamna/tap && brew install jira-commands jira-mcp`)
 - npm (`npm install -g @mulham28/jirac` / `@mulham28/jirac-mcp`)
+- Scoop (`scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket && scoop install mulhamna/jirac mulhamna/jirac-mcp`)
 - shell installer on macOS/Linux
 - PowerShell installer on Windows
 - GitHub Releases archives and packaged binaries

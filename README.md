@@ -3,16 +3,13 @@
 Jira on the command line.
 
 [![CI](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/jira-commands/actions/workflows/ci.yml)
-[![Crates.io](https://img.shields.io/crates/v/jira-commands.svg)](https://crates.io/crates/jira-commands)
-[![npm](https://img.shields.io/npm/v/%40mulham28%2Fjirac)](https://www.npmjs.com/package/@mulham28/jirac)
-
-[![Homebrew](https://img.shields.io/github/v/release/mulhamna/jira-commands?label=homebrew&color=fbb040)](https://github.com/mulhamna/homebrew-tap)
-[![Winget](https://img.shields.io/winget/v/mulhamna.jirac)](https://github.com/mulhamna/winget-pkgs/tree/main/manifests/m/mulhamna/jirac)
-[![Scoop](https://img.shields.io/badge/dynamic/json?label=scoop&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fmulhamna%2Fscoop-bucket%2Fmain%2Fbucket%2Fjirac.json&color=00b4ff)](https://github.com/mulhamna/scoop-bucket)
-
 [![License: MIT + Apache-2.0](https://img.shields.io/badge/license-MIT%20%2B%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12742/badge)](https://www.bestpractices.dev/projects/12742)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+
+| `jirac` | `jira-mcp` | `plugin` | `clawhub` |
+| --- | --- | --- | --- |
+| [![crate jirac](https://img.shields.io/crates/v/jira-commands.svg?label=crate)](https://crates.io/crates/jira-commands)<br>[![npm jirac](https://img.shields.io/npm/v/%40mulham28%2Fjirac?label=npm)](https://www.npmjs.com/package/@mulham28/jirac)<br>[![homebrew jirac](https://img.shields.io/badge/homebrew-1.2.2-fbb040)](https://github.com/mulhamna/homebrew-tap/blob/main/Formula/jira-commands.rb)<br>[![scoop jirac](https://img.shields.io/badge/scoop-1.2.2-00b4ff)](https://github.com/mulhamna/scoop-bucket/blob/main/bucket/jirac.json)<br>[![winget jirac](https://img.shields.io/badge/winget-1.2.2-2b579a)](https://github.com/mulhamna/winget-pkgs/tree/main/manifests/m/mulhamna/jirac) | [![crate jira-mcp](https://img.shields.io/crates/v/jira-mcp.svg?label=crate)](https://crates.io/crates/jira-mcp)<br>[![npm jira-mcp](https://img.shields.io/npm/v/%40mulham28%2Fjirac-mcp?label=npm)](https://www.npmjs.com/package/@mulham28/jirac-mcp)<br>[![homebrew jira-mcp](https://img.shields.io/badge/homebrew-1.2.0-fbb040)](https://github.com/mulhamna/homebrew-tap/blob/main/Formula/jira-mcp.rb)<br>[![scoop jira-mcp](https://img.shields.io/badge/scoop-next%20release-f5a623)](https://github.com/mulhamna/scoop-bucket) | [![plugin jira](https://img.shields.io/badge/plugin-0.17.0-7c3aed)](plugin/README.md) | [![clawhub jirac](https://img.shields.io/badge/clawhub-0.1.8-0f766e)](clawhub/jirac/SKILL.md) |
 
 `jirac` is a Jira command-line client written in Rust. It ships as a single binary with no runtime dependencies and runs on macOS, Linux, and Windows. It supports Jira Cloud and Jira Data Center, stores multiple login profiles, and discovers custom fields at runtime so there is little to configure beyond your credentials.
 
@@ -90,6 +87,7 @@ cargo install jira-commands
 # Windows (Scoop)
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/jirac
+scoop install mulhamna/jirac-mcp
 
 # Windows (winget)
 winget install mulhamna.jirac

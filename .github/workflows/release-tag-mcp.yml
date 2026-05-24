@@ -349,6 +349,7 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.vars.outputs.version }}
+      sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
       sha_mcp_macos_arm: ${{ steps.vars.outputs.sha_mcp_macos_arm }}
       sha_mcp_macos_x86: ${{ steps.vars.outputs.sha_mcp_macos_x86 }}
       sha_mcp_linux_arm: ${{ steps.vars.outputs.sha_mcp_linux_arm }}
@@ -372,14 +373,17 @@ jobs:
           SHA_MCP_MACOS_X86=$(grep -E '(^|/)jirac-mcp-macos-x86_64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_MCP_LINUX_ARM=$(grep -E '(^|/)jirac-mcp-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_MCP_LINUX_X86=$(grep -E '(^|/)jirac-mcp-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-mcp-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MCP_MACOS_ARM"
           test -n "$SHA_MCP_MACOS_X86"
           test -n "$SHA_MCP_LINUX_ARM"
           test -n "$SHA_MCP_LINUX_X86"
+          test -n "$SHA_WINDOWS_X86"
 
           {
             echo "version=$VERSION"
+            echo "sha_windows_x86=$SHA_WINDOWS_X86"
             echo "sha_mcp_macos_arm=$SHA_MCP_MACOS_ARM"
             echo "sha_mcp_macos_x86=$SHA_MCP_MACOS_X86"
             echo "sha_mcp_linux_arm=$SHA_MCP_LINUX_ARM"
@@ -450,4 +454,74 @@ jobs:
           git add Formula/jira-mcp.rb
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore: bump jira-mcp to v${VERSION}"
+          git push
+
+  update-scoop-bucket:
+    name: Update Scoop bucket manifest (jira-mcp)
+    runs-on: ubuntu-latest
+    needs: collect-release-metadata
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.collect-release-metadata.outputs.version }}
+      SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
+      REPOSITORY: ${{ github.repository }}
+      SCOOP_BINARY: jirac-mcp
+      SCOOP_RELEASE_TAG_PREFIX: jira-mcp-v
+      SCOOP_WINDOWS_ARCHIVE: jirac-mcp-windows-x86_64.zip
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+          path: repo
+
+      - name: Checkout scoop bucket
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: mulhamna/scoop-bucket
+          token: ${{ secrets.SCOOP_BUCKET_PAT }}
+          path: bucket
+
+      - name: Seed jirac-mcp manifest if missing
+        run: |
+          mkdir -p bucket/bucket
+          if [ ! -f bucket/bucket/jirac-mcp.json ]; then
+            cat > bucket/bucket/jirac-mcp.json <<'EOF'
+            {
+              "version": "0.0.0",
+              "description": "Typed Jira MCP server built in Rust.",
+              "homepage": "https://github.com/mulhamna/jira-commands",
+              "license": [
+                "MIT",
+                "Apache-2.0"
+              ],
+              "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-x86_64.zip",
+              "hash": "",
+              "bin": "jirac-mcp.exe",
+              "checkver": {
+                "url": "https://api.github.com/repos/mulhamna/jira-commands/releases?per_page=20",
+                "regex": "\"tag_name\":\\s*\"jira-mcp-v([^\"]+)\""
+              },
+              "autoupdate": {
+                "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-x86_64.zip"
+              }
+            }
+            EOF
+          fi
+
+      - name: Update Scoop manifest
+        env:
+          SCOOP_MANIFEST_PATH: bucket/bucket/jirac-mcp.json
+        run: python3 repo/.github/scripts/update_scoop_manifest.py
+
+      - name: Commit and push Scoop manifest
+        run: |
+          cd bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/jirac-mcp.json
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: bump jirac-mcp to v${VERSION}"
           git push

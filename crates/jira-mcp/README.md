@@ -22,6 +22,10 @@ cargo install jira-mcp
 # npm (Node 18+)
 npm install -g @mulham28/jirac-mcp
 
+# Scoop (Windows)
+scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
+scoop install mulhamna/jirac-mcp
+
 # From a local checkout
 cargo install --path crates/jira-mcp --locked
 ```

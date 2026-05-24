@@ -19,8 +19,9 @@ use crate::{
     models::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
         CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
-        ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs, SprintAddIssueArgs,
+        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs,
+        IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
+        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
         SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs, ToolResponse,
         WorklogAddArgs, WorklogDeleteArgs,
     },
@@ -323,6 +324,69 @@ impl JiraMcpServer {
         Parameters(args): Parameters<CommentAddArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.comment_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_types_list",
+        description = "List available Jira issue link types such as blocks, relates to, and duplicates"
+    )]
+    pub async fn jira_issue_link_types_list(&self) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_types_list().await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_create",
+        description = "Create a link between two Jira issues using a Jira link type name"
+    )]
+    pub async fn jira_issue_link_create(
+        &self,
+        Parameters(args): Parameters<IssueLinkCreateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_create(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_link_delete",
+        description = "Delete a Jira issue link by link ID; requires confirm=true"
+    )]
+    pub async fn jira_issue_link_delete(
+        &self,
+        Parameters(args): Parameters<IssueLinkDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_link_delete(args).await)
+    }
+
+    #[tool(
+        name = "jira_remote_link_list",
+        description = "List remote links attached to a Jira issue"
+    )]
+    pub async fn jira_remote_link_list(
+        &self,
+        Parameters(args): Parameters<IssueKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.remote_link_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_remote_link_add",
+        description = "Attach a remote URL link to a Jira issue"
+    )]
+    pub async fn jira_remote_link_add(
+        &self,
+        Parameters(args): Parameters<RemoteLinkAddArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.remote_link_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_remote_link_delete",
+        description = "Delete a remote link from a Jira issue; requires confirm=true"
+    )]
+    pub async fn jira_remote_link_delete(
+        &self,
+        Parameters(args): Parameters<RemoteLinkDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.remote_link_delete(args).await)
     }
 
     #[tool(

@@ -22,10 +22,11 @@ use crate::{
     models::{
         ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
         BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs,
-        IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs,
-        SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs,
-        WorklogAddArgs, WorklogDeleteArgs,
+        IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
+        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
+        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -493,6 +494,73 @@ impl JiraApp {
         let client = self.build_client()?;
         let comment = client.add_comment(&args.key, &args.body).await?;
         to_value(comment)
+    }
+
+    pub async fn issue_link_types_list(&self) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let link_types = client.list_issue_link_types().await?;
+        Ok(json!({
+            "link_types": link_types
+        }))
+    }
+
+    pub async fn issue_link_create(&self, args: IssueLinkCreateArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        client
+            .link_issues(
+                &args.outward_key,
+                &args.inward_key,
+                &args.link_type,
+                args.comment.as_deref(),
+            )
+            .await?;
+        Ok(json!({
+            "outward_key": args.outward_key,
+            "inward_key": args.inward_key,
+            "link_type": args.link_type,
+            "created": true
+        }))
+    }
+
+    pub async fn issue_link_delete(&self, args: IssueLinkDeleteArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+        client.delete_issue_link(&args.link_id).await?;
+        Ok(json!({
+            "link_id": args.link_id,
+            "deleted": true
+        }))
+    }
+
+    pub async fn remote_link_list(&self, args: IssueKeyArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let links = client.get_remote_links(&args.key).await?;
+        Ok(json!({
+            "key": args.key,
+            "remote_links": links
+        }))
+    }
+
+    pub async fn remote_link_add(&self, args: RemoteLinkAddArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let link = client
+            .add_remote_link(&args.key, &args.url, &args.title)
+            .await?;
+        Ok(json!({
+            "key": args.key,
+            "remote_link": link
+        }))
+    }
+
+    pub async fn remote_link_delete(&self, args: RemoteLinkDeleteArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+        client.delete_remote_link(&args.key, &args.link_id).await?;
+        Ok(json!({
+            "key": args.key,
+            "link_id": args.link_id,
+            "deleted": true
+        }))
     }
 
     pub async fn worklog_list(&self, args: IssueKeyArgs) -> AppResult<Value> {
@@ -1126,5 +1194,76 @@ mod tests {
         .expect_err("duplicate query should fail");
 
         assert_eq!(err.to_mcp().message, "validation_error");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn issue_link_types_list_returns_values() {
+        let temp_dir = TempDir::new().expect("tempdir");
+        let mock_server = MockServer::start().await;
+        set_test_env(&temp_dir, Some(&mock_server.uri()));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issueLinkType"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issueLinkTypes": [{
+                    "id": "10000",
+                    "name": "Blocks",
+                    "inward": "is blocked by",
+                    "outward": "blocks"
+                }]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = JiraApp
+            .issue_link_types_list()
+            .await
+            .expect("link type list");
+
+        assert_eq!(result["link_types"].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            result["link_types"][0]["name"],
+            Value::String("Blocks".into())
+        );
+
+        clear_test_env();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn remote_link_list_returns_links() {
+        let temp_dir = TempDir::new().expect("tempdir");
+        let mock_server = MockServer::start().await;
+        set_test_env(&temp_dir, Some(&mock_server.uri()));
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/PROJ-1/remotelink"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
+                "id": 321,
+                "relationship": "references",
+                "object": {
+                    "title": "Spec",
+                    "url": "https://example.com/spec"
+                }
+            }])))
+            .mount(&mock_server)
+            .await;
+
+        let result = JiraApp
+            .remote_link_list(IssueKeyArgs {
+                key: "PROJ-1".into(),
+            })
+            .await
+            .expect("remote links");
+
+        assert_eq!(result["key"], Value::String("PROJ-1".into()));
+        assert_eq!(result["remote_links"].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            result["remote_links"][0]["object"]["title"],
+            Value::String("Spec".into())
+        );
+
+        clear_test_env();
     }
 }

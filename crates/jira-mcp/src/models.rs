@@ -203,6 +203,34 @@ pub struct CommentAddArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueLinkCreateArgs {
+    pub outward_key: String,
+    pub inward_key: String,
+    pub link_type: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueLinkDeleteArgs {
+    pub link_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct RemoteLinkAddArgs {
+    pub key: String,
+    pub url: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct RemoteLinkDeleteArgs {
+    pub key: String,
+    pub link_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorklogAddArgs {
     pub key: String,
     pub time_spent: String,

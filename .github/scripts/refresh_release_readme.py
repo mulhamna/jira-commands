@@ -82,6 +82,7 @@ cargo install jira-commands
 # Windows (Scoop)
 scoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}
 scoop install mulhamna/jirac
+scoop install mulhamna/jirac-mcp
 
 # Windows (winget)
 winget install mulhamna.jirac
@@ -137,7 +138,7 @@ def refresh_install_md(text: str) -> str:
         r"## PowerShell installer \(Windows\)\n.*?## Cargo\n",
         flags=re.S,
     )
-    new = f"""## PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstall `jirac-mcp` instead:\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\" -Binary jirac-mcp\n```\n\n## Scoop (Windows)\n\n```powershell\nscoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}\nscoop install mulhamna/jirac\n```\n\n## Cargo\n"""
+    new = f"""## PowerShell installer (Windows)\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\"\n```\n\nInstall `jirac-mcp` instead:\n\n```powershell\npowershell -ExecutionPolicy Bypass -Command \"& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))\" -Binary jirac-mcp\n```\n\n## Scoop (Windows)\n\n```powershell\nscoop bucket add mulhamna https://github.com/{SCOOP_BUCKET}\nscoop install mulhamna/jirac\nscoop install mulhamna/jirac-mcp\n```\n\n## Cargo\n"""
     if not pattern.search(text):
         raise SystemExit("expected PowerShell/Cargo section not found in INSTALL.md")
     return pattern.sub(new, text, count=1)

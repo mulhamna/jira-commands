@@ -133,8 +133,9 @@ Format: `<type>(<scope>): <description>` — in English.
 See `.github/workflows/` for details — actual files are source of truth.
 - **ci.yml**: fmt + clippy + test + build (matrix: ubuntu/macos/windows)
 - **security.yml**: `cargo audit`
-- **release-please.yml**: auto version bump + CHANGELOG + tag
-- **release-tag.yml**: build binaries + publish to crates.io (trigger: tag `v*`)
+- **release-please.yml**: auto version bump + CHANGELOG + tag (both lanes)
+- **release-tag.yml**: build binaries + publish jirac (trigger: tag `v*`)
+- **release-tag-mcp.yml**: build binaries + publish jirac-mcp (trigger: tag `jira-mcp-v*`)
 - **release-recover.yml**: recovery workflow for failed releases
 - **clawhub-publish-jirac.yml**: publish to ClawHub plugin marketplace
 - **pr-automerge.yml**: auto-merge release-please PRs
@@ -143,6 +144,28 @@ See `.github/workflows/` for details — actual files are source of truth.
 ### Release strategy
 
 Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files updated via `generic` updater in `release-please-config.json`. Plugin version in `plugin/.claude-plugin/plugin.json` is separate and NOT auto-bumped by release-please.
+
+### Dual release lanes (jira-commands vs jira-mcp)
+
+Two independent lanes via `separate-pull-requests: true`:
+
+| Lane            | Component        | Tag                  | Version source             | Excludes                                  |
+| --------------- | ---------------- | -------------------- | -------------------------- | ----------------------------------------- |
+| jira-commands   | jira + jira-core | `vX.Y.Z`             | `/VERSION`                 | `crates/jira-mcp`, `packaging/npm-mcp`    |
+| jira-mcp        | jira-mcp         | `jira-mcp-vX.Y.Z`    | `crates/jira-mcp/VERSION`  | —                                         |
+
+**Commit scoping → which lane bumps:**
+
+- Edits ONLY under `crates/jira-mcp/**` or `packaging/npm-mcp/**` → jira-mcp lane only. Use `feat(jira-mcp):` / `fix(jira-mcp):` (or `feat(mcp):`).
+- Edits to root files (`README.md`, `INSTALL.md`, `.github/workflows/**`, `release-please-config.json`, root `Cargo.toml`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`) → jira-commands lane bumps regardless of scope name.
+- Mixed PRs bump BOTH lanes → two release PRs open in parallel.
+
+**Manifest race (avoid):** if two release PRs are open at once, merging one stale-overwrites the other's manifest entry. Mitigation:
+
+1. Merge release PRs one at a time. After the first merges, **wait for release-please.yml to rebase the second PR** before merging it (it picks up updated manifest).
+2. `release-please.yml` has a `Verify manifest matches VERSION files` guard step — fails fast if state drifts.
+
+To recover from a stomped manifest: edit `.release-please-manifest.json` to match the latest published tag for each component, commit as `fix(release): correct manifest after parallel release PR race`.
 
 ### Plugin marketplace
 

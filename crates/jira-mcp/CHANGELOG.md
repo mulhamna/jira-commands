@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.0.0...jira-mcp-v2.0.1) (2026-05-24)
+
+
+### Bug Fixes
+
+* **jira-mcp:** implement Display and std::error::Error for AppError ([#291](https://github.com/mulhamna/jira-commands/issues/291)) ([5f9bfec](https://github.com/mulhamna/jira-commands/commit/5f9bfecea06621f2bca2cf836fa80987176658ca))
+
 ## [2.0.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v1.2.0...jira-mcp-v2.0.0) (2026-05-24)
 
 

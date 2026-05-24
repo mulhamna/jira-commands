@@ -86,6 +86,14 @@ impl AppError {
     }
 }
 
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.stable_code, self.detail)
+    }
+}
+
+impl std::error::Error for AppError {}
+
 impl From<jira_core::JiraError> for AppError {
     fn from(value: jira_core::JiraError) -> Self {
         match value {

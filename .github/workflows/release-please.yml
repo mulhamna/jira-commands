@@ -93,6 +93,24 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Verify manifest matches VERSION files
+        run: |
+          set -euo pipefail
+          ROOT_VER=$(cat VERSION)
+          MCP_VER=$(cat crates/jira-mcp/VERSION)
+          MANIFEST_ROOT=$(jq -r '."."' .release-please-manifest.json)
+          MANIFEST_MCP=$(jq -r '."crates/jira-mcp"' .release-please-manifest.json)
+          if [ "$ROOT_VER" != "$MANIFEST_ROOT" ]; then
+            echo "::error::manifest root $MANIFEST_ROOT != VERSION $ROOT_VER (likely parallel release PR stomp)"
+            exit 1
+          fi
+          if [ "$MCP_VER" != "$MANIFEST_MCP" ]; then
+            echo "::error::manifest crates/jira-mcp $MANIFEST_MCP != crates/jira-mcp/VERSION $MCP_VER"
+            exit 1
+          fi
+
       - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
         id: release
         with:

@@ -6,6 +6,18 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.3.0](https://github.com/mulhamna/jira-commands/compare/v1.2.2...v1.3.0) (2026-05-24)
+
+
+### Features
+
+* **release:** add jira-mcp scoop docs and automation ([#284](https://github.com/mulhamna/jira-commands/issues/284)) ([e4f3459](https://github.com/mulhamna/jira-commands/commit/e4f34599db275fe221d8c886b7d8b756709c5097))
+
+
+### Bug Fixes
+
+* **release:** scope jira-mcp and root release lanes ([#280](https://github.com/mulhamna/jira-commands/issues/280)) ([5e2081a](https://github.com/mulhamna/jira-commands/commit/5e2081ac88b3daee12f9bfec42a8e87b98110469))
+
 ## [1.2.2](https://github.com/mulhamna/jira-commands/compare/v1.2.1...v1.2.2) (2026-05-23)
 
 

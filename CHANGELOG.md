@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.3.2](https://github.com/mulhamna/jira-commands/compare/v1.3.1...v1.3.2) (2026-05-24)
+
+
+### Bug Fixes
+
+* **ci:** rewrite jira-mcp scoop seed step without nested python heredoc ([#293](https://github.com/mulhamna/jira-commands/issues/293)) ([ebadcb8](https://github.com/mulhamna/jira-commands/commit/ebadcb8f2bccb046cd958050b0abec77920e14ee))
+
 ## [1.3.1](https://github.com/mulhamna/jira-commands/compare/v1.3.0...v1.3.1) (2026-05-24)
 
 

@@ -6,6 +6,15 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.3.1](https://github.com/mulhamna/jira-commands/compare/v1.3.0...v1.3.1) (2026-05-24)
+
+
+### Bug Fixes
+
+* **ci:** repair jira-mcp scoop manifest seed step ([#287](https://github.com/mulhamna/jira-commands/issues/287)) ([b5263ef](https://github.com/mulhamna/jira-commands/commit/b5263ef4acca82e15b63005157fbcd8a203f65d5))
+* **ci:** seed jirac-mcp manifest without heredoc ([#288](https://github.com/mulhamna/jira-commands/issues/288)) ([da4ae07](https://github.com/mulhamna/jira-commands/commit/da4ae07344609ca277b7729aa75f556f71c8df78))
+* **release:** repair manifest race and workflow_dispatch release lane ([#289](https://github.com/mulhamna/jira-commands/issues/289)) ([b0a75e3](https://github.com/mulhamna/jira-commands/commit/b0a75e37a2ed6a681c28c2576f5135518b128be4))
+
 ## [1.3.0](https://github.com/mulhamna/jira-commands/compare/v1.2.2...v1.3.0) (2026-05-24)
 
 

@@ -48,6 +48,7 @@ pub enum McpClient {
     OpenCode,
     GenericJson,
     Zed,
+    Antigravity,
 }
 
 impl std::fmt::Display for McpClient {
@@ -62,6 +63,9 @@ impl std::fmt::Display for McpClient {
             McpClient::GeminiCli => "gemini-cli         (delegates to `gemini mcp add`)",
             McpClient::OpenCode => "opencode           (writes opencode.jsonc)",
             McpClient::Zed => "zed                (writes Zed settings.json context_servers)",
+            McpClient::Antigravity => {
+                "antigravity        (writes ~/.gemini/antigravity/mcp_config.json)"
+            }
             McpClient::GenericJson => "generic-json       (print snippet only, no file changes)",
         };
         f.write_str(label)
@@ -150,6 +154,7 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::GeminiCli,
             McpClient::OpenCode,
             McpClient::Zed,
+            McpClient::Antigravity,
             McpClient::GenericJson,
         ],
     )
@@ -280,6 +285,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::OpenCode,
             McpClient::GenericJson,
             McpClient::Zed,
+            McpClient::Antigravity,
         ],
     };
 
@@ -420,6 +426,14 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
         McpClient::OpenCode => ("opencode", opencode_settings_path(&home), "mcp"),
         McpClient::GeminiCli | McpClient::Codex | McpClient::GenericJson => unreachable!(),
         McpClient::Zed => ("zed", zed_settings_path(&home), "context_servers"),
+        McpClient::Antigravity => (
+            "antigravity",
+            config_path_from_env_or_default(
+                "ANTIGRAVITY_CONFIG",
+                home.join(".gemini/antigravity/mcp_config.json"),
+            ),
+            "mcpServers",
+        ),
     };
 
     Ok(InstallTarget {
@@ -479,6 +493,13 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.config/zed/settings.json")),
             note: "Writes context_servers.jira.settings for the Zed marketplace extension.",
+        },
+        McpClient::Antigravity => ClientDescriptor::FileTarget {
+            label: "antigravity",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.gemini/antigravity/mcp_config.json")),
+            note: "Writes user-level config at ~/.gemini/antigravity/mcp_config.json (mcpServers).",
         },
     }
 }

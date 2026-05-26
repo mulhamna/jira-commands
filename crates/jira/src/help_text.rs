@@ -18,6 +18,7 @@ pub const ROOT_LONG_ABOUT: &str = concat!(
     "Quick start:\n",
     "  jirac auth login                       Set up credentials\n",
     "  jirac issue list                       List your assigned issues\n",
+    "  jirac PROJ-123 --web                   Open an issue in your browser\n",
     "  jirac issue standup                    Generate a daily standup summary\n",
     "  jirac issue sprint-summary -p MYPROJ   Summarize the current sprint\n",
     "  jirac issue sprints -p MYPROJ          List project sprints and states\n",

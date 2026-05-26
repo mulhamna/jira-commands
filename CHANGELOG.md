@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.4.0](https://github.com/mulhamna/jira-commands/compare/v1.3.2...v1.4.0) (2026-05-26)
+
+
+### Features
+
+* **cli:** add issue browser shortcut ([#299](https://github.com/mulhamna/jira-commands/issues/299)) ([286141d](https://github.com/mulhamna/jira-commands/commit/286141d0c8fb80e37759600fd31e740cdba3fa23))
+
 ## [1.3.2](https://github.com/mulhamna/jira-commands/compare/v1.3.1...v1.3.2) (2026-05-24)
 
 

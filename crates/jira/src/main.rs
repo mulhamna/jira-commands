@@ -9,11 +9,20 @@ use tracing_subscriber::{fmt, EnvFilter};
     name = "jirac",
     about = "jirac — terminal client for the Jira ecosystem",
     long_about = help_text::ROOT_LONG_ABOUT,
-    version
+    version,
+    args_conflicts_with_subcommands = true
 )]
 struct Cli {
+    /// Issue key shortcut. Use with --web to open in Jira.
+    #[arg(value_name = "ISSUE")]
+    issue: Option<String>,
+
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+
+    /// Open the issue shortcut in your browser (for example: jirac PROJ-123 --web)
+    #[arg(long, requires = "issue")]
+    web: bool,
 
     /// Enable verbose logging (sets RUST_LOG=debug)
     #[arg(short, long, global = true)]
@@ -81,7 +90,21 @@ async fn main() -> Result<()> {
 
     fmt().with_env_filter(filter).with_target(false).init();
 
-    match cli.command {
+    if let Some(issue) = cli.issue {
+        if cli.web {
+            open_issue_shortcut(&issue)?;
+            if let Some(notice) = &update_notice {
+                eprintln!("{}", version_check::cli_message(notice));
+            }
+            return Ok(());
+        }
+    }
+
+    let Some(command) = cli.command else {
+        anyhow::bail!("No command provided. Run `jirac --help` for usage.");
+    };
+
+    match command {
         Commands::Auth { command } => {
             cli::auth::handle(command).await?;
             if let Some(notice) = &update_notice {
@@ -126,6 +149,30 @@ async fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn open_issue_shortcut(issue: &str) -> Result<()> {
+    let config = JiraConfig::load().unwrap_or_default();
+
+    if config.base_url.is_empty() {
+        anyhow::bail!(
+            "Jira URL not configured. Run `jirac auth login` or set JIRA_URL environment variable."
+        );
+    }
+
+    let issue = issue.trim();
+    if issue.is_empty() {
+        anyhow::bail!("Issue key cannot be empty.");
+    }
+    if !issue.contains('-') {
+        anyhow::bail!("Issue shortcut expects a full issue key like `PROJ-123`.");
+    }
+
+    let base = config.base_url.trim_end_matches('/');
+    let url = format!("{base}/browse/{issue}");
+    open::that(&url).with_context(|| format!("Failed to open browser for {issue}"))?;
+    println!("Opened {url}");
     Ok(())
 }
 

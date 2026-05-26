@@ -107,6 +107,7 @@ jirac issue list
 # View an issue
 jirac issue view PROJ-123
 jirac issue view PROJ-123 --versions
+jirac PROJ-123 --web
 
 # Browse or manage project fix versions
 jirac issue versions -p PROJ --version "v1.2.0"
@@ -142,6 +143,7 @@ jirac issue sprint-delete -p PROJ --sprint "Sprint 24A" --force
 
 jirac issue view PROJ-123                           # view detail
 jirac issue view PROJ-123 --versions                # include fix-version backlog preview
+jirac PROJ-123 --web                                # open issue in browser
 jirac issue versions -p PROJ                        # list project fix versions
 jirac issue versions -p PROJ --version "v1.2.0"    # preview backlog for one fix version
 jirac issue versions -p PROJ --version "v1.2.0" --set-start-date 2026-05-20

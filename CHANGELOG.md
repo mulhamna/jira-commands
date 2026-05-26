@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.5.0](https://github.com/mulhamna/jira-commands/compare/v1.4.0...v1.5.0) (2026-05-26)
+
+
+### Features
+
+* **cli:** add Antigravity MCP client ([#302](https://github.com/mulhamna/jira-commands/issues/302)) ([5296aa4](https://github.com/mulhamna/jira-commands/commit/5296aa48530c6dfd4cb7cc92e58dcda0aba46067))
+
 ## [1.4.0](https://github.com/mulhamna/jira-commands/compare/v1.3.2...v1.4.0) (2026-05-26)
 
 

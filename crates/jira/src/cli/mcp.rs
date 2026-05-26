@@ -1013,6 +1013,24 @@ mod tests {
     }
 
     #[test]
+    fn antigravity_install_target_uses_mcp_servers() {
+        let target = install_target(&McpClient::Antigravity).unwrap();
+        assert_eq!(target.label, "antigravity");
+        assert_eq!(target.top_level_key, "mcpServers");
+        assert!(target.path.ends_with(".gemini/antigravity/mcp_config.json"));
+    }
+
+    #[test]
+    fn antigravity_snippet_uses_standard_mcp_servers_shape() {
+        let snippet =
+            server_spec(&McpClient::Antigravity, "jira", "jirac-mcp", "stdio").json_snippet;
+        let rendered = serde_json::to_string_pretty(&snippet).unwrap();
+        assert!(rendered.contains("\"mcpServers\""));
+        assert!(rendered.contains("\"jira\""));
+        assert!(rendered.contains("\"jirac-mcp\""));
+    }
+
+    #[test]
     fn merge_string_values_only_overwrites_requested_keys() {
         let mut target = Map::new();
         target.insert(

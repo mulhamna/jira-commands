@@ -176,6 +176,7 @@ jirac mcp install --client opencode
 jirac mcp install --client generic-json
 jirac mcp install --client zed
 jirac mcp install --client antigravity
+jirac mcp install --client antigravity-cli
 ```
 
 Supported targets now:
@@ -188,6 +189,7 @@ Supported targets now:
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
 - `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension published from <https://github.com/mulhamna/jirac-ext>)
 - `antigravity` (`~/.gemini/antigravity/mcp_config.json`, user-level JSON with `mcpServers`)
+- `antigravity-cli` (`~/.gemini/antigravity-cli/settings.json`, user-level JSON with `mcp.servers`)
 
 Helpful flags:
 - `--print` prints the JSON snippet or delegated client command first
@@ -210,3 +212,5 @@ Local verification notes:
 - Gemini CLI currently stores user MCP config in `~/.gemini/settings.json`; this helper delegates to the Gemini CLI directly
 - Codex stores MCP entries under `~/.codex/config.toml`; this helper delegates to the Codex CLI directly
 - Antigravity user scope writes `~/.gemini/antigravity/mcp_config.json` (top-level `mcpServers`); override with `ANTIGRAVITY_CONFIG`
+- Antigravity CLI user scope writes `~/.gemini/antigravity-cli/settings.json` (`mcp.servers`); override with `ANTIGRAVITY_CLI_CONFIG`
+- For local-binary clients, `jirac mcp install` requires `jirac-mcp` on PATH. Install it with `cargo install jira-mcp`, download a release binary, or pass `--command /path/to/jirac-mcp`.

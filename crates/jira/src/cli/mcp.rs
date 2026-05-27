@@ -49,6 +49,8 @@ pub enum McpClient {
     GenericJson,
     Zed,
     Antigravity,
+    #[value(name = "antigravity-cli")]
+    AntigravityCli,
 }
 
 impl std::fmt::Display for McpClient {
@@ -65,6 +67,9 @@ impl std::fmt::Display for McpClient {
             McpClient::Zed => "zed                (writes Zed settings.json context_servers)",
             McpClient::Antigravity => {
                 "antigravity        (writes ~/.gemini/antigravity/mcp_config.json)"
+            }
+            McpClient::AntigravityCli => {
+                "antigravity-cli    (writes ~/.gemini/antigravity-cli/settings.json)"
             }
             McpClient::GenericJson => "generic-json       (print snippet only, no file changes)",
         };
@@ -155,6 +160,7 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::OpenCode,
             McpClient::Zed,
             McpClient::Antigravity,
+            McpClient::AntigravityCli,
             McpClient::GenericJson,
         ],
     )
@@ -201,7 +207,7 @@ fn install_client(
 
     let target = install_target(&client)?;
     let mut root = load_json_object(&target.path)?;
-    let mcp_servers = ensure_object_field(&mut root, &target.top_level_key)?;
+    let mcp_servers = ensure_object_path(&mut root, &target.top_level_key)?;
 
     if let Some(existing) = mcp_servers.get(name) {
         if existing == &spec.file_entry {
@@ -286,6 +292,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::GenericJson,
             McpClient::Zed,
             McpClient::Antigravity,
+            McpClient::AntigravityCli,
         ],
     };
 
@@ -383,6 +390,23 @@ fn server_spec(client: &McpClient, name: &str, command: &str, transport: &str) -
                 json_snippet,
             }
         }
+        McpClient::AntigravityCli => {
+            let file_entry = json!({
+                "command": command,
+                "args": ["serve", "--transport", transport]
+            });
+            let json_snippet = json!({
+                "mcp": {
+                    "servers": {
+                        name: file_entry.clone()
+                    }
+                }
+            });
+            ServerSpec {
+                file_entry,
+                json_snippet,
+            }
+        }
         _ => {
             let file_entry = json!({
                 "command": command,
@@ -433,6 +457,14 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
                 home.join(".gemini/antigravity/mcp_config.json"),
             ),
             "mcpServers",
+        ),
+        McpClient::AntigravityCli => (
+            "antigravity-cli",
+            config_path_from_env_or_default(
+                "ANTIGRAVITY_CLI_CONFIG",
+                home.join(".gemini/antigravity-cli/settings.json"),
+            ),
+            "mcp.servers",
         ),
     };
 
@@ -500,6 +532,13 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.gemini/antigravity/mcp_config.json")),
             note: "Writes user-level config at ~/.gemini/antigravity/mcp_config.json (mcpServers).",
+        },
+        McpClient::AntigravityCli => ClientDescriptor::FileTarget {
+            label: "antigravity-cli",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.gemini/antigravity-cli/settings.json")),
+            note: "Writes user-level config at ~/.gemini/antigravity-cli/settings.json (mcp.servers).",
         },
     }
 }
@@ -749,7 +788,7 @@ fn opencode_settings_path(home: &Path) -> PathBuf {
 }
 
 fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
-    if !matches!(client, McpClient::GeminiCli | McpClient::Codex) {
+    if matches!(client, McpClient::GenericJson | McpClient::Zed) {
         return Ok(command.to_string());
     }
 
@@ -758,11 +797,19 @@ fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) 
     }
 
     if dry_run {
+        eprintln!(
+            "[warn] MCP server command '{}' was not found on PATH.",
+            command
+        );
+        eprintln!("       Install it with `cargo install jira-mcp`, download `jirac-mcp` from https://github.com/mulhamna/jira-commands/releases, or pass `--command /path/to/jirac-mcp`.");
         return Ok(command.to_string());
     }
 
     bail!(
-        "MCP server command '{}' was not found on PATH. Install it first or pass --command with an absolute path.",
+        "MCP server command '{}' was not found on PATH. Install it first:
+  cargo install jira-mcp
+  # or download `jirac-mcp` from https://github.com/mulhamna/jira-commands/releases
+  # or pass --command /path/to/jirac-mcp",
         command
     )
 }
@@ -861,6 +908,17 @@ fn strip_json_comments(input: &str) -> String {
     }
 
     out
+}
+
+fn ensure_object_path<'a>(
+    root: &'a mut Map<String, Value>,
+    path: &str,
+) -> Result<&'a mut Map<String, Value>> {
+    let mut current = root;
+    for key in path.split('.') {
+        current = ensure_object_field(current, key)?;
+    }
+    Ok(current)
 }
 
 fn ensure_object_field<'a>(
@@ -1021,11 +1079,32 @@ mod tests {
     }
 
     #[test]
+    fn antigravity_cli_install_target_uses_settings_json_mcp_servers() {
+        let target = install_target(&McpClient::AntigravityCli).unwrap();
+        assert_eq!(target.label, "antigravity-cli");
+        assert_eq!(target.top_level_key, "mcp.servers");
+        assert!(target
+            .path
+            .ends_with(".gemini/antigravity-cli/settings.json"));
+    }
+
+    #[test]
     fn antigravity_snippet_uses_standard_mcp_servers_shape() {
         let snippet =
             server_spec(&McpClient::Antigravity, "jira", "jirac-mcp", "stdio").json_snippet;
         let rendered = serde_json::to_string_pretty(&snippet).unwrap();
         assert!(rendered.contains("\"mcpServers\""));
+        assert!(rendered.contains("\"jira\""));
+        assert!(rendered.contains("\"jirac-mcp\""));
+    }
+
+    #[test]
+    fn antigravity_cli_snippet_uses_mcp_servers_shape() {
+        let snippet =
+            server_spec(&McpClient::AntigravityCli, "jira", "jirac-mcp", "stdio").json_snippet;
+        let rendered = serde_json::to_string_pretty(&snippet).unwrap();
+        assert!(rendered.contains("\"mcp\""));
+        assert!(rendered.contains("\"servers\""));
         assert!(rendered.contains("\"jira\""));
         assert!(rendered.contains("\"jirac-mcp\""));
     }
@@ -1061,6 +1140,17 @@ mod tests {
             false,
         )
         .unwrap_err();
-        assert!(err.to_string().contains("was not found on PATH"));
+        assert!(err.to_string().contains("cargo install jira-mcp"));
+    }
+
+    #[test]
+    fn resolve_command_for_file_clients_rejects_missing_binary() {
+        let err = resolve_command_for_client(
+            &McpClient::AntigravityCli,
+            "definitely-not-a-real-binary",
+            false,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("--command /path/to/jirac-mcp"));
     }
 }

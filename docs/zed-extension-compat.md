@@ -21,7 +21,7 @@ Check these before merging:
 - [ ] `serve --transport stdio` still works
 - [ ] env vars still match: `JIRA_URL`, `JIRA_EMAIL`, `JIRA_TOKEN`, `JIRA_PROJECT`
 - [ ] release asset names still match the wrapper expectations
-- [ ] latest release still includes every required `jirac-mcp-*` artifact
+- [ ] the dedicated `jira-mcp-v*` release still includes every required `jirac-mcp-*` artifact
 
 ## When changing `crates/zed-jira`
 
@@ -32,7 +32,7 @@ Check these before merging:
 
 ## When changing release workflows
 
-- [ ] keep `release-tag.yml` and `release-recover.yml` aligned with `asset_name_for_platform()`
+- [ ] keep `release-tag-mcp.yml` and `release-recover.yml` aligned with `asset_name_for_platform()`
 - [ ] do not rename `jirac-mcp-*` assets without updating the wrapper
 - [ ] confirm at least one real release path still publishes the expected artifacts
 

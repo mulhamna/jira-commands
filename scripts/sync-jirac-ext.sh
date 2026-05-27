@@ -20,7 +20,7 @@ import sys
 src = Path(sys.argv[1])
 dest = Path(sys.argv[2])
 
-managed_files = ["Cargo.toml", "README.md", "extension.toml"]
+managed_files = ["Cargo.toml", "README.md", "extension.toml", "jira-mcp-version.txt"]
 managed_dirs = ["src", "configuration"]
 
 for name in managed_files:

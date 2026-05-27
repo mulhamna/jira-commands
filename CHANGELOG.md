@@ -6,6 +6,19 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.6.0](https://github.com/mulhamna/jira-commands/compare/v1.5.0...v1.6.0) (2026-05-27)
+
+
+### Features
+
+* **mcp:** add antigravity cli install support ([#308](https://github.com/mulhamna/jira-commands/issues/308)) ([09ef62a](https://github.com/mulhamna/jira-commands/commit/09ef62a6a332392ec43ae77af424ff5ef8c5b654))
+
+
+### Bug Fixes
+
+* **release:** split CLI and MCP release assets ([#305](https://github.com/mulhamna/jira-commands/issues/305)) ([bc66f94](https://github.com/mulhamna/jira-commands/commit/bc66f94e3ab2331d524d22763355e34f2892e80a))
+* **zed:** resolve MCP assets from dedicated release ([#306](https://github.com/mulhamna/jira-commands/issues/306)) ([7f0a621](https://github.com/mulhamna/jira-commands/commit/7f0a621ba3fe226f17f5fbd2fa687ef8da10e92a))
+
 ## [1.5.0](https://github.com/mulhamna/jira-commands/compare/v1.4.0...v1.5.0) (2026-05-26)
 
 

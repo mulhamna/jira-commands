@@ -58,13 +58,15 @@ impl zed::Extension for JiraExtension {
 }
 
 fn ensure_binary() -> zed::Result<String> {
-    let release = zed::latest_github_release(
-        REPO,
-        zed::GithubReleaseOptions {
-            require_assets: true,
-            pre_release: false,
-        },
-    )?;
+    let release = zed::github_release_by_tag_name(REPO, &mcp_release_tag()).or_else(|_| {
+        zed::latest_github_release(
+            REPO,
+            zed::GithubReleaseOptions {
+                require_assets: true,
+                pre_release: false,
+            },
+        )
+    })?;
 
     let asset_name = asset_name_for_platform()?;
     let asset = release
@@ -86,6 +88,13 @@ fn ensure_binary() -> zed::Result<String> {
     }
 
     Ok(relative_path)
+}
+
+fn mcp_release_tag() -> String {
+    format!(
+        "jira-mcp-v{}",
+        include_str!("../jira-mcp-version.txt").trim()
+    )
 }
 
 fn asset_name_for_platform() -> zed::Result<&'static str> {

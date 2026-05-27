@@ -5,11 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZED_LIB="$ROOT/crates/zed-jira/src/lib.rs"
 README="$ROOT/README.md"
 INSTALL="$ROOT/INSTALL.md"
-RELEASE_TAG="$ROOT/.github/workflows/release-tag.yml"
+RELEASE_TAG_MCP="$ROOT/.github/workflows/release-tag-mcp.yml"
 RELEASE_RECOVER="$ROOT/.github/workflows/release-recover.yml"
 MIRROR_WORKFLOW="$ROOT/.github/workflows/zed-extension-mirror.yml"
 CHECKLIST="$ROOT/docs/zed-extension-compat.md"
 SYNC_SCRIPT="$ROOT/scripts/sync-jirac-ext.sh"
+ZED_MCP_VERSION="$ROOT/crates/zed-jira/jira-mcp-version.txt"
+JIRA_MCP_VERSION="$ROOT/crates/jira-mcp/VERSION"
 
 require_grep() {
   local pattern="$1"
@@ -31,6 +33,11 @@ require_grep 'mulhamna/jirac-ext' "$INSTALL"
 require_grep 'Verify jirac-ext mirror stays in sync' "$MIRROR_WORKFLOW"
 require_grep 'Zed extension compatibility checklist' "$CHECKLIST"
 
+if ! diff -q <(tr -d '[:space:]' < "$ZED_MCP_VERSION") <(tr -d '[:space:]' < "$JIRA_MCP_VERSION") >/dev/null; then
+  echo "zed-jira jira-mcp-version.txt is out of sync with crates/jira-mcp/VERSION" >&2
+  exit 1
+fi
+
 affected_assets=(
   jirac-mcp-linux-x86_64
   jirac-mcp-linux-aarch64
@@ -41,7 +48,7 @@ affected_assets=(
 
 for asset in "${affected_assets[@]}"; do
   require_grep "$asset" "$ZED_LIB"
-  require_grep "$asset" "$RELEASE_TAG"
+  require_grep "$asset" "$RELEASE_TAG_MCP"
   if [[ "$asset" != "jirac-mcp-windows-x86_64.exe" ]]; then
     require_grep "$asset" "$RELEASE_RECOVER"
   fi

@@ -5,7 +5,7 @@ on:
     paths:
       - 'crates/zed-jira/**'
       - 'crates/jira-mcp/**'
-      - '.github/workflows/release-tag.yml'
+      - '.github/workflows/release-tag-mcp.yml'
       - '.github/workflows/release-recover.yml'
       - '.github/workflows/zed-extension-compat.yml'
       - '.github/workflows/zed-extension-mirror.yml'
@@ -19,7 +19,7 @@ on:
     paths:
       - 'crates/zed-jira/**'
       - 'crates/jira-mcp/**'
-      - '.github/workflows/release-tag.yml'
+      - '.github/workflows/release-tag-mcp.yml'
       - '.github/workflows/release-recover.yml'
       - '.github/workflows/zed-extension-compat.yml'
       - '.github/workflows/zed-extension-mirror.yml'

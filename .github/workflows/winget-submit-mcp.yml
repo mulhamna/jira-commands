@@ -1,0 +1,107 @@
+name: Winget Submit jira-mcp
+
+on:
+  workflow_run:
+    workflows: ["Release jira-mcp"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to submit, for example jira-mcp-v0.5.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winget-submit-mcp-${{ github.event.workflow_run.head_sha || github.event.inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  submit-winget:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.name == 'Release jira-mcp' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+    steps:
+      - name: Require Winget token
+        run: test -n "${GH_TOKEN}"
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: vars
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RELEASE_TAG="${{ inputs.release_tag }}"
+          else
+            RELEASE_TAG=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep '^jira-mcp-v' | head -n 1 || true)
+          fi
+
+          case "$RELEASE_TAG" in
+            jira-mcp-v*) ;;
+            *)
+              echo "Skipping Winget submit because no jira-mcp release tag could be resolved for '$RELEASE_TAG'."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Skipping Winget submit because GitHub release '$RELEASE_TAG' is not published yet."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION="${RELEASE_TAG#jira-mcp-v}"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download Windows ZIP and compute Winget SHA
+        if: steps.vars.outputs.skip != 'true'
+        id: checksums
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${{ steps.vars.outputs.release_tag }}"
+          RELEASE_DATE=$(date -u +%F)
+          ASSET_URL="https://github.com/mulhamna/jira-commands/releases/download/${RELEASE_TAG}/jirac-mcp-windows-x86_64.zip"
+          curl -fsSL "$ASSET_URL" -o jirac-mcp-windows-x86_64.zip
+          SHA_WINDOWS_X86=$(sha256sum jirac-mcp-windows-x86_64.zip | awk '{print $1}')
+          test -n "$SHA_WINDOWS_X86"
+          echo "sha_windows_x86=$SHA_WINDOWS_X86" >> "$GITHUB_OUTPUT"
+          echo "release_date=$RELEASE_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Submit Winget PR
+        if: steps.vars.outputs.skip != 'true'
+        run: python3 .github/scripts/submit-winget-pr.py
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_PKGS_TOKEN }}
+          VERSION: ${{ steps.vars.outputs.version }}
+          SHA_WINDOWS_X86: ${{ steps.checksums.outputs.sha_windows_x86 }}
+          RELEASE_DATE: ${{ steps.checksums.outputs.release_date }}
+          WINGET_PACKAGE_IDENTIFIER: mulhamna.jirac-mcp
+          WINGET_PACKAGE_NAME: jirac-mcp
+          WINGET_PACKAGE_MONIKER: jirac-mcp
+          WINGET_PACKAGE_SHORT_DESCRIPTION: Typed Jira MCP server built in Rust.
+          WINGET_PACKAGE_DESCRIPTION: jirac-mcp exposes Jira as typed MCP tools for editors and AI agents, with release archives for Windows, macOS, and Linux.
+          WINGET_PACKAGE_TAGS: jira,atlassian,cli,mcp,ai
+          WINGET_RELEASE_TAG_PREFIX: jira-mcp-v
+          WINGET_WINDOWS_ARCHIVE: jirac-mcp-windows-x86_64.zip
+          WINGET_NESTED_INSTALLER_FILE: jirac-mcp-windows-x86_64.exe
+          WINGET_PORTABLE_COMMAND_ALIAS: jirac-mcp
+          WINGET_BRANCH_PREFIX: jirac-mcp-winget

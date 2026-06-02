@@ -69,7 +69,7 @@ impl std::fmt::Display for McpClient {
                 "antigravity        (writes ~/.gemini/antigravity/mcp_config.json)"
             }
             McpClient::AntigravityCli => {
-                "antigravity-cli    (writes ~/.gemini/antigravity-cli/settings.json)"
+                "antigravity-cli    (writes ~/.gemini/config/mcp_config.json)"
             }
             McpClient::GenericJson => "generic-json       (print snippet only, no file changes)",
         };
@@ -390,23 +390,6 @@ fn server_spec(client: &McpClient, name: &str, command: &str, transport: &str) -
                 json_snippet,
             }
         }
-        McpClient::AntigravityCli => {
-            let file_entry = json!({
-                "command": command,
-                "args": ["serve", "--transport", transport]
-            });
-            let json_snippet = json!({
-                "mcp": {
-                    "servers": {
-                        name: file_entry.clone()
-                    }
-                }
-            });
-            ServerSpec {
-                file_entry,
-                json_snippet,
-            }
-        }
         _ => {
             let file_entry = json!({
                 "command": command,
@@ -462,9 +445,9 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
             "antigravity-cli",
             config_path_from_env_or_default(
                 "ANTIGRAVITY_CLI_CONFIG",
-                home.join(".gemini/antigravity-cli/settings.json"),
+                home.join(".gemini/config/mcp_config.json"),
             ),
-            "mcp.servers",
+            "mcpServers",
         ),
     };
 
@@ -537,8 +520,8 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             label: "antigravity-cli",
             path: install_target(client)
                 .map(|t| t.path)
-                .unwrap_or_else(|_| PathBuf::from("~/.gemini/antigravity-cli/settings.json")),
-            note: "Writes user-level config at ~/.gemini/antigravity-cli/settings.json (mcp.servers).",
+                .unwrap_or_else(|_| PathBuf::from("~/.gemini/config/mcp_config.json")),
+            note: "Writes user-level config at ~/.gemini/config/mcp_config.json (mcpServers).",
         },
     }
 }
@@ -1079,13 +1062,11 @@ mod tests {
     }
 
     #[test]
-    fn antigravity_cli_install_target_uses_settings_json_mcp_servers() {
+    fn antigravity_cli_install_target_uses_shared_gemini_mcp_config() {
         let target = install_target(&McpClient::AntigravityCli).unwrap();
         assert_eq!(target.label, "antigravity-cli");
-        assert_eq!(target.top_level_key, "mcp.servers");
-        assert!(target
-            .path
-            .ends_with(".gemini/antigravity-cli/settings.json"));
+        assert_eq!(target.top_level_key, "mcpServers");
+        assert!(target.path.ends_with(".gemini/config/mcp_config.json"));
     }
 
     #[test]
@@ -1099,12 +1080,11 @@ mod tests {
     }
 
     #[test]
-    fn antigravity_cli_snippet_uses_mcp_servers_shape() {
+    fn antigravity_cli_snippet_uses_standard_mcp_servers_shape() {
         let snippet =
             server_spec(&McpClient::AntigravityCli, "jira", "jirac-mcp", "stdio").json_snippet;
         let rendered = serde_json::to_string_pretty(&snippet).unwrap();
-        assert!(rendered.contains("\"mcp\""));
-        assert!(rendered.contains("\"servers\""));
+        assert!(rendered.contains("\"mcpServers\""));
         assert!(rendered.contains("\"jira\""));
         assert!(rendered.contains("\"jirac-mcp\""));
     }

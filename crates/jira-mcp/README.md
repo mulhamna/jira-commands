@@ -63,7 +63,7 @@ jirac auth use work-cloud
 
 The MCP server includes tools for:
 - auth status and credential updates
-- issue list, view, create, update, delete, clone, and batch flows
+- issue list, view, create, update, delete, clone, batch flows, standups, sprint summaries, and notifications
 - field and transition discovery
 - comments (single + bulk)
 - attachment upload

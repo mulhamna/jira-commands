@@ -20,10 +20,11 @@ use crate::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs,
         BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
         IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs,
-        IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs,
-        RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs,
-        SprintDeleteArgs, SprintListArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs,
+        IssueLinkDeleteArgs, IssueListArgs, IssueNotificationsArgs, IssueStandupArgs,
+        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
+        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
+        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs,
         WorklogDeleteArgs,
     },
 };
@@ -108,6 +109,39 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueListArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_standup",
+        description = "Generate a structured daily standup summary from current-user Jira issues"
+    )]
+    pub async fn jira_issue_standup(
+        &self,
+        Parameters(args): Parameters<IssueStandupArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_standup(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_sprint_summary",
+        description = "Summarize sprint issues by status and assignee for a project"
+    )]
+    pub async fn jira_issue_sprint_summary(
+        &self,
+        Parameters(args): Parameters<SprintSummaryArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_sprint_summary(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_notifications",
+        description = "Scan recent Jira mentions from issue descriptions and comments"
+    )]
+    pub async fn jira_issue_notifications(
+        &self,
+        Parameters(args): Parameters<IssueNotificationsArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_notifications(args).await)
     }
 
     #[tool(
@@ -626,6 +660,13 @@ mod tests {
             .iter()
             .any(|tool| tool.name == "jira_issue_bulk_comment"));
         assert!(tools.iter().any(|tool| tool.name == "jira_issue_batch"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_standup"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_sprint_summary"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_notifications"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

@@ -5,9 +5,11 @@ name: Release Please
 # 2. release-please creates/updates two Release PRs (one per package):
 #      - `jira-commands` — covers the root release lane (`.`), which bumps
 #        jira-core + jira-commands in lockstep. Tag: vX.Y.Z.
-#        Source-of-truth: VERSION file at repo root.
+#        Source-of-truth: VERSION file at repo root + `.release-please-manifest.json`.
 #      - `jira-mcp` — covers `crates/jira-mcp`. Tag: jira-mcp-vX.Y.Z.
-#        Source-of-truth: crates/jira-mcp/VERSION.
+#        Source-of-truth: crates/jira-mcp/VERSION + `.release-please-manifest-mcp.json`.
+#    The two lanes intentionally use separate release-please config/manifest
+#    files so simultaneous Release PRs do not conflict on one shared manifest.
 #    Routing is path-based, not scope-based:
 #      - commits touching only `crates/jira-mcp/**`, `packaging/npm-mcp/**`,
 #        and/or `Cargo.lock` are eligible for the jira-mcp Release PR.
@@ -109,9 +111,9 @@ jobs:
           ROOT_VER=$(cat VERSION)
           MCP_VER=$(cat crates/jira-mcp/VERSION)
           MANIFEST_ROOT=$(jq -r '."."' .release-please-manifest.json)
-          MANIFEST_MCP=$(jq -r '."crates/jira-mcp"' .release-please-manifest.json)
+          MANIFEST_MCP=$(jq -r '."crates/jira-mcp"' .release-please-manifest-mcp.json)
           if [ "$ROOT_VER" != "$MANIFEST_ROOT" ]; then
-            echo "::error::manifest root $MANIFEST_ROOT != VERSION $ROOT_VER (likely parallel release PR stomp)"
+            echo "::error::manifest root $MANIFEST_ROOT != VERSION $ROOT_VER"
             exit 1
           fi
           if [ "$MCP_VER" != "$MANIFEST_MCP" ]; then
@@ -119,12 +121,21 @@ jobs:
             exit 1
           fi
 
-      - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
+      - name: Release Please (jira-commands)
+        uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Release Please (jira-mcp)
+        uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
+        id: release-mcp
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config-mcp.json
+          manifest-file: .release-please-manifest-mcp.json
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

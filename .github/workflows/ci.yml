@@ -81,13 +81,16 @@ jobs:
               - 'crates/jira-core/README.md'
               - 'crates/jira-mcp/README.md'
               - 'packaging/winget/**'
+              - 'packaging/winget-mcp/**'
               - 'packaging/scoop/**'
               - 'packaging/npm/**'
               - 'packaging/npm-mcp/**'
               - 'install.ps1'
             release:
               - 'release-please-config.json'
+              - 'release-please-config-mcp.json'
               - '.release-please-manifest.json'
+              - '.release-please-manifest-mcp.json'
               - 'VERSION'
               - 'CHANGELOG.md'
             workspace_meta:

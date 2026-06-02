@@ -1,14 +1,21 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chrono::{DateTime, Duration, Utc};
 use jira_core::{
+    adf::{adf_to_text, mentioned_account_ids},
     config::{
         config_file_path, default_profile_name, parse_auth_type, parse_deployment, JiraConfig,
         JiraProfilesFile,
     },
     model::{
         field::{Field, FieldValue},
-        CreateIssueRequestV2, CreateProjectVersionRequest, UpdateIssueRequest,
+        CreateIssueRequestV2, CreateProjectVersionRequest, Issue, UpdateIssueRequest,
         UpdateProjectVersionRequest,
     },
     JiraClient,
@@ -24,10 +31,11 @@ use crate::{
         BatchCreateOp, BatchOperation, BatchUpdateOp, BulkCommentArgs, BulkTransitionArgs,
         BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
         IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs,
-        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
-        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
+        IssueListArgs, IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs,
+        IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
+        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
+        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs,
+        WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -151,6 +159,161 @@ impl JiraApp {
             "issues": result.issues,
             "next_page_token": result.next_page_token,
             "total": result.total
+        }))
+    }
+
+    pub async fn issue_standup(&self, args: IssueStandupArgs) -> AppResult<Value> {
+        let limit = args.limit.unwrap_or(50);
+        if !(1..=100).contains(&limit) {
+            return Err(AppError::validation("limit must be between 1 and 100"));
+        }
+
+        let since = args.since.unwrap_or_else(|| "2d".to_string());
+        let cutoff = Utc::now() - parse_relative_window(&since)?;
+        let client = self.build_client()?;
+        let query = if let Some(jql) = args.jql {
+            jql
+        } else if let Some(project_key) = args.project_key {
+            format!("project = {project_key} AND assignee = currentUser() ORDER BY updated DESC")
+        } else {
+            "assignee = currentUser() ORDER BY updated DESC".to_string()
+        };
+
+        let issues = client
+            .search_issues(&query, None, Some(limit))
+            .await?
+            .issues;
+
+        let mut done = vec![];
+        let mut in_progress = vec![];
+        let mut next_up = vec![];
+        let mut blocked = vec![];
+        let mut other = vec![];
+
+        for issue in issues {
+            let category = issue_status_category(&issue);
+            let is_done_recent = category == "done"
+                && issue_updated_at(&issue)
+                    .map(|updated| updated >= cutoff)
+                    .unwrap_or(false);
+
+            if issue_is_blocked(&issue) {
+                blocked.push(issue);
+            } else if is_done_recent {
+                done.push(issue);
+            } else if category == "indeterminate" {
+                in_progress.push(issue);
+            } else if category == "new" {
+                next_up.push(issue);
+            } else {
+                other.push(issue);
+            }
+        }
+
+        Ok(json!({
+            "query": query,
+            "since": since,
+            "recently_done": done,
+            "in_progress": in_progress,
+            "next_up": next_up,
+            "blocked": blocked,
+            "other": other,
+        }))
+    }
+
+    pub async fn issue_sprint_summary(&self, args: SprintSummaryArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let limit = args.limit.unwrap_or(100);
+        if !(1..=100).contains(&limit) {
+            return Err(AppError::validation("limit must be between 1 and 100"));
+        }
+
+        let sprint_label = args
+            .sprint
+            .clone()
+            .unwrap_or_else(|| "openSprints()".to_string());
+        let sprint_clause = match args.sprint.as_deref() {
+            Some(value) if value.trim().parse::<u64>().is_ok() => {
+                format!("sprint = {}", value.trim())
+            }
+            Some(value) => format!("sprint = \"{}\"", escape_jql_literal(value.trim())),
+            None => "sprint in openSprints()".to_string(),
+        };
+        let query = format!(
+            "project = {} AND {} ORDER BY status ASC, updated DESC",
+            args.project_key, sprint_clause
+        );
+
+        let issues = client
+            .search_issues(&query, None, Some(limit))
+            .await?
+            .issues;
+        let mut by_status: HashMap<String, Vec<Issue>> = HashMap::new();
+        let mut by_assignee: HashMap<String, usize> = HashMap::new();
+        let mut done_count = 0usize;
+        let mut in_progress_count = 0usize;
+        let mut todo_count = 0usize;
+        let mut blocked_count = 0usize;
+
+        for issue in issues {
+            let category = issue_status_category(&issue);
+            if issue_is_blocked(&issue) {
+                blocked_count += 1;
+            }
+            match category.as_str() {
+                "done" => done_count += 1,
+                "indeterminate" => in_progress_count += 1,
+                "new" => todo_count += 1,
+                _ => {}
+            }
+            let assignee = issue
+                .assignee
+                .clone()
+                .unwrap_or_else(|| "Unassigned".to_string());
+            *by_assignee.entry(assignee).or_insert(0) += 1;
+            by_status
+                .entry(issue.status.clone())
+                .or_default()
+                .push(issue);
+        }
+
+        let total: usize = by_status.values().map(Vec::len).sum();
+
+        Ok(json!({
+            "project": args.project_key,
+            "sprint": sprint_label,
+            "query": query,
+            "total": total,
+            "done": done_count,
+            "in_progress": in_progress_count,
+            "todo": todo_count,
+            "blocked": blocked_count,
+            "by_assignee": by_assignee,
+            "by_status": by_status,
+        }))
+    }
+
+    pub async fn issue_notifications(&self, args: IssueNotificationsArgs) -> AppResult<Value> {
+        let limit = args.limit.unwrap_or(50);
+        if !(1..=100).contains(&limit) {
+            return Err(AppError::validation("limit must be between 1 and 100"));
+        }
+
+        let since = args.since.unwrap_or_else(|| "7d".to_string());
+        let client = self.build_client()?;
+        let scan =
+            scan_issue_notifications(&client, args.project_key.as_deref(), &since, limit).await?;
+        let unread_count = scan.entries.iter().filter(|entry| !entry.read).count();
+
+        Ok(json!({
+            "project_key": args.project_key,
+            "since": since,
+            "jql": scan.jql,
+            "scanned_issues": scan.scanned_issues,
+            "comment_errors": scan.comment_errors,
+            "total": scan.entries.len(),
+            "unread": unread_count,
+            "notifications": scan.entries,
         }))
     }
 
@@ -971,6 +1134,172 @@ struct ResolvedTransition {
     name: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct IssueNotificationEntry {
+    id: String,
+    issue: Issue,
+    source: String,
+    author: Option<String>,
+    created: String,
+    excerpt: String,
+    url: String,
+    read: bool,
+}
+
+#[derive(Debug, Clone)]
+struct IssueNotificationScan {
+    entries: Vec<IssueNotificationEntry>,
+    scanned_issues: usize,
+    comment_errors: usize,
+    jql: String,
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+struct NotificationReadState {
+    read_ids: HashSet<String>,
+}
+
+fn build_notifications_jql(project: Option<&str>, since: &str) -> String {
+    let since = since.trim();
+    if let Some(project) = project {
+        format!("project = {project} AND updated >= -{since} ORDER BY updated DESC")
+    } else {
+        format!("updated >= -{since} ORDER BY updated DESC")
+    }
+}
+
+fn notifications_state_path() -> PathBuf {
+    config_file_path()
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("notifications-read.json")
+}
+
+fn load_notification_read_state() -> NotificationReadState {
+    let path = notifications_state_path();
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+fn notification_entry_id(issue_key: &str, source: &str, created: &str) -> String {
+    format!("{issue_key}|{source}|{created}")
+}
+
+async fn scan_issue_notifications(
+    client: &JiraClient,
+    project: Option<&str>,
+    since: &str,
+    limit: u32,
+) -> AppResult<IssueNotificationScan> {
+    let account_id = client.get_myself().await?;
+    let limit = limit.clamp(1, 100);
+    let jql = build_notifications_jql(project, since);
+    let result = client.search_issues(&jql, None, Some(limit)).await?;
+
+    let read_state = load_notification_read_state();
+    let mut entries = Vec::new();
+    let mut comment_errors = 0usize;
+    let scanned_issues = result.issues.len();
+    let base_url = client.base_url().to_string();
+    let mut comment_tasks = tokio::task::JoinSet::new();
+    let comment_scan_limit = Arc::new(tokio::sync::Semaphore::new(8));
+
+    for issue in result.issues {
+        if let Some(description) = issue.description.as_ref() {
+            if mentioned_account_ids(description)
+                .iter()
+                .any(|mentioned| mentioned == &account_id)
+            {
+                let id = notification_entry_id(&issue.key, "description-mention", &issue.updated);
+                entries.push(IssueNotificationEntry {
+                    id: id.clone(),
+                    issue: issue.clone(),
+                    source: "description-mention".to_string(),
+                    author: issue.reporter.clone(),
+                    created: issue.updated.clone(),
+                    excerpt: notification_excerpt(&adf_to_text(description)),
+                    url: format!("{base_url}/browse/{}", issue.key),
+                    read: read_state.read_ids.contains(&id),
+                });
+            }
+        }
+
+        let issue_for_comments = issue.clone();
+        let client_for_comments = client.clone();
+        let comment_scan_limit = Arc::clone(&comment_scan_limit);
+        comment_tasks.spawn(async move {
+            let _permit = comment_scan_limit.acquire_owned().await.ok();
+            let comments = client_for_comments
+                .get_comments(&issue_for_comments.key)
+                .await;
+            (issue_for_comments, comments)
+        });
+    }
+
+    while let Some(joined) = comment_tasks.join_next().await {
+        let Ok((issue, comments)) = joined else {
+            comment_errors += 1;
+            continue;
+        };
+
+        match comments {
+            Ok(comments) => {
+                for comment in comments {
+                    if comment.author_account_id.as_deref() == Some(account_id.as_str()) {
+                        continue;
+                    }
+                    if comment
+                        .mentions
+                        .iter()
+                        .any(|mentioned| mentioned == &account_id)
+                    {
+                        let id =
+                            notification_entry_id(&issue.key, "comment-mention", &comment.created);
+                        entries.push(IssueNotificationEntry {
+                            id: id.clone(),
+                            issue: issue.clone(),
+                            source: "comment-mention".to_string(),
+                            author: comment.author.clone(),
+                            created: comment.created.clone(),
+                            excerpt: notification_excerpt(comment.body.as_deref().unwrap_or("")),
+                            url: format!("{base_url}/browse/{}", issue.key),
+                            read: read_state.read_ids.contains(&id),
+                        });
+                    }
+                }
+            }
+            Err(_) => comment_errors += 1,
+        }
+    }
+
+    entries.sort_by_key(|entry| std::cmp::Reverse(parse_jira_datetime(&entry.created)));
+
+    Ok(IssueNotificationScan {
+        entries,
+        scanned_issues,
+        comment_errors,
+        jql,
+    })
+}
+
+fn parse_jira_datetime(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn notification_excerpt(raw: &str) -> String {
+    let condensed = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if condensed.chars().count() <= 140 {
+        condensed
+    } else {
+        let truncated: String = condensed.chars().take(137).collect();
+        format!("{truncated}...")
+    }
+}
+
 fn normalize_sprint_state(state: &str) -> AppResult<String> {
     let normalized = state.trim().to_ascii_lowercase();
     match normalized.as_str() {
@@ -1113,6 +1442,60 @@ fn build_update_issue_request_from_batch(entry: BatchUpdateOp) -> AppResult<Upda
         custom_fields,
         ..Default::default()
     })
+}
+
+fn issue_status_category(issue: &Issue) -> String {
+    issue
+        .fields
+        .get("status")
+        .and_then(|status| status.get("statusCategory"))
+        .and_then(|category| category.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_lowercase()
+}
+
+fn issue_is_blocked(issue: &Issue) -> bool {
+    let status = issue.status.to_lowercase();
+    status.contains("blocked") || status.contains("on hold") || status.contains("stuck")
+}
+
+fn parse_relative_window(raw: &str) -> AppResult<Duration> {
+    let value = raw.trim().to_lowercase();
+    if value.len() < 2 {
+        return Err(AppError::validation(format!(
+            "Invalid relative window '{}'. Use values like 2d, 36h, or 1w.",
+            raw
+        )));
+    }
+
+    let (num, unit) = value.split_at(value.len() - 1);
+    let amount: i64 = num.parse().map_err(|_| {
+        AppError::validation(format!(
+            "Invalid relative window '{}'. Use values like 2d, 36h, or 1w.",
+            raw
+        ))
+    })?;
+
+    match unit {
+        "h" => Ok(Duration::hours(amount)),
+        "d" => Ok(Duration::days(amount)),
+        "w" => Ok(Duration::weeks(amount)),
+        _ => Err(AppError::validation(format!(
+            "Invalid relative window '{}'. Use values like 2d, 36h, or 1w.",
+            raw
+        ))),
+    }
+}
+
+fn issue_updated_at(issue: &Issue) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(&issue.updated)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn escape_jql_literal(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn require_confirm(confirm: Option<bool>) -> AppResult<()> {
@@ -1333,6 +1716,37 @@ mod tests {
 
         assert_eq!(result["total"], Value::from(0));
         assert_eq!(result["results"].as_array().map(Vec::len), Some(0));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn standup_rejects_invalid_since_window() {
+        let err = JiraApp
+            .issue_standup(IssueStandupArgs {
+                project_key: None,
+                jql: None,
+                since: Some("nope".into()),
+                limit: Some(10),
+            })
+            .await
+            .expect_err("invalid since should fail");
+
+        assert_eq!(err.to_mcp().message, "validation_error");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn notifications_reject_invalid_limit_before_auth() {
+        let err = JiraApp
+            .issue_notifications(IssueNotificationsArgs {
+                project_key: None,
+                since: None,
+                limit: Some(101),
+            })
+            .await
+            .expect_err("invalid limit should fail");
+
+        assert_eq!(err.to_mcp().message, "validation_error");
     }
 
     #[tokio::test]

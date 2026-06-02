@@ -46,6 +46,28 @@ pub struct IssueListArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueStandupArgs {
+    pub project_key: Option<String>,
+    pub jql: Option<String>,
+    pub since: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintSummaryArgs {
+    pub project_key: String,
+    pub sprint: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueNotificationsArgs {
+    pub project_key: Option<String>,
+    pub since: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueKeyArgs {
     pub key: String,
 }

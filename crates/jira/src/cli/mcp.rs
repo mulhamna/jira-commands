@@ -298,15 +298,68 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
 
     for client in clients {
         match describe_client(&client) {
-            ClientDescriptor::FileTarget { label, path, note } => {
+            ClientDescriptor::FileTarget {
+                label,
+                path,
+                note,
+                top_level_key,
+            } => {
                 if path.exists() {
                     println!("[ok] {} target path exists: {}", label, path.display());
+                    match load_json_object(&path) {
+                        Ok(root) => match lookup_object_path(&root, top_level_key) {
+                            Ok(Some(entries)) if !entries.is_empty() => {
+                                let suffix = if entries.len() == 1 { "y" } else { "ies" };
+                                println!(
+                                    "[ok] {} config has {} entr{} under {}",
+                                    label,
+                                    entries.len(),
+                                    suffix,
+                                    top_level_key
+                                );
+                            }
+                            Ok(Some(_)) => {
+                                println!(
+                                    "[warn] {} config exists but {} is empty",
+                                    label, top_level_key
+                                );
+                            }
+                            Ok(None) => {
+                                println!(
+                                    "[warn] {} config exists but has no {} object yet",
+                                    label, top_level_key
+                                );
+                            }
+                            Err(err) => {
+                                println!("[warn] {} config exists but {}", label, err);
+                                hard_failures += 1;
+                            }
+                        },
+                        Err(err) => {
+                            println!("[warn] {} config could not be parsed: {err:#}", label);
+                            hard_failures += 1;
+                        }
+                    }
                 } else {
                     println!(
                         "[info] {} target path will be created: {}",
                         label,
                         path.display()
                     );
+                }
+                if matches!(client, McpClient::AntigravityCli) {
+                    if let Some(legacy_path) = antigravity_cli_legacy_settings_path() {
+                        if legacy_path.exists() && legacy_path != path {
+                            println!(
+                                "[info] antigravity-cli legacy config path also exists: {}",
+                                legacy_path.display()
+                            );
+                            println!(
+                                "       Current helper target is {} because newer antigravity-cli builds appear to read that file instead.",
+                                path.display()
+                            );
+                        }
+                    }
                 }
                 if !note.is_empty() {
                     println!("       {}", note);
@@ -360,6 +413,7 @@ enum ClientDescriptor {
         label: &'static str,
         path: PathBuf,
         note: &'static str,
+        top_level_key: &'static str,
     },
     Delegated {
         label: &'static str,
@@ -466,6 +520,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.claude.json")),
             note: "Writes user-level config at ~/.claude.json (mcpServers).",
+            top_level_key: "mcpServers",
         },
         McpClient::ClaudeDesktop => ClientDescriptor::FileTarget {
             label: "claude-desktop",
@@ -473,6 +528,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("claude_desktop_config.json")),
             note: "macOS: ~/Library/Application Support/Claude/claude_desktop_config.json; Windows: %APPDATA%\\Claude\\claude_desktop_config.json.",
+            top_level_key: "mcpServers",
         },
         McpClient::Cursor => ClientDescriptor::FileTarget {
             label: "cursor",
@@ -480,6 +536,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.cursor/mcp.json")),
             note: "Provisional path until verified in a real Cursor install.",
+            top_level_key: "mcpServers",
         },
         McpClient::OpenCode => ClientDescriptor::FileTarget {
             label: "opencode",
@@ -487,6 +544,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.config/opencode/opencode.jsonc")),
             note: "Writes JSONC at ~/.config/opencode/opencode.jsonc by default.",
+            top_level_key: "mcp",
         },
         McpClient::GeminiCli => ClientDescriptor::Delegated {
             label: "gemini-cli",
@@ -508,6 +566,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.config/zed/settings.json")),
             note: "Writes context_servers.jira.settings for the Zed marketplace extension.",
+            top_level_key: "context_servers",
         },
         McpClient::Antigravity => ClientDescriptor::FileTarget {
             label: "antigravity",
@@ -515,6 +574,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.gemini/antigravity/mcp_config.json")),
             note: "Writes user-level config at ~/.gemini/antigravity/mcp_config.json (mcpServers).",
+            top_level_key: "mcpServers",
         },
         McpClient::AntigravityCli => ClientDescriptor::FileTarget {
             label: "antigravity-cli",
@@ -522,6 +582,7 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .map(|t| t.path)
                 .unwrap_or_else(|_| PathBuf::from("~/.gemini/config/mcp_config.json")),
             note: "Writes user-level config at ~/.gemini/config/mcp_config.json (mcpServers).",
+            top_level_key: "mcpServers",
         },
     }
 }
@@ -815,6 +876,10 @@ fn command_exists(command: &str) -> bool {
     resolve_command_path(command).is_some()
 }
 
+fn antigravity_cli_legacy_settings_path() -> Option<PathBuf> {
+    home_dir().map(|home| home.join(".gemini/antigravity-cli/settings.json"))
+}
+
 fn load_json_object(path: &Path) -> Result<Map<String, Value>> {
     if !path.exists() {
         return Ok(Map::new());
@@ -891,6 +956,21 @@ fn strip_json_comments(input: &str) -> String {
     }
 
     out
+}
+
+fn lookup_object_path<'a>(
+    root: &'a Map<String, Value>,
+    path: &str,
+) -> Result<Option<&'a Map<String, Value>>> {
+    let mut current = root;
+    for key in path.split('.') {
+        match current.get(key) {
+            Some(Value::Object(map)) => current = map,
+            Some(_) => bail!("Field '{}' in path '{}' must be a JSON object", key, path),
+            None => return Ok(None),
+        }
+    }
+    Ok(Some(current))
 }
 
 fn ensure_object_path<'a>(
@@ -994,6 +1074,20 @@ mod tests {
         let mut root = Map::new();
         root.insert("mcpServers".into(), Value::String("bad".into()));
         let err = ensure_object_field(&mut root, "mcpServers").unwrap_err();
+        assert!(err.to_string().contains("must be a JSON object"));
+    }
+
+    #[test]
+    fn lookup_object_path_returns_none_for_missing_path() {
+        let root = Map::new();
+        assert!(lookup_object_path(&root, "mcpServers").unwrap().is_none());
+    }
+
+    #[test]
+    fn lookup_object_path_rejects_non_object_segment() {
+        let mut root = Map::new();
+        root.insert("mcpServers".into(), Value::String("bad".into()));
+        let err = lookup_object_path(&root, "mcpServers.jira").unwrap_err();
         assert!(err.to_string().contains("must be a JSON object"));
     }
 

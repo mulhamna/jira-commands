@@ -3,12 +3,20 @@ name: Release Please
 # ── HOW THIS WORKS ────────────────────────────────────────────────────────────
 # 1. Every push to main is analyzed for Conventional Commits.
 # 2. release-please creates/updates two Release PRs (one per package):
-#      - `jira-commands` — covers jira-core + jira-commands (lockstep).
-#        Tag: vX.Y.Z. Source-of-truth: VERSION file at repo root.
-#      - `jira-mcp` — covers jira-mcp only.
-#        Tag: jira-mcp-vX.Y.Z. Source-of-truth: crates/jira-mcp/VERSION.
-#    Commit scopes determine which PR is bumped: `feat(mcp):`/`fix(mcp):` →
-#    jira-mcp; everything else → jira-commands.
+#      - `jira-commands` — covers the root release lane (`.`), which bumps
+#        jira-core + jira-commands in lockstep. Tag: vX.Y.Z.
+#        Source-of-truth: VERSION file at repo root.
+#      - `jira-mcp` — covers `crates/jira-mcp`. Tag: jira-mcp-vX.Y.Z.
+#        Source-of-truth: crates/jira-mcp/VERSION.
+#    Routing is path-based, not scope-based:
+#      - commits touching only `crates/jira-mcp/**`, `packaging/npm-mcp/**`,
+#        and/or `Cargo.lock` are eligible for the jira-mcp Release PR.
+#      - the root `jira-commands` lane excludes those paths, but any commit that
+#        also touches another non-excluded file (for example `INSTALL.md` or
+#        `crates/jira/src/cli/mcp.rs`) will still be included in the root
+#        Release PR and can appear in its changelog.
+#    Conventional commit scopes like `feat(mcp):` help the changelog read well,
+#    but they do not decide release lane ownership by themselves.
 # 3. When you (the owner) merge a Release PR:
 #      - release-please pushes the corresponding tag
 #      - vX.Y.Z         → release-tag.yml      (builds jirac, publishes jira-core + jira-commands)

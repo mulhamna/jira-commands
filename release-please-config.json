@@ -11,7 +11,8 @@
       "changelog-path": "CHANGELOG.md",
       "exclude-paths": [
         "crates/jira-mcp",
-        "packaging/npm-mcp"
+        "packaging/npm-mcp",
+        "Cargo.lock"
       ],
       "extra-files": [
         { "type": "generic", "path": "/Cargo.toml" },

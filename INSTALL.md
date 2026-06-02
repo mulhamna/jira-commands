@@ -7,30 +7,29 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | Method               | macOS | Linux | Windows | Notes                                           |
 | -------------------- | ----- | ----- | ------- | ----------------------------------------------- |
 | Homebrew             | ✅    | ✅    | ❌      | `jira-commands` and `jira-mcp` via `mulhamna/tap` |
-| Install script       | ✅    | ✅    | ❌      | Downloads latest release asset                  |
-| PowerShell installer | ❌    | ❌    | ✅      | Installs `jirac.exe` to user-local bin          |
-| Cargo                | ✅    | ✅    | ✅      | Best for Rust users                             |
+| Install script       | ✅    | ✅    | ❌      | Downloads the latest release asset for `jirac` or `jirac-mcp` |
+| PowerShell installer | ❌    | ❌    | ✅      | Installs `jirac.exe` or `jirac-mcp.exe` to a user-local bin |
+| Cargo                | ✅    | ✅    | ✅      | Best for Rust users; install `jira-commands` and/or `jira-mcp` |
 | From source          | ✅    | ✅    | ✅      | `cargo install --path` from a local checkout    |
-| npm                  | ✅    | ✅    | ✅      | Downloads prebuilt release binary               |
-| GitHub Releases      | ✅    | ✅    | ✅      | Manual download of archives/binaries            |
+| npm                  | ✅    | ✅    | ✅      | Downloads the matching prebuilt release binary  |
+| GitHub Releases      | ✅    | ✅    | ✅      | Manual download of CLI and MCP archives/binaries |
 | Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket` for `jirac` + `jirac-mcp` |
-| Winget               | ❌    | ❌    | ✅      | Windows package manager                         |
+| Winget               | ❌    | ❌    | ✅      | Windows package manager for `mulhamna.jirac` + `mulhamna.jirac-mcp` |
 
 ## Homebrew (macOS / Linux)
 
-```bash
-brew tap mulhamna/tap
-brew install jira-commands
-
-# Optional MCP server
-brew install jira-mcp
-```
-
-Install both binaries with Homebrew:
+Install both packages:
 
 ```bash
 brew tap mulhamna/tap
 brew install jira-commands jira-mcp
+```
+
+Install just one:
+
+```bash
+brew install jira-commands
+brew install jira-mcp
 ```
 
 ## Install script (macOS / Linux)
@@ -69,6 +68,7 @@ scoop install mulhamna/jirac-mcp
 
 ```bash
 cargo install jira-commands
+cargo install jira-mcp
 ```
 
 ## From source (local checkout)
@@ -93,19 +93,13 @@ npm install -g @mulham28/jirac-mcp    # jirac-mcp MCP server
 
 Each package downloads the matching prebuilt release binary during install. Linux support depends on the release binary's glibc compatibility.
 
-Alternatively, install the MCP server from crates.io:
-
-```bash
-cargo install jira-mcp
-```
-
 ## GitHub Releases
 
 Download from:
 
 - <https://github.com/mulhamna/jira-commands/releases>
 
-Preferred archives:
+Preferred CLI (`vX.Y.Z`) archives:
 
 | Platform            | Archive                      |
 | ------------------- | ---------------------------- |
@@ -115,19 +109,24 @@ Preferred archives:
 | Linux ARM64         | `jirac-linux-aarch64.tar.gz` |
 | Windows x86_64      | `jirac-windows-x86_64.zip`   |
 
+Preferred MCP (`jira-mcp-vX.Y.Z`) archives:
+
+| Platform            | Archive                          |
+| ------------------- | -------------------------------- |
+| macOS Apple Silicon | `jirac-mcp-macos-aarch64.tar.gz` |
+| macOS Intel         | `jirac-mcp-macos-x86_64.tar.gz`  |
+| Linux x86_64        | `jirac-mcp-linux-x86_64.tar.gz`  |
+| Linux ARM64         | `jirac-mcp-linux-aarch64.tar.gz` |
+| Windows x86_64      | `jirac-mcp-windows-x86_64.zip`   |
+
 ## Winget (Windows)
 
 ```powershell
 winget install mulhamna.jirac
+winget install mulhamna.jirac-mcp
 ```
 
-If you prefer Scoop, use the custom bucket instead:
-
-```powershell
-scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
-scoop install mulhamna/jirac
-scoop install mulhamna/jirac-mcp
-```
+If you prefer Scoop, see the dedicated Scoop section above.
 
 ## After install
 

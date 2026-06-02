@@ -17,13 +17,14 @@ use crate::{
     app::JiraApp,
     error::AppResult,
     models::{
-        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs,
-        IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
-        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
+        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs,
+        BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
+        IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs,
+        IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs, ProjectVersionUpdateArgs,
+        RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs,
+        SprintDeleteArgs, SprintListArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs,
+        WorklogDeleteArgs,
     },
 };
 
@@ -338,6 +339,17 @@ impl JiraMcpServer {
     }
 
     #[tool(
+        name = "jira_issue_bulk_comment",
+        description = "Add the same comment to multiple Jira issues selected by JQL or explicit keys; requires confirm=true"
+    )]
+    pub async fn jira_issue_bulk_comment(
+        &self,
+        Parameters(args): Parameters<BulkCommentArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_bulk_comment(args).await)
+    }
+
+    #[tool(
         name = "jira_issue_link_types_list",
         description = "List available Jira issue link types such as blocks, relates to, and duplicates"
     )]
@@ -453,6 +465,17 @@ impl JiraMcpServer {
         Parameters(args): Parameters<BulkUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_bulk_update(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_batch",
+        description = "Run typed create, update, transition, and archive issue operations in sequence; requires confirm=true"
+    )]
+    pub async fn jira_issue_batch(
+        &self,
+        Parameters(args): Parameters<BatchArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_batch(args).await)
     }
 
     #[tool(
@@ -599,6 +622,10 @@ mod tests {
         let tools = client.list_all_tools().await?;
         assert!(tools.iter().any(|tool| tool.name == "jira_auth_status"));
         assert!(tools.iter().any(|tool| tool.name == "jira_issue_clone"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_issue_bulk_comment"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_batch"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

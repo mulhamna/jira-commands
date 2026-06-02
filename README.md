@@ -302,7 +302,7 @@ export JIRA_TOKEN=your_api_token
 
 Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then writes the right config file for the client you pick. Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites without writing anything.
 
-Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, OpenCode, generic JSON snippets, and Zed. Zed uses the official `Jira` marketplace extension from <https://github.com/mulhamna/jirac-ext>, while `jirac mcp install --client zed` seeds `context_servers.jira.settings` in `settings.json`.
+Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, OpenCode, generic JSON snippets, Antigravity, and antigravity-cli.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 
@@ -358,7 +358,6 @@ crates/
   jira-core/   # shared client, models, config, auth
   jira/        # CLI app
   jira-mcp/    # MCP server
-  zed-jira/    # Source-of-truth wrapper code mirrored into github.com/mulhamna/jirac-ext
 assets/        # screenshots and images
 packaging/     # release/install packaging
 ```

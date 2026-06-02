@@ -173,7 +173,6 @@ jirac mcp install --client gemini-cli
 jirac mcp install --client codex
 jirac mcp install --client opencode
 jirac mcp install --client generic-json
-jirac mcp install --client zed
 jirac mcp install --client antigravity
 jirac mcp install --client antigravity-cli
 ```
@@ -186,7 +185,6 @@ Supported targets now:
 - `codex` (delegates to `codex mcp add ...`)
 - `opencode` (`~/.config/opencode/opencode.jsonc`, direct JSONC write)
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
-- `zed` (`~/.config/zed/settings.json` on Linux, `~/Library/Application Support/Zed/settings.json` on macOS, `%APPDATA%/Zed/settings.json` on Windows; seeds `context_servers.jira.settings` for the official Zed marketplace extension published from <https://github.com/mulhamna/jirac-ext>)
 - `antigravity` (`~/.gemini/antigravity/mcp_config.json`, user-level JSON with `mcpServers`)
 - `antigravity-cli` (`~/.gemini/config/mcp_config.json`, user-level JSON with `mcpServers`)
 
@@ -195,7 +193,7 @@ Helpful flags:
 - `--dry-run` previews without writing
 - `--force` overwrites an existing MCP entry with the same name, or runs remove+add for delegated clients
 - install helpers use the active Jira profile by default; if you only have one Jira login configured, that is the profile the MCP server will use
-- `--name jira` changes the MCP server name (except `zed`, which uses the fixed `jira` context server id)
+- `--name jira` changes the MCP server name
 - `--command jirac-mcp` changes the launched binary
 - `--transport stdio` changes the transport args
 

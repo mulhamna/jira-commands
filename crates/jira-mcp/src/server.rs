@@ -18,12 +18,12 @@ use crate::{
     error::AppResult,
     models::{
         ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BulkTransitionArgs, BulkUpdateArgs,
-        CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs, IssueTransitionArgs,
-        IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
-        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
-        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs, ToolResponse,
-        WorklogAddArgs, WorklogDeleteArgs,
+        CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs,
+        IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
+        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
+        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -280,6 +280,17 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueDeleteArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_delete(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_clone",
+        description = "Clone a Jira issue into the same or another project; deleting the original requires move_original=true and confirm=true"
+    )]
+    pub async fn jira_issue_clone(
+        &self,
+        Parameters(args): Parameters<IssueCloneArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_clone(args).await)
     }
 
     #[tool(
@@ -587,6 +598,7 @@ mod tests {
         let client = TestClient.serve(client_transport).await?;
         let tools = client.list_all_tools().await?;
         assert!(tools.iter().any(|tool| tool.name == "jira_auth_status"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_clone"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

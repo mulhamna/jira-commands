@@ -75,6 +75,7 @@ The MCP server includes tools for:
 
 - Current focus is tools, not prompts/resources/UI.
 - Destructive operations require `confirm: true`.
+- `jira_issue_clone` can optionally delete the source issue with `move_original: true`, but only when `confirm: true` is also set.
 - Attachment uploads support local file paths or inline base64 payloads.
 
 ## Client install helper

@@ -21,9 +21,9 @@ use crate::{
     error::{AppError, AppResult},
     models::{
         ApiRequestArgs, ArchiveArgs, AttachmentInput, AuthSetCredentialsArgs, BulkTransitionArgs,
-        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCreateArgs, IssueDeleteArgs,
-        IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
+        BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
+        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs,
+        IssueListArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
         ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
         RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
         SprintListArgs, SprintUpdateArgs, WorklogAddArgs, WorklogDeleteArgs,
@@ -430,6 +430,83 @@ impl JiraApp {
         Ok(json!({
             "key": args.key,
             "deleted": true
+        }))
+    }
+
+    pub async fn issue_clone(&self, args: IssueCloneArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let source = client.get_issue(&args.key).await?;
+        let target_project = args
+            .project_key
+            .unwrap_or_else(|| source.project_key.clone());
+        let summary = args.summary.unwrap_or_else(|| source.summary.clone());
+
+        let labels: Vec<String> = source
+            .fields
+            .get("labels")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|s| s.as_str())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let components: Vec<String> = source
+            .fields
+            .get("components")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|c| c.get("name").and_then(|n| n.as_str()))
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let fix_versions: Vec<String> = source
+            .fields
+            .get("fixVersions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.get("name").and_then(|n| n.as_str()))
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let cloned = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: target_project,
+                summary,
+                description: None,
+                description_adf: source.description.clone(),
+                issue_type: source.issue_type.clone(),
+                assignee: args.assignee,
+                priority: source.priority.clone(),
+                labels,
+                components,
+                parent: None,
+                fix_versions,
+                custom_fields: HashMap::new(),
+            })
+            .await?;
+
+        let move_original = args.move_original.unwrap_or(false);
+        let mut deleted_original = false;
+        if move_original {
+            require_confirm(args.confirm)?;
+            client.delete_issue(&args.key).await?;
+            deleted_original = true;
+        }
+
+        Ok(json!({
+            "source_key": args.key,
+            "move_original": move_original,
+            "deleted_original": deleted_original,
+            "issue": cloned
         }))
     }
 

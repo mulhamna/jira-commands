@@ -6,6 +6,21 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.7.0](https://github.com/mulhamna/jira-commands/compare/v1.6.0...v1.7.0) (2026-06-02)
+
+
+### Features
+
+* **mcp:** add standup, sprint summary, and notifications ([#320](https://github.com/mulhamna/jira-commands/issues/320)) ([ec4c2f8](https://github.com/mulhamna/jira-commands/commit/ec4c2f81f4a961855c552f34a19ce74b4df2334f))
+
+
+### Bug Fixes
+
+* **mcp:** align antigravity-cli config target ([#314](https://github.com/mulhamna/jira-commands/issues/314)) ([c262bd7](https://github.com/mulhamna/jira-commands/commit/c262bd7b6ba0b49f74715657d89602b00c1d9e93))
+* **mcp:** make doctor validate config shape ([#316](https://github.com/mulhamna/jira-commands/issues/316)) ([f220c4f](https://github.com/mulhamna/jira-commands/commit/f220c4f8bbf66d4677d4cedcac0d049fd22e7d71))
+* **release:** refresh jira-mcp winget manifests ([#324](https://github.com/mulhamna/jira-commands/issues/324)) ([2d4b206](https://github.com/mulhamna/jira-commands/commit/2d4b2068b3d8a9b39b179b9324e8522b0be07c5d))
+* **release:** split release-please manifests by lane ([#326](https://github.com/mulhamna/jira-commands/issues/326)) ([7f3a090](https://github.com/mulhamna/jira-commands/commit/7f3a090e80648b3d8be558703ef1957770faab38))
+
 ## [1.6.0](https://github.com/mulhamna/jira-commands/compare/v1.5.0...v1.6.0) (2026-05-27)
 
 

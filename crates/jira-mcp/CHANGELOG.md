@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.0.1...jira-mcp-v2.1.0) (2026-06-02)
+
+
+### Features
+
+* **mcp:** add bulk comment and batch tools ([#319](https://github.com/mulhamna/jira-commands/issues/319)) ([496d4fc](https://github.com/mulhamna/jira-commands/commit/496d4fc1070444bd3595056b810102cbf0e71302))
+* **mcp:** add jira issue clone tool ([#317](https://github.com/mulhamna/jira-commands/issues/317)) ([fe30984](https://github.com/mulhamna/jira-commands/commit/fe309849deeec39a324859cb772a79237e9994f3))
+* **mcp:** add standup, sprint summary, and notifications ([#320](https://github.com/mulhamna/jira-commands/issues/320)) ([ec4c2f8](https://github.com/mulhamna/jira-commands/commit/ec4c2f81f4a961855c552f34a19ce74b4df2334f))
+
 ## [2.0.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.0.0...jira-mcp-v2.0.1) (2026-05-24)
 
 

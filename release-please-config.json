@@ -1,6 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "separate-pull-requests": true,
   "packages": {
     ".": {
       "release-type": "simple",
@@ -24,18 +23,6 @@
         { "type": "generic", "path": "/packaging/winget/jirac.locale.en-US.yaml" },
         { "type": "generic", "path": "/packaging/winget/jirac.installer.yaml" },
         { "type": "generic", "path": "/packaging/npm/package.json" }
-      ]
-    },
-    "crates/jira-mcp": {
-      "release-type": "simple",
-      "include-component-in-tag": true,
-      "component": "jira-mcp",
-      "package-name": "jira-mcp",
-      "version-file": "VERSION",
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": [
-        { "type": "generic", "path": "Cargo.toml" },
-        { "type": "generic", "path": "/packaging/npm-mcp/package.json" }
       ]
     }
   }

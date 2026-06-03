@@ -24,7 +24,6 @@ jobs:
       PACKAGE_MARKETPLACE: clawhub/jirac-plugin/marketplace.json
       PACKAGE_VERSION_FILE: clawhub/jirac-plugin/VERSION
       PLUGIN_MANIFEST: plugin/.claude-plugin/plugin.json
-      PLUGIN_VERSION_FILE: plugin/VERSION
       DEFAULT_CHANGELOG: Update ClawHub jirac plugin wrapper metadata
     steps:
       - name: Checkout
@@ -54,17 +53,12 @@ jobs:
           test -f "$PACKAGE_VERSION_FILE"
           test -f "$PACKAGE_ROOT/CHANGELOG.md"
           test -f "$PLUGIN_MANIFEST"
-          test -f "$PLUGIN_VERSION_FILE"
 
           PACKAGE_VER=$(tr -d '[:space:]' < "$PACKAGE_VERSION_FILE")
-          PLUGIN_VER=$(jq -r '.version' "$PLUGIN_MANIFEST")
-          PLUGIN_LANE_VER=$(tr -d '[:space:]' < "$PLUGIN_VERSION_FILE")
           MARKETPLACE_VER=$(jq -r '.metadata.version' "$PACKAGE_MARKETPLACE")
           MARKETPLACE_PLUGIN_VER=$(jq -r '.plugins[0].version' "$PACKAGE_MARKETPLACE")
           MARKETPLACE_PLUGIN_PATH=$(jq -r '.plugins[0].source.path' "$PACKAGE_MARKETPLACE")
 
-          test "$PACKAGE_VER" = "$PLUGIN_VER"
-          test "$PACKAGE_VER" = "$PLUGIN_LANE_VER"
           test "$PACKAGE_VER" = "$MARKETPLACE_VER"
           test "$PACKAGE_VER" = "$MARKETPLACE_PLUGIN_VER"
           test "$MARKETPLACE_PLUGIN_PATH" = "../../plugin"

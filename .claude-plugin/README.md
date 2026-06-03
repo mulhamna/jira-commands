@@ -51,4 +51,4 @@ Notes:
 
 - The repo currently does not have the `clawhub` CLI available in this environment.
 - `CLAWHUB_TOKEN` can stay configured now even if publish is done later.
-- Keep marketplace/plugin versions aligned with release-please bumps.
+- Keep the ClawHub wrapper version aligned with `clawhub/jirac-plugin/marketplace.json`; it can release independently from the Claude plugin lane.

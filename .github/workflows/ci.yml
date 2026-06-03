@@ -202,14 +202,10 @@ jobs:
           test -f plugin/.claude-plugin/plugin.json
 
           WRAPPER_VER=$(tr -d '[:space:]' < clawhub/jirac-plugin/VERSION)
-          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
-          PLUGIN_LANE_VER=$(tr -d '[:space:]' < plugin/VERSION)
           MARKETPLACE_VER=$(jq -r '.metadata.version' clawhub/jirac-plugin/marketplace.json)
           MARKETPLACE_PLUGIN_VER=$(jq -r '.plugins[0].version' clawhub/jirac-plugin/marketplace.json)
           MARKETPLACE_PLUGIN_PATH=$(jq -r '.plugins[0].source.path' clawhub/jirac-plugin/marketplace.json)
 
-          test "$WRAPPER_VER" = "$PLUGIN_VER"
-          test "$WRAPPER_VER" = "$PLUGIN_LANE_VER"
           test "$WRAPPER_VER" = "$MARKETPLACE_VER"
           test "$WRAPPER_VER" = "$MARKETPLACE_PLUGIN_VER"
           test "$MARKETPLACE_PLUGIN_PATH" = '../../plugin'

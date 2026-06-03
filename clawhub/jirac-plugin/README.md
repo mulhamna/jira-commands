@@ -9,5 +9,5 @@ This directory is the **ClawHub-only package surface** for the `jirac` Claude Co
 ## Files
 
 - `marketplace.json` — ClawHub package metadata and plugin source mapping
-- `VERSION` — wrapper package version (kept aligned with the published plugin version)
+- `VERSION` — wrapper package version (independent from the Claude plugin release lane)
 - `CHANGELOG.md` — wrapper package release notes

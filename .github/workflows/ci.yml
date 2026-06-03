@@ -77,6 +77,7 @@ jobs:
               - 'docs/**'
               - '.github/PULL_REQUEST_TEMPLATE.md'
               - 'plugin/README.md'
+              - 'clawhub/jirac-plugin/README.md'
               - 'crates/jira/README.md'
               - 'crates/jira-core/README.md'
               - 'crates/jira-mcp/README.md'
@@ -191,6 +192,27 @@ jobs:
           grep -q '^---' clawhub/jirac/SKILL.md
           grep -q '^name: jirac' clawhub/jirac/SKILL.md
           grep -q '^description:' clawhub/jirac/SKILL.md
+
+      - name: Check ClawHub jirac plugin wrapper files
+        if: needs.changes.outputs.clawhub == 'true' || needs.changes.outputs.workflows == 'true'
+        run: |
+          test -f clawhub/jirac-plugin/marketplace.json
+          test -f clawhub/jirac-plugin/VERSION
+          test -f clawhub/jirac-plugin/CHANGELOG.md
+          test -f plugin/.claude-plugin/plugin.json
+
+          WRAPPER_VER=$(tr -d '[:space:]' < clawhub/jirac-plugin/VERSION)
+          PLUGIN_VER=$(jq -r '.version' plugin/.claude-plugin/plugin.json)
+          PLUGIN_LANE_VER=$(tr -d '[:space:]' < plugin/VERSION)
+          MARKETPLACE_VER=$(jq -r '.metadata.version' clawhub/jirac-plugin/marketplace.json)
+          MARKETPLACE_PLUGIN_VER=$(jq -r '.plugins[0].version' clawhub/jirac-plugin/marketplace.json)
+          MARKETPLACE_PLUGIN_PATH=$(jq -r '.plugins[0].source.path' clawhub/jirac-plugin/marketplace.json)
+
+          test "$WRAPPER_VER" = "$PLUGIN_VER"
+          test "$WRAPPER_VER" = "$PLUGIN_LANE_VER"
+          test "$WRAPPER_VER" = "$MARKETPLACE_VER"
+          test "$WRAPPER_VER" = "$MARKETPLACE_PLUGIN_VER"
+          test "$MARKETPLACE_PLUGIN_PATH" = '../../plugin'
 
       - name: Package ClawHub jirac skill artifact
         if: needs.changes.outputs.clawhub == 'true' || needs.changes.outputs.workflows == 'true'

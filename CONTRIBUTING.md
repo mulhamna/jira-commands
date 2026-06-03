@@ -140,6 +140,11 @@ If you update `clawhub/jirac/`:
 - review `clawhub-publish-jirac.yml`
 - update references/docs under the same skill lane if behavior changed
 
+If you update `clawhub/jirac-plugin/`:
+- keep `clawhub/jirac-plugin/VERSION` aligned with `plugin/VERSION` and `plugin/.claude-plugin/plugin.json`
+- keep `clawhub/jirac-plugin/marketplace.json` pointed at `../../plugin`
+- review `clawhub-publish-jirac-plugin.yml`
+
 ## Pull request guidance
 
 Please prefer focused PRs with a clear theme:

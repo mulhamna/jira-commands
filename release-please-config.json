@@ -8,20 +8,17 @@
       "package-name": "jira-commands",
       "version-file": "VERSION",
       "changelog-path": "CHANGELOG.md",
-      "exclude-paths": [
-        "crates/jira-mcp",
-        "packaging/npm-mcp",
-        "Cargo.lock",
-        "plugin",
-        ".claude-plugin",
-        "clawhub",
-        ".github/workflows/clawhub-publish-jirac.yml",
-        ".github/workflows/clawhub-publish-jirac-plugin.yml",
-        ".github/workflows/release-please.yml",
-        "release-please-config.json",
-        "CLAUDE.md",
-        "CONTRIBUTING.md",
-        "PLUGIN.md"
+      "include-paths": [
+        "Cargo.toml",
+        "VERSION",
+        "CHANGELOG.md",
+        "README.md",
+        "INSTALL.md",
+        "install.sh",
+        "install.ps1",
+        "crates/jira",
+        "crates/jira-core",
+        "packaging/npm"
       ],
       "extra-files": [
         { "type": "generic", "path": "/Cargo.toml" },

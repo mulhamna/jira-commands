@@ -158,7 +158,8 @@ Two independent lanes via `separate-pull-requests: true`:
 **Commit scoping → which lane bumps:**
 
 - Edits ONLY under `crates/jira-mcp/**` or `packaging/npm-mcp/**` → jira-mcp lane only. Use `feat(jira-mcp):` / `fix(jira-mcp):` (or `feat(mcp):`).
-- Edits to root files (`README.md`, `INSTALL.md`, `.github/workflows/**`, `release-please-config.json`, root `Cargo.toml`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`) → jira-commands lane bumps regardless of scope name.
+- Edits to the explicit root include-paths (`VERSION`, `CHANGELOG.md`, `README.md`, `INSTALL.md`, `install.sh`, `install.ps1`, root `Cargo.toml`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`) → jira-commands lane bumps regardless of scope name.
+- ClawHub / Claude wrapper files and release-infra-only workflow/config changes should stay out of the jira-commands lane unless they also touch one of those included release surfaces.
 - Mixed PRs bump BOTH lanes → two release PRs open in parallel.
 
 **Manifest race (avoid):** if two release PRs are open at once, merging one stale-overwrites the other's manifest entry. Mitigation:

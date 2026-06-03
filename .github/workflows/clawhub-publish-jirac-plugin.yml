@@ -6,6 +6,7 @@ on:
     paths:
       - 'clawhub/jirac-plugin/**'
       - 'plugin/**'
+      - '.github/workflows/clawhub-publish-jirac-plugin.yml'
 
 concurrency:
   group: clawhub-publish-jirac-plugin

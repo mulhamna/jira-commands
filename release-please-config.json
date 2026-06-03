@@ -11,7 +11,15 @@
       "exclude-paths": [
         "crates/jira-mcp",
         "packaging/npm-mcp",
-        "Cargo.lock"
+        "Cargo.lock",
+        "plugin",
+        ".claude-plugin",
+        "clawhub",
+        ".github/workflows/clawhub-publish-jirac.yml",
+        ".github/workflows/clawhub-publish-jirac-plugin.yml",
+        "CLAUDE.md",
+        "CONTRIBUTING.md",
+        "PLUGIN.md"
       ],
       "extra-files": [
         { "type": "generic", "path": "/Cargo.toml" },

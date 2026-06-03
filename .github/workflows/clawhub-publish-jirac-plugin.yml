@@ -88,7 +88,7 @@ jobs:
 
       - name: Dry-run package publish
         run: |
-          npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_MARKETPLACE" \
+          npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
             --dry-run \
             --source-repo "https://github.com/${{ github.repository }}" \
             --source-commit "${{ github.sha }}" \
@@ -101,7 +101,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Publish attempt $attempt/3"
 
-            if npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_MARKETPLACE" \
+            if npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
               --source-repo "https://github.com/${{ github.repository }}" \
               --source-commit "${{ github.sha }}" \
               --source-ref "${{ github.ref_name }}"; then

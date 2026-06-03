@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.7.1](https://github.com/mulhamna/jira-commands/compare/v1.7.0...v1.7.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* publish clawhub wrapper from package root ([#329](https://github.com/mulhamna/jira-commands/issues/329)) ([d462661](https://github.com/mulhamna/jira-commands/commit/d4626618110a98978c7e3ba1814dcc1a1bb8a679))
+
 ## [1.7.0](https://github.com/mulhamna/jira-commands/compare/v1.6.0...v1.7.0) (2026-06-02)
 
 

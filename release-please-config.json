@@ -17,6 +17,8 @@
         "clawhub",
         ".github/workflows/clawhub-publish-jirac.yml",
         ".github/workflows/clawhub-publish-jirac-plugin.yml",
+        ".github/workflows/release-please.yml",
+        "release-please-config.json",
         "CLAUDE.md",
         "CONTRIBUTING.md",
         "PLUGIN.md"

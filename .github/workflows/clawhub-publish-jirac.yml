@@ -24,6 +24,7 @@ jobs:
       SKILL_SLUG: jirac
       SKILL_NAME: jirac
       SKILL_VERSION_FILE: clawhub/jirac/VERSION
+      WORKFLOW_FILE: .github/workflows/clawhub-publish-jirac.yml
       DEFAULT_CHANGELOG: Update ClawHub jirac skill metadata and docs
     steps:
       - name: Checkout
@@ -50,6 +51,30 @@ jobs:
           test -d "$SKILL_PATH"
           test -f "$SKILL_PATH/SKILL.md"
           test -f "$SKILL_VERSION_FILE"
+
+      - name: Detect publish-worthy changes
+        id: trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            echo "source_changed=true" >> "$GITHUB_OUTPUT"
+            echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --quiet HEAD~1 HEAD -- "$SKILL_PATH"; then
+            echo "source_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --quiet HEAD~1 HEAD -- "$WORKFLOW_FILE"; then
+            echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Dry-run sync
         run: npx --prefix .github/clawhub-cli clawhub sync --dry-run --all --root "$SKILL_PATH"
@@ -87,6 +112,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish skill
+        if: steps.trigger.outputs.source_changed == 'true'
         run: |
           set -euo pipefail
 
@@ -111,3 +137,7 @@ jobs:
 
           echo "Publish failed after 3 attempts."
           exit 1
+
+      - name: Skip publish when only workflow wiring changed
+        if: steps.trigger.outputs.source_changed != 'true' && steps.trigger.outputs.workflow_changed == 'true'
+        run: echo "Skipping publish because only workflow wiring changed; no skill version bump was requested."

@@ -106,16 +106,26 @@ jobs:
             CHANGELOG="$DEFAULT_CHANGELOG"
           fi
 
+          VERSION=$(tr -d '[:space:]' < "$PACKAGE_VERSION_FILE")
+          echo "Publish version: $VERSION"
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version in $PACKAGE_VERSION_FILE: $VERSION"
+            exit 1
+          fi
+
           {
             echo "changelog<<EOF"
             echo "$CHANGELOG"
             echo "EOF"
+            echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
 
       - name: Dry-run package publish
         run: |
           npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
             --family code-plugin \
+            --version "${{ steps.publish_meta.outputs.version }}" \
             --dry-run \
             --source-repo "https://github.com/${{ github.repository }}" \
             --source-commit "${{ github.sha }}" \
@@ -131,6 +141,8 @@ jobs:
 
             if npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
               --family code-plugin \
+              --version "${{ steps.publish_meta.outputs.version }}" \
+              --changelog "${{ steps.publish_meta.outputs.changelog }}" \
               --source-repo "https://github.com/${{ github.repository }}" \
               --source-commit "${{ github.sha }}" \
               --source-ref "${{ github.ref_name }}"; then

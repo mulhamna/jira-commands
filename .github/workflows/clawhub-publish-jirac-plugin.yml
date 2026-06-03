@@ -24,6 +24,8 @@ jobs:
       PACKAGE_ROOT: clawhub/jirac-plugin
       PACKAGE_MARKETPLACE: clawhub/jirac-plugin/marketplace.json
       PACKAGE_VERSION_FILE: clawhub/jirac-plugin/VERSION
+      PACKAGE_NAME: jirac-plugin
+      PACKAGE_DISPLAY_NAME: jirac Plugin
       PLUGIN_MANIFEST: plugin/.claude-plugin/plugin.json
       WORKFLOW_FILE: .github/workflows/clawhub-publish-jirac-plugin.yml
       DEFAULT_CHANGELOG: Update ClawHub jirac plugin wrapper metadata
@@ -121,10 +123,43 @@ jobs:
             echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Prepare staged bundle package
+        id: staged_bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUNDLE_DIR=$(mktemp -d)
+          cp -R plugin/. "$BUNDLE_DIR/"
+          cp "$PACKAGE_ROOT/README.md" "$BUNDLE_DIR/README.md"
+          cp "$PACKAGE_ROOT/CHANGELOG.md" "$BUNDLE_DIR/CHANGELOG.md"
+          cp "$PACKAGE_VERSION_FILE" "$BUNDLE_DIR/VERSION"
+
+          DESCRIPTION=$(jq -r '.metadata.description' "$PACKAGE_MARKETPLACE")
+          jq -n \
+            --arg id "$PACKAGE_NAME" \
+            --arg name "$PACKAGE_DISPLAY_NAME" \
+            --arg description "$DESCRIPTION" \
+            '{
+              id: $id,
+              name: $name,
+              description: $description,
+              activation: { onStartup: false },
+              configSchema: {
+                type: "object",
+                additionalProperties: false,
+                properties: {}
+              }
+            }' > "$BUNDLE_DIR/openclaw.plugin.json"
+
+          echo "bundle_dir=$BUNDLE_DIR" >> "$GITHUB_OUTPUT"
+
       - name: Dry-run package publish
         run: |
-          npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
-            --family code-plugin \
+          npx --prefix .github/clawhub-cli clawhub package publish "${{ steps.staged_bundle.outputs.bundle_dir }}" \
+            --family bundle-plugin \
+            --name "$PACKAGE_NAME" \
+            --display-name "$PACKAGE_DISPLAY_NAME" \
             --version "${{ steps.publish_meta.outputs.version }}" \
             --dry-run \
             --source-repo "https://github.com/${{ github.repository }}" \
@@ -139,8 +174,10 @@ jobs:
           for attempt in 1 2 3; do
             echo "Publish attempt $attempt/3"
 
-            if npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_ROOT" \
-              --family code-plugin \
+            if npx --prefix .github/clawhub-cli clawhub package publish "${{ steps.staged_bundle.outputs.bundle_dir }}" \
+              --family bundle-plugin \
+              --name "$PACKAGE_NAME" \
+              --display-name "$PACKAGE_DISPLAY_NAME" \
               --version "${{ steps.publish_meta.outputs.version }}" \
               --changelog "${{ steps.publish_meta.outputs.changelog }}" \
               --source-repo "https://github.com/${{ github.repository }}" \

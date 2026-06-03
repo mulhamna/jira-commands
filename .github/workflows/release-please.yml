@@ -16,6 +16,8 @@ name: Release Please
 #      - ClawHub / Claude marketplace wrapper surfaces (`clawhub/**`, `plugin/**`,
 #        `.claude-plugin/**`, and their dedicated publish-workflow/docs files)
 #        are excluded from the root `jira-commands` lane.
+#      - release-please routing/config maintenance files are also excluded so
+#        release-infra-only fixes do not mint a new CLI version.
 #      - the root `jira-commands` lane still includes other non-excluded files
 #        (for example `INSTALL.md` or `crates/jira/src/cli/mcp.rs`) and those
 #        changes can appear in the root Release PR changelog.

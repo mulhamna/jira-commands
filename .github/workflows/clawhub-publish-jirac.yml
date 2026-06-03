@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'clawhub/jirac/**'
+      - '.github/workflows/clawhub-publish-jirac.yml'
 
 concurrency:
   group: clawhub-publish-jirac

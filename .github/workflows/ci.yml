@@ -37,73 +37,107 @@ jobs:
       any_code: ${{ steps.filter.outputs.any_code }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - id: filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
-        with:
-          filters: |
-            workflows:
-              - '.github/workflows/**'
-            rust:
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'deny.toml'
-              - 'crates/**'
-            rust_core:
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'crates/jira-core/**'
-            rust_cli:
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'crates/jira/**'
-            rust_mcp:
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'crates/jira-mcp/**'
-            plugin:
-              - 'plugin/**'
-              - '.claude-plugin/**'
-            plugin_release:
-              - 'plugin/VERSION'
-              - 'plugin/CHANGELOG.md'
-              - 'plugin/.claude-plugin/plugin.json'
-              - '.claude-plugin/marketplace.json'
-            clawhub:
-              - 'clawhub/**'
-            docs:
-              - 'README.md'
-              - 'INSTALL.md'
-              - 'docs/**'
-              - '.github/PULL_REQUEST_TEMPLATE.md'
-              - 'plugin/README.md'
-              - 'clawhub/jirac-plugin/README.md'
-              - 'crates/jira/README.md'
-              - 'crates/jira-core/README.md'
-              - 'crates/jira-mcp/README.md'
-              - 'packaging/winget/**'
-              - 'packaging/winget-mcp/**'
-              - 'packaging/scoop/**'
-              - 'packaging/npm/**'
-              - 'packaging/npm-mcp/**'
-              - 'install.ps1'
-            release:
-              - 'release-please-config.json'
-              - 'release-please-config-mcp.json'
-              - '.release-please-manifest.json'
-              - '.release-please-manifest-mcp.json'
-              - 'VERSION'
-              - 'CHANGELOG.md'
-            workspace_meta:
-              - '.github/CODEOWNERS'
-              - '.github/dependabot.yml'
-              - 'install.sh'
-              - 'install.ps1'
-              - 'SECURITY.md'
-              - 'LICENSE'
-              - 'LICENSE-MIT'
-              - 'LICENSE-APACHE'
-          predicate-quantifier: 'some'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA=$(git rev-parse "$HEAD_SHA~1")
+          fi
+
+          changed() {
+            local name="$1"
+            shift
+            if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "$@"; then
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          changed workflows \
+            '.github/workflows/**'
+
+          changed rust \
+            'Cargo.toml' \
+            'Cargo.lock' \
+            'deny.toml' \
+            'crates/**'
+
+          changed rust_core \
+            'Cargo.toml' \
+            'Cargo.lock' \
+            'crates/jira-core/**'
+
+          changed rust_cli \
+            'Cargo.toml' \
+            'Cargo.lock' \
+            'crates/jira/**'
+
+          changed rust_mcp \
+            'Cargo.toml' \
+            'Cargo.lock' \
+            'crates/jira-mcp/**'
+
+          changed plugin \
+            'plugin/**' \
+            '.claude-plugin/**'
+
+          changed plugin_release \
+            'plugin/VERSION' \
+            'plugin/CHANGELOG.md' \
+            'plugin/.claude-plugin/plugin.json' \
+            '.claude-plugin/marketplace.json'
+
+          changed clawhub \
+            'clawhub/**'
+
+          changed docs \
+            'README.md' \
+            'INSTALL.md' \
+            'docs/**' \
+            '.github/PULL_REQUEST_TEMPLATE.md' \
+            'plugin/README.md' \
+            'clawhub/jirac-plugin/README.md' \
+            'crates/jira/README.md' \
+            'crates/jira-core/README.md' \
+            'crates/jira-mcp/README.md' \
+            'packaging/winget/**' \
+            'packaging/winget-mcp/**' \
+            'packaging/scoop/**' \
+            'packaging/npm/**' \
+            'packaging/npm-mcp/**' \
+            'install.ps1'
+
+          changed release \
+            'release-please-config.json' \
+            'release-please-config-mcp.json' \
+            '.release-please-manifest.json' \
+            '.release-please-manifest-mcp.json' \
+            'VERSION' \
+            'CHANGELOG.md'
+
+          changed workspace_meta \
+            '.github/CODEOWNERS' \
+            '.github/dependabot.yml' \
+            'install.sh' \
+            'install.ps1' \
+            'SECURITY.md' \
+            'LICENSE' \
+            'LICENSE-MIT' \
+            'LICENSE-APACHE'
 
       - id: any_code
         run: |

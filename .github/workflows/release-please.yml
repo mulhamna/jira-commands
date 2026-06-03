@@ -13,14 +13,13 @@ name: Release Please
 #    Routing is path-based, not scope-based:
 #      - commits touching only `crates/jira-mcp/**`, `packaging/npm-mcp/**`,
 #        and/or `Cargo.lock` are eligible for the jira-mcp Release PR.
-#      - ClawHub / Claude marketplace wrapper surfaces (`clawhub/**`, `plugin/**`,
-#        `.claude-plugin/**`, and their dedicated publish-workflow/docs files)
-#        are excluded from the root `jira-commands` lane.
-#      - release-please routing/config maintenance files are also excluded so
-#        release-infra-only fixes do not mint a new CLI version.
-#      - the root `jira-commands` lane still includes other non-excluded files
-#        (for example `INSTALL.md` or `crates/jira/src/cli/mcp.rs`) and those
-#        changes can appear in the root Release PR changelog.
+#      - the root `jira-commands` lane uses explicit `include-paths`, so only
+#        root release metadata plus real CLI/core package surfaces
+#        (`Cargo.toml`, `VERSION`, `crates/jira/**`, `crates/jira-core/**`,
+#        and `packaging/npm/**`) contribute to a root release PR.
+#      - ClawHub / Claude wrapper work and release-infra-only maintenance stay
+#        outside the root lane unless they also touch one of those included
+#        release surfaces.
 #    Conventional commit scopes like `feat(mcp):` help the changelog read well,
 #    but they do not decide release lane ownership by themselves.
 # 3. When you (the owner) merge a Release PR:

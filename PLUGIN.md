@@ -2,7 +2,7 @@
 
 The `jirac` Claude Code plugin exposes Jira operations as slash commands inside Claude Code. The plugin namespace is `/jira:*`.
 
-The plugin has its own release lane under `plugin/`, with dedicated `plugin/VERSION` and `plugin/CHANGELOG.md` files. ClawHub publishing uses a separate skill lane under `clawhub/jirac/`.
+The Claude Code plugin has its own release lane under `plugin/`, with dedicated `plugin/VERSION` and `plugin/CHANGELOG.md` files. ClawHub publishing is separate: the `clawhub/jirac/` skill ships independently, and the `clawhub/jirac-plugin/` wrapper package points back to `plugin/` for ClawHub package publishing.
 
 ## Setup
 

@@ -137,7 +137,8 @@ See `.github/workflows/` for details — actual files are source of truth.
 - **release-tag.yml**: build binaries + publish jirac (trigger: tag `v*`)
 - **release-tag-mcp.yml**: build binaries + publish jirac-mcp (trigger: tag `jira-mcp-v*`)
 - **release-recover.yml**: recovery workflow for failed releases
-- **clawhub-publish-jirac.yml**: publish to ClawHub plugin marketplace
+- **clawhub-publish-jirac.yml**: publish the `clawhub/jirac` skill to ClawHub
+- **clawhub-publish-jirac-plugin.yml**: publish the `clawhub/jirac-plugin` wrapper package to ClawHub
 - **pr-automerge.yml**: auto-merge release-please PRs
 - **winget-submit.yml**: submit to Windows Package Manager
 

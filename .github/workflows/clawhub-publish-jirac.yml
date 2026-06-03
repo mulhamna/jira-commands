@@ -51,7 +51,7 @@ jobs:
           test -f "$SKILL_VERSION_FILE"
 
       - name: Dry-run sync
-        run: npx --prefix .github/clawhub-cli clawhub sync --dry-run --all --root "$SKILL_PATH/.."
+        run: npx --prefix .github/clawhub-cli clawhub sync --dry-run --all --root "$SKILL_PATH"
 
       - name: Resolve publish metadata
         id: publish_meta
@@ -92,7 +92,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Publish attempt $attempt/3"
 
-            if npx --prefix .github/clawhub-cli clawhub publish "$SKILL_PATH" \
+            if npx --prefix .github/clawhub-cli clawhub skill publish "$SKILL_PATH" \
               --slug "$SKILL_SLUG" \
               --name "$SKILL_NAME" \
               --version "${{ steps.publish_meta.outputs.version }}" \

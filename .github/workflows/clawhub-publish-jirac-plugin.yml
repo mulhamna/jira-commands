@@ -1,0 +1,120 @@
+name: ClawHub Publish jirac Plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'clawhub/jirac-plugin/**'
+      - 'plugin/**'
+
+concurrency:
+  group: clawhub-publish-jirac-plugin
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Validate and publish ClawHub package wrapper
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PACKAGE_ROOT: clawhub/jirac-plugin
+      PACKAGE_MARKETPLACE: clawhub/jirac-plugin/marketplace.json
+      PACKAGE_VERSION_FILE: clawhub/jirac-plugin/VERSION
+      PLUGIN_MANIFEST: plugin/.claude-plugin/plugin.json
+      DEFAULT_CHANGELOG: Update ClawHub jirac plugin wrapper metadata
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Install pinned ClawHub CLI dependencies
+        run: npm ci --prefix .github/clawhub-cli
+
+      - name: Validate auth
+        run: |
+          test -n "${{ secrets.CLAWHUB_TOKEN }}"
+          npx --prefix .github/clawhub-cli clawhub login --token "${{ secrets.CLAWHUB_TOKEN }}" --no-browser
+          npx --prefix .github/clawhub-cli clawhub whoami
+
+      - name: Validate wrapper metadata
+        run: |
+          set -euo pipefail
+          test -d "$PACKAGE_ROOT"
+          test -f "$PACKAGE_MARKETPLACE"
+          test -f "$PACKAGE_VERSION_FILE"
+          test -f "$PACKAGE_ROOT/CHANGELOG.md"
+          test -f "$PLUGIN_MANIFEST"
+
+          PACKAGE_VER=$(tr -d '[:space:]' < "$PACKAGE_VERSION_FILE")
+          MARKETPLACE_VER=$(jq -r '.metadata.version' "$PACKAGE_MARKETPLACE")
+          MARKETPLACE_PLUGIN_VER=$(jq -r '.plugins[0].version' "$PACKAGE_MARKETPLACE")
+          MARKETPLACE_PLUGIN_PATH=$(jq -r '.plugins[0].source.path' "$PACKAGE_MARKETPLACE")
+
+          test "$PACKAGE_VER" = "$MARKETPLACE_VER"
+          test "$PACKAGE_VER" = "$MARKETPLACE_PLUGIN_VER"
+          test "$MARKETPLACE_PLUGIN_PATH" = "../../plugin"
+
+      - name: Resolve publish metadata
+        id: publish_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RANGE="HEAD~1..HEAD"
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            CHANGELOG=$(git log --format=%s ${RANGE} -- "$PACKAGE_ROOT" plugin | sed '/^$/d')
+          else
+            CHANGELOG=""
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="$DEFAULT_CHANGELOG"
+          fi
+
+          {
+            echo "changelog<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run package publish
+        run: |
+          npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_MARKETPLACE" \
+            --dry-run \
+            --source-repo "https://github.com/${{ github.repository }}" \
+            --source-commit "${{ github.sha }}" \
+            --source-ref "${{ github.ref_name }}"
+
+      - name: Publish package
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            echo "Publish attempt $attempt/3"
+
+            if npx --prefix .github/clawhub-cli clawhub package publish "$PACKAGE_MARKETPLACE" \
+              --source-repo "https://github.com/${{ github.repository }}" \
+              --source-commit "${{ github.sha }}" \
+              --source-ref "${{ github.ref_name }}"; then
+              echo "Publish succeeded on attempt $attempt"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              backoff=$((attempt * 15))
+              echo "Publish failed, retrying in ${backoff}s..."
+              sleep "$backoff"
+            fi
+          done
+
+          echo "Publish failed after 3 attempts."
+          exit 1

@@ -1,563 +1,331 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-LFHBF9XWMJ"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-LFHBF9XWMJ');
-  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="jirac is a Jira CLI and terminal UI for Jira issue management, JQL search, fix versions, worklogs, MCP integration, and automation-friendly workflows." />
-  <meta name="keywords" content="jira cli,jira command line,jira terminal,jira tui,jql cli,jira mcp,jira automation,jira-commands,jirac" />
+  <title>jirac — a fast Jira CLI, TUI & MCP server for the terminal</title>
+  <meta name="description" content="jirac is an open-source Jira CLI with a full terminal UI, JQL search, fix-version management, worklogs, and MCP integration for AI-assisted workflows." />
   <link rel="canonical" href="https://mulhamna.github.io/jira-commands/" />
   <meta property="og:title" content="jirac — Jira CLI, terminal UI, and MCP tooling" />
   <meta property="og:description" content="Open-source Jira CLI for terminal-first teams: search Jira, browse issues, manage fix versions, log work, and run Jira through TUI or MCP." />
   <meta property="og:image" content="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" />
-  <meta property="og:url" content="https://mulhamna.github.io/jira-commands/" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="jirac — Jira CLI, terminal UI, and MCP tooling" />
-  <meta name="twitter:description" content="A modern Jira CLI for issue management, JQL, worklogs, fix versions, and terminal-first workflows." />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23124ee5'/%3E%3Ctext x='32' y='41' font-size='26' font-weight='700' text-anchor='middle' fill='white' font-family='Arial, sans-serif'%3Ejc%3C/text%3E%3C/svg%3E" />
-  <title>Jira CLI for Terminal, TUI, and MCP | jirac Docs</title>
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "jirac",
-      "alternateName": ["jira-commands", "Jira CLI"],
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "macOS, Linux, Windows",
-      "description": "Open-source Jira CLI with terminal UI, JQL search, fix-version management, worklogs, and MCP integration.",
-      "url": "https://mulhamna.github.io/jira-commands/",
-      "downloadUrl": "https://github.com/mulhamna/jira-commands",
-      "softwareHelp": "https://mulhamna.github.io/jira-commands/",
-      "image": "https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg",
-      "license": "https://github.com/mulhamna/jira-commands/blob/main/LICENSE"
-    }
-  </script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231f6dff'/%3E%3Ctext x='32' y='42' font-size='27' font-weight='800' text-anchor='middle' fill='white' font-family='monospace'%3Ejc%3C/text%3E%3C/svg%3E" />
   <script>
     (function () {
-      const saved = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (saved === 'dark' || (!saved && prefersDark)) {
-        document.documentElement.classList.add('dark');
-      }
+      var saved = localStorage.getItem("theme");
+      var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (saved === "dark" || (!saved && prefersDark)) document.documentElement.classList.add("dark");
     })();
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#f2f8ff',
-              100: '#d9ebff',
-              200: '#b7d8ff',
-              300: '#84bcff',
-              400: '#4e97ff',
-              500: '#266fff',
-              600: '#124ee5',
-              700: '#113fb6',
-              800: '#153a8f',
-              900: '#183477'
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Helvetica Neue', 'Arial', 'Noto Sans', 'sans-serif'],
-            mono: ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Monaco', 'Cascadia Code', 'Consolas', 'Liberation Mono', 'monospace']
-          },
-          boxShadow: {
-            soft: '0 8px 30px rgba(15, 23, 42, 0.08)'
-          }
-        }
-      }
-    }
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"jirac","alternateName":["jira-commands","Jira CLI"],"applicationCategory":"DeveloperApplication","operatingSystem":"macOS, Linux, Windows","description":"Open-source Jira CLI with terminal UI, JQL search, fix-version management, worklogs, and MCP integration.","url":"https://mulhamna.github.io/jira-commands/","downloadUrl":"https://github.com/mulhamna/jira-commands"}
   </script>
-  <style>
-    .bg-grid {
-      background-image: linear-gradient(to right, rgba(37, 99, 235, 0.08) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(37, 99, 235, 0.08) 1px, transparent 1px);
-      background-size: 26px 26px;
-    }
-    .dark .bg-grid {
-      background-image: linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
-    }
-    .command-row {
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 0.98) 100%);
-      transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(2, 6, 23, 0.18);
-    }
-    .command-row:hover {
-      border-color: rgba(96, 165, 250, 0.7);
-      transform: translateY(-1px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 14px 30px rgba(2, 6, 23, 0.28);
-    }
-    .command-row code,
-    pre code,
-    .command-code {
-      font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
-      font-size: 0.95em;
-      line-height: 1.7;
-      font-weight: 500;
-      -webkit-font-smoothing: auto;
-      text-rendering: optimizeLegibility;
-    }
-    p code,
-    li code,
-    td code,
-    .inline-code {
-      display: inline-block;
-      padding: 0.14rem 0.42rem;
-      border-radius: 0.5rem;
-      border: 1px solid rgba(148, 163, 184, 0.32);
-      background: rgba(241, 245, 249, 0.95);
-      color: rgb(15, 23, 42);
-      font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
-      font-size: 0.9em;
-      font-weight: 600;
-      line-height: 1.35;
-      vertical-align: baseline;
-      word-break: break-word;
-    }
-    .keycap {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2rem;
-      padding: 0.2rem 0.5rem;
-      border-radius: 0.6rem;
-      border: 1px solid rgba(148, 163, 184, 0.38);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(241,245,249,0.98) 100%);
-      box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.22), 0 1px 2px rgba(15, 23, 42, 0.08);
-      font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Monaco, 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
-      font-size: 0.85em;
-      font-weight: 700;
-      color: rgb(15, 23, 42);
-    }
-    .mini-command {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 0.8rem;
-      padding: 0.7rem 0.9rem;
-      border-radius: 0.75rem;
-      border: 1px solid rgba(51, 65, 85, 0.12);
-      background: rgba(15, 23, 42, 0.96);
-      color: rgb(248, 250, 252);
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-    }
-    .mini-command-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgb(147, 197, 253);
-    }
-    .command-cell code {
-      display: inline-block;
-      max-width: 100%;
-      padding: 0.28rem 0.56rem;
-      border-radius: 0.6rem;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      background: rgba(248, 250, 252, 0.96);
-      color: rgb(15, 23, 42);
-      font-size: 0.88em;
-      font-weight: 600;
-    }
-    .dark .doc-card {
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.92) 100%);
-      border-color: rgba(71, 85, 105, 0.65);
-      box-shadow: 0 14px 40px rgba(2, 6, 23, 0.45);
-    }
-    .dark p code,
-    .dark li code,
-    .dark td code,
-    .dark .inline-code,
-    .dark .command-cell code {
-      border-color: rgba(71, 85, 105, 0.75);
-      background: rgba(15, 23, 42, 0.92);
-      color: rgb(241, 245, 249);
-    }
-    .dark .keycap {
-      border-color: rgba(100, 116, 139, 0.72);
-      background: linear-gradient(180deg, rgba(30,41,59,0.98) 0%, rgba(15,23,42,0.98) 100%);
-      box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.18), 0 1px 2px rgba(2, 6, 23, 0.35);
-      color: rgb(241, 245, 249);
-    }
-    .dark .mini-command {
-      border-color: rgba(71, 85, 105, 0.72);
-      background: linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(2,6,23,0.98) 100%);
-      box-shadow: 0 14px 28px rgba(2, 6, 23, 0.4);
-    }
-    .dark .copy-btn {
-      border-color: rgba(100, 116, 139, 0.7);
-      background: rgba(15, 23, 42, 0.75);
-      color: rgb(226, 232, 240);
-    }
-    .dark .copy-btn:hover {
-      border-color: rgba(96, 165, 250, 0.9);
-      color: #fff;
-      background: rgba(30, 41, 59, 0.95);
-    }
-  </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 antialiased">
-  <header class="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 backdrop-blur">
-    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-      <a href="#top" class="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
-        <span class="inline-flex h-8 w-8 items-center justify-center rounded bg-brand-600 text-xs font-bold text-white">jc</span>
-        <span>jirac docs</span>
+<body data-hero="spotlight">
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="wrap site-header__row">
+      <a href="#top" class="brand" aria-label="jirac home">
+        <span class="brand__mark">jc</span>
+        <span class="brand__name"><b>jirac</b></span>
       </a>
-      <nav class="hidden items-center gap-5 text-sm md:flex">
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#why">Why</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#screenshots">Screenshots</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#quickstart">Quickstart</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#commands">Commands</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#mcp">MCP</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#contributing">Contributing</a>
-        <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm" href="#faq">FAQ</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#install" data-spy>Install</a>
+        <a href="#features" data-spy>Features</a>
+        <a href="#commands" data-spy>Commands</a>
+        <a href="#tui" data-spy>TUI</a>
+        <a href="#mcp" data-spy>MCP</a>
+        <a href="#faq" data-spy>FAQ</a>
       </nav>
-      <div class="flex items-center gap-2">
-        <button id="theme-toggle" type="button" class="inline-flex items-center gap-2 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:border-brand-300 hover:text-brand-700 dark:hover:text-brand-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" aria-label="Toggle theme">
-          <span id="theme-icon" aria-hidden="true">🌙</span>
-          <span id="theme-label">Dark</span>
+      <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle dark mode" aria-pressed="false">
+          <svg data-theme-moon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          <svg data-theme-sun viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         </button>
-        <a href="https://github.com/mulhamna/jira-commands" class="rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:border-brand-300 hover:text-brand-700 dark:hover:text-brand-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">GitHub</a>
+        <a href="https://github.com/mulhamna/jira-commands" class="gh-cta" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.7.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5Z"/></svg>
+          <span class="gh-cta__text">Star on GitHub</span>
+        </a>
+        <button id="nav-toggle" class="icon-btn" type="button" aria-label="Open menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
       </div>
     </div>
-    <nav class="md:hidden border-t border-slate-200 dark:border-slate-700 px-4 py-2 overflow-x-auto whitespace-nowrap text-sm">
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#why">Why</a>
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#screenshots">Screenshots</a>
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#quickstart">Quickstart</a>
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#commands">Commands</a>
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#mcp">MCP</a>
-      <a class="mr-4 text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#contributing">Contributing</a>
-      <a class="text-slate-600 dark:text-slate-400 hover:text-brand-700" href="#faq">FAQ</a>
-    </nav>
+    <div class="mobile-nav" id="mobile-nav">
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a href="#commands">Commands</a>
+      <a href="#tui">TUI</a>
+      <a href="#mcp">MCP</a>
+      <a href="#faq">FAQ</a>
+    </div>
   </header>
 
   <main id="top">
-    <section class="relative overflow-hidden border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="absolute inset-0 bg-grid"></div>
-      <div class="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:px-8 lg:py-20">
-        <div class="max-w-2xl">
-          <p class="mb-3 inline-flex rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">Jira CLI + terminal UI + MCP</p>
-          <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-5xl">A modern <span class="text-brand-700">Jira CLI</span> for terminal-first teams</h1>
-          <p class="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-400">jirac is an open-source Jira command-line tool with a full TUI, JQL search, fix-version management, worklogs, attachments, backlog moves, and MCP integration for AI-assisted workflows.</p>
-          <div class="mt-8 flex flex-wrap gap-3">
-            <a href="#quickstart" class="rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700">Get Started</a>
-            <a href="#non-tech" class="rounded-md border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-brand-300 hover:text-brand-700">For Non-Tech Users</a>
+    <!-- ===================== HERO ===================== -->
+    <section class="hero">
+      <div class="hero__glow"></div>
+      <svg class="hero__holo" viewBox="0 0 1440 860" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="holo" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#4e97ff"/>
+            <stop offset="0.34" stop-color="#7c5cff"/>
+            <stop offset="0.62" stop-color="#33d6e7"/>
+            <stop offset="1" stop-color="#4e97ff"/>
+          </linearGradient>
+          <g id="rustGear">
+            <path fill="url(#holo)" fill-rule="evenodd" d="M-7.70 -91.68L-8.79 -111.65L8.79 -111.65L7.70 -91.68L16.29 -90.55L20.41 -110.12L37.39 -105.58L31.16 -86.56L39.17 -83.24L48.22 -101.09L63.44 -92.30L52.51 -75.55L59.38 -70.27L72.74 -85.17L85.17 -72.74L70.27 -59.38L75.55 -52.51L92.30 -63.44L101.09 -48.22L83.24 -39.17L86.56 -31.16L105.58 -37.39L110.12 -20.41L90.55 -16.29L91.68 -7.70L111.65 -8.79L111.65 8.79L91.68 7.70L90.55 16.29L110.12 20.41L105.58 37.39L86.56 31.16L83.24 39.17L101.09 48.22L92.30 63.44L75.55 52.51L70.27 59.38L85.17 72.74L72.74 85.17L59.38 70.27L52.51 75.55L63.44 92.30L48.22 101.09L39.17 83.24L31.16 86.56L37.39 105.58L20.41 110.12L16.29 90.55L7.70 91.68L8.79 111.65L-8.79 111.65L-7.70 91.68L-16.29 90.55L-20.41 110.12L-37.39 105.58L-31.16 86.56L-39.17 83.24L-48.22 101.09L-63.44 92.30L-52.51 75.55L-59.38 70.27L-72.74 85.17L-85.17 72.74L-70.27 59.38L-75.55 52.51L-92.30 63.44L-101.09 48.22L-83.24 39.17L-86.56 31.16L-105.58 37.39L-110.12 20.41L-90.55 16.29L-91.68 7.70L-111.65 8.79L-111.65 -8.79L-91.68 -7.70L-90.55 -16.29L-110.12 -20.41L-105.58 -37.39L-86.56 -31.16L-83.24 -39.17L-101.09 -48.22L-92.30 -63.44L-75.55 -52.51L-70.27 -59.38L-85.17 -72.74L-72.74 -85.17L-59.38 -70.27L-52.51 -75.55L-63.44 -92.30L-48.22 -101.09L-39.17 -83.24L-31.16 -86.56L-37.39 -105.58L-20.41 -110.12L-16.29 -90.55ZM60 0A60 60 0 1 1 -60 0A60 60 0 1 1 60 0Z"/>
+            <text x="0" y="42" text-anchor="middle" font-family="'JetBrains Mono',ui-monospace,monospace" font-weight="700" font-size="116" fill="url(#holo)">R</text>
+          </g>
+        </defs>
+        <use href="#rustGear" transform="translate(120 150) scale(1.55) rotate(9)" opacity="0.13"/>
+        <use href="#rustGear" transform="translate(1340 300) scale(2.15) rotate(-13)" opacity="0.12"/>
+        <use href="#rustGear" transform="translate(190 760) scale(1.0) rotate(22)" opacity="0.07"/>
+        <use href="#rustGear" transform="translate(1230 70) scale(0.62) rotate(-6)" opacity="0.11"/>
+        <use href="#rustGear" transform="translate(740 820) scale(2.5) rotate(4)" opacity="0.05"/>
+      </svg>
+      <div class="hero__grid"></div>
+      <div class="wrap">
+        <div style="display:flex;justify-content:center;margin-bottom:36px" data-reveal>
+          <div class="dir-switch" role="group" aria-label="Hero style">
+            <span class="dir-switch__label">Style</span>
+            <button type="button" data-hero-pick="spotlight" aria-pressed="true">Spotlight</button>
+            <button type="button" data-hero-pick="split" aria-pressed="false">Split</button>
+            <button type="button" data-hero-pick="terminal" aria-pressed="false">Terminal</button>
           </div>
-          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Not affiliated with, endorsed by, or sponsored by Atlassian.</p>
         </div>
-        <div class="mt-10 w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-900 p-3 text-slate-100 shadow-soft lg:mt-0">
-          <p class="mb-2 text-xs uppercase tracking-wide text-slate-400">Split master-detail TUI</p>
-          <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac split-pane TUI showing issue list with detail panel" class="w-full rounded-lg border border-slate-700" loading="lazy" />
-          <pre class="mt-3 overflow-x-auto text-sm leading-6"><code>$ jirac issue list --project CORE
-CORE-183  In Progress  Refactor auth error handling
-CORE-177  To Do        Add MCP transition confirmation
-CORE-171  Done         Improve TUI issue detail renderer
 
-$ jirac issue transition CORE-183 --to Done
-✓ CORE-183 moved to Done</code></pre>
+        <!-- Variant A: Spotlight -->
+        <div class="hero-variant hero-variant--spotlight">
+          <span class="badge-pill" data-reveal><span class="badge-pill__tag">v3 API</span> <b>CLI</b> · TUI · MCP server</span>
+          <h1 data-reveal data-reveal-delay="1">Run Jira from the <span class="grad">terminal.</span></h1>
+          <p class="hero__sub" data-reveal data-reveal-delay="2">jirac is an open-source Jira CLI with a full keyboard-driven TUI, JQL search, worklogs, fix-version management, and an MCP server for AI-assisted workflows — without living in the web UI.</p>
+          <div class="hero__cta" data-reveal data-reveal-delay="2">
+            <a href="#install" class="btn btn-primary">Install jirac</a>
+            <a href="#commands" class="btn btn-ghost">Browse commands</a>
+          </div>
+          <p class="hero__note" data-reveal data-reveal-delay="3">Not affiliated with, endorsed by, or sponsored by Atlassian.</p>
+          <div class="hero-stage" data-reveal data-reveal-delay="2">
+            <div class="win">
+              <div class="win__bar"><span class="win__dot win__dot--r"></span><span class="win__dot win__dot--y"></span><span class="win__dot win__dot--g"></span><span class="win__title">~/code/core — jirac</span></div>
+              <div class="win__body"><div class="term" id="type-out"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variant B: Split -->
+        <div class="hero-variant hero-variant--split">
+          <div class="hero__inner">
+            <span class="badge-pill"><span class="badge-pill__tag">v3 API</span> <b>CLI</b> · TUI · MCP server</span>
+            <h1>The Jira CLI for <span class="grad">terminal-first</span> teams.</h1>
+            <p class="hero__sub">Browse, update, and automate Jira from your shell. Full TUI, JQL search, worklogs, fix versions, bulk actions, and an MCP server for agents.</p>
+            <div class="hero__cta">
+              <a href="#install" class="btn btn-primary">Install jirac</a>
+              <a href="https://github.com/mulhamna/jira-commands" target="_blank" rel="noopener" class="btn btn-ghost">View source</a>
+            </div>
+            <p class="hero__note">Not affiliated with, endorsed by, or sponsored by Atlassian.</p>
+          </div>
+          <div class="hero__inner">
+            <div class="hero-screenshot">
+              <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac split-pane TUI showing an issue list with a detail panel" loading="lazy" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Variant C: Terminal -->
+        <div class="hero-variant hero-variant--terminal">
+          <div class="hero__inner" style="margin-inline:auto;text-align:center">
+            <span class="badge-pill" style="margin-inline:auto"><span class="badge-pill__tag">v3 API</span> <b>CLI</b> · TUI · MCP server</span>
+            <h1>Your backlog, <span class="grad">one keystroke</span> away.</h1>
+            <p class="hero__sub" style="margin-inline:auto;text-align:center">A daily-driver Jira CLI that lives where you already work — the terminal.</p>
+          </div>
+          <div class="hero-stage hero-stage--big">
+            <div class="win">
+              <div class="win__bar"><span class="win__dot win__dot--r"></span><span class="win__dot win__dot--y"></span><span class="win__dot win__dot--g"></span><span class="win__title">jirac — live</span></div>
+              <div class="win__body"><div class="term" id="type-out"></div></div>
+            </div>
+            <div class="hero__cta" style="justify-content:center">
+              <a href="#install" class="btn btn-primary">Install jirac</a>
+              <a href="#tui" class="btn btn-ghost">See the TUI</a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="why" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Why jirac</h2>
-      <p class="mt-2 max-w-3xl text-sm text-slate-600 dark:text-slate-400">If you searched for a Jira CLI, Jira command line tool, or terminal client for Jira, this page is the quick answer: <strong>jirac</strong> is built for browsing, updating, and automating Jira without living in the web UI.</p>
-      <div class="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Latest Jira API v3</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Uses modern endpoints like <code>/search/jql</code> with cursor pagination.</p>
-        </article>
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Custom fields supported</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Runtime field introspection without manual YAML mapping.</p>
-        </article>
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Terminal + TUI + MCP</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Works for direct CLI, keyboard-driven TUI, mention inboxes, and agent workflows.</p>
-        </article>
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Cross-platform</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">macOS, Linux, and Windows releases with focused CLI binaries for terminal and MCP workflows.</p>
-        </article>
+    <!-- ===================== INSTALL ===================== -->
+    <section class="section section--tight" id="install">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">Install</span>
+          <h2>Pick your platform, copy one line.</h2>
+          <p>Choose your OS and package manager — we’ll show the single command you need. Everything installs both <code class="mono">jirac</code> and the <code class="mono">jirac-mcp</code> server.</p>
+        </div>
+        <div class="installer" data-reveal data-reveal-delay="1">
+          <div class="installer__os" id="install-os" role="tablist" aria-label="Operating system">
+            <button class="os-tab" type="button" data-os="macos">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.7 12.7c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.8-3-.8C7.2 7.5 5.7 8.4 5 9.9c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2-.1 1.6-.8 3-.8s1.8.8 3 .7c1.2 0 2-1.1 2.8-2.3.6-.8.8-1.3 1.3-2.3-3.4-1.3-3.5-5-3.5-6.1ZM14.5 5.6c.6-.8 1-1.9.9-3-.9 0-2 .6-2.7 1.4-.6.7-1.1 1.8-.9 2.9 1 .1 2-.5 2.7-1.3Z"/></svg>
+              macOS
+            </button>
+            <button class="os-tab" type="button" data-os="linux">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-1.7 0-3 1.6-3 3.5 0 1 .2 1.6.2 2.4 0 .9-.7 1.6-1.4 2.7C6.8 12 6 13.4 6 15c0 .6-.5 1-.9 1.6-.4.5-.6 1-.3 1.6.2.5.8.6 1.4.7.7.1 1.3.3 1.8.8.4.4.9.7 1.6.7.5 0 1-.2 1.4-.5.4.3.9.5 1.4.5.7 0 1.2-.3 1.6-.7.5-.5 1.1-.7 1.8-.8.6-.1 1.2-.2 1.4-.7.3-.6.1-1.1-.3-1.6-.4-.6-.9-1-.9-1.6 0-1.6-.8-3-1.8-4.4-.7-1.1-1.4-1.8-1.4-2.7 0-.8.2-1.4.2-2.4C15 3.6 13.7 2 12 2Zm-1.4 4.1c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7Zm2.8 0c.3 0 .5.3.5.7s-.2.7-.5.7-.5-.3-.5-.7.2-.7.5-.7Z"/></svg>
+              Linux
+            </button>
+            <button class="os-tab" type="button" data-os="windows">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.7 10.5 4.7V11.5H3V5.7ZM10.5 12.5V19.3L3 18.3V12.5H10.5ZM11.5 4.6 21 3.2V11.5H11.5V4.6ZM21 12.5V20.8L11.5 19.4V12.5H21Z"/></svg>
+              Windows
+            </button>
+          </div>
+          <div class="installer__body">
+            <div class="install-methods" id="install-methods"></div>
+            <div class="install-cmd" id="install-cmd">
+              <code class="mono"><span class="prompt">$</span><span data-cmd></span></code>
+              <button class="copy-mini" type="button" data-copy="@target" data-copy-target="install-cmd-text"><span data-copy-label>Copy</span></button>
+            </div>
+            <p class="install-hint">Need the full matrix or the standalone MCP binary? See <a class="link" href="https://github.com/mulhamna/jira-commands/blob/main/INSTALL.md" target="_blank" rel="noopener">INSTALL.md</a>. OpenClaw users can grab the published skill or plugin:</p>
+            <div class="claw" id="install-claw"></div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">What makes this Jira CLI different?</h2>
-        <div class="mt-6 grid gap-4 lg:grid-cols-3">
-          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-            <h3 class="font-semibold">More than a thin wrapper</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">jirac is not just a couple of REST helpers. It ships a daily-driver Jira CLI, interactive TUI, MCP server, saved JQL flows, version browsing, and native-style issue move/type actions.</p>
+    <!-- ===================== FEATURES ===================== -->
+    <section class="section" id="features" style="background:var(--bg-sunken);border-block:1px solid var(--line)">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">Why jirac</span>
+          <h2>More than a thin REST wrapper.</h2>
+          <p>A daily-driver toolkit for the people who live in a terminal — and the agents that work alongside them.</p>
+        </div>
+        <div class="feat-grid">
+          <article class="feat-card" data-reveal>
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6M12 19h8"/></svg></div>
+            <h3>CLI · TUI · MCP</h3>
+            <p>One tool, three surfaces: scriptable CLI, a keyboard-driven TUI, and an <code>jirac-mcp</code> server for AI agents.</p>
           </article>
-          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-            <h3 class="font-semibold">Built for real Jira workflows</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use it to list assigned issues, generate daily standups and sprint summaries, search with JQL, update assignees, log work, preview fix-version backlog, manage project versions, and handle mention notifications from the terminal.</p>
+          <article class="feat-card" data-reveal data-reveal-delay="1">
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+            <h3>JQL, the easy way</h3>
+            <p>Interactive query builder by project, status, and assignee — plus saved JQL flows you can re-run instantly.</p>
           </article>
-          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-            <h3 class="font-semibold">Good fit for humans and agents</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Terminal users get keyboard speed; automation stacks get CLI composability; AI tooling gets <code>jirac-mcp</code> for MCP-based Jira access.</p>
+          <article class="feat-card" data-reveal data-reveal-delay="2">
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div>
+            <h3>Reports in seconds</h3>
+            <p>Daily standups, sprint summaries, worklog backfills across date ranges, and mention notifications — straight to the terminal.</p>
+          </article>
+          <article class="feat-card" data-reveal>
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg></div>
+            <h3>Native bulk + moves</h3>
+            <p>Change issue type, move across projects with native semantics, and bulk-comment, -transition, -update, or -create.</p>
+          </article>
+          <article class="feat-card" data-reveal data-reveal-delay="1">
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg></div>
+            <h3>Custom fields, auto-mapped</h3>
+            <p>Runtime field introspection per project — no manual YAML mapping to maintain. Built on the latest Jira API v3.</p>
+          </article>
+          <article class="feat-card" data-reveal data-reveal-delay="2">
+            <div class="feat-card__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3M13 15h4"/></svg></div>
+            <h3>Cross-platform &amp; fast</h3>
+            <p>A single Rust binary for macOS, Linux, and Windows. Quick to install, quicker to run.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section id="screenshots" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Screenshots</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Issue browser, split master-detail layout, and interactive JQL builder — presented as three focused preview cards.</p>
-      <div class="mt-6 grid gap-5 md:grid-cols-3">
-        <figure class="flex h-full flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
-          <div class="aspect-video overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-950">
-            <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui.jpeg" alt="jirac TUI issue list" class="h-full w-full object-cover" loading="lazy" />
+    <!-- ===================== COMMANDS ===================== -->
+    <section class="section" id="commands">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">Command reference</span>
+          <h2>Every command, one search box.</h2>
+          <p>Filter by category or type what you’re trying to do — then copy the command. <code class="mono">jirac --help</code> always has the full story.</p>
+        </div>
+        <div data-reveal data-reveal-delay="1">
+          <div class="cmd-toolbar">
+            <label class="cmd-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input id="cmd-search" type="search" placeholder="Search commands — e.g. worklog, transition, sprint…" aria-label="Search commands" />
+            </label>
+            <span class="cmd-count" id="cmd-count"></span>
           </div>
-          <figcaption class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-300">TUI issue list</figcaption>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Browse, search, and filter backlog items in a sortable table.</p>
-        </figure>
-        <figure class="flex h-full flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
-          <div class="aspect-video overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-950">
-            <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac TUI split master-detail view" class="h-full w-full object-cover" loading="lazy" />
-          </div>
-          <figcaption class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Split master-detail</figcaption>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Keep list visible while inspecting summary, comments, worklog, attachments, links.</p>
-        </figure>
-        <figure class="flex h-full flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-soft">
-          <div class="aspect-video overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-950">
-            <img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample-jql.jpeg" alt="jirac interactive JQL builder" class="h-full w-full object-cover" loading="lazy" />
-          </div>
-          <figcaption class="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Interactive JQL builder</figcaption>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Build queries by project, status, and assignee without memorizing JQL syntax.</p>
-        </figure>
-      </div>
-    </section>
-
-    <section id="non-tech" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Quick Guide for Non-Tech Users</h2>
-        <ol class="mt-6 grid gap-4 md:grid-cols-2">
-          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">1. Install</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use the installer that matches your machine. Windows users can choose PowerShell, Winget, or Scoop; macOS and Linux can use the shell installer or package managers.</p><div class="mini-command"><span class="mini-command-label">Tool</span><code>jirac</code></div></li>
-          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">2. Login</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use your Jira URL, email, and API token to connect your account the first time.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac auth login</code></div></li>
-          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">3. View your tasks</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">See issues assigned to you in a simple terminal list.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac issue list</code></div></li>
-          <li class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5"><span class="font-semibold">4. Move issue status</span><p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Select an issue and move it to the next status when work changes.</p><div class="mini-command"><span class="mini-command-label">Run</span><code>jirac issue transition PROJ-123</code></div></li>
-        </ol>
-      </div>
-    </section>
-
-    <section id="quickstart" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Quickstart (Tech Users)</h2>
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <article class="doc-card rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Installation options</h3>
-          <div class="mt-3 space-y-3 text-sm">
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-curl" class="break-all">curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-curl">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-powershell" class="break-all">powershell -ExecutionPolicy Bypass -Command "&amp; ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-powershell">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-brew" class="break-all">brew tap mulhamna/tap && brew install jira-commands jira-mcp</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-brew">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-cargo" class="break-all">cargo install jira-commands</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-cargo">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-cargo-mcp" class="break-all">cargo install jira-mcp</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-cargo-mcp">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-npm" class="break-all">npm install -g @mulham28/jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-npm">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-npm-mcp" class="break-all">npm install -g @mulham28/jirac-mcp</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-npm-mcp">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-scoop" class="break-all">scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket && scoop install mulhamna/jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-scoop">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-scoop-mcp" class="break-all">scoop install mulhamna/jirac-mcp</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-scoop-mcp">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-winget" class="break-all">winget install mulhamna.jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-winget">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-winget-mcp" class="break-all">winget install mulhamna.jirac-mcp</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-winget-mcp">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-source" class="break-all">git clone https://github.com/mulhamna/jira-commands &amp;&amp; cd jira-commands &amp;&amp; cargo install --path crates/jira --locked</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-source">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-clawhub-skill" class="break-all">openclaw skills install jirac</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-clawhub-skill">Copy</button></div>
-            <div class="command-row rounded-md bg-slate-900 p-3 text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-install-clawhub-plugin" class="break-all">openclaw plugins install clawhub:jirac-plugin</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-install-clawhub-plugin">Copy</button></div>
-          </div>
-          <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Pick one. Homebrew, Cargo, npm, Scoop, and Winget all expose <code>jirac</code> and <code>jirac-mcp</code> as separate install targets now, while the shell and PowerShell installers can fetch the release binaries directly. OpenClaw users can also install the published <a class="text-brand-700 hover:underline" href="https://clawhub.ai/mulhamna/jirac">ClawHub skill</a> or the <a class="text-brand-700 hover:underline" href="https://clawhub.ai/plugins/jirac-plugin">ClawHub Claude-compatible plugin bundle</a>. Contributors tracking <code>main</code> can install from a local checkout via <code>cargo install --path</code>. See <a class="text-brand-700 hover:underline" href="https://github.com/mulhamna/jira-commands/blob/main/INSTALL.md">INSTALL.md</a> for the full matrix.</p>
-        </article>
-        <article class="doc-card rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">First login</h3>
-          <div class="command-row mt-3 rounded-md bg-slate-900 p-3 text-sm text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-auth-login" class="break-all">jirac auth login</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-auth-login">Copy</button></div>
-          <p class="mt-3 text-sm text-slate-600 dark:text-slate-400">Config file path: <code>~/.config/jira/config.toml</code> (permission 600).</p>
-          <div class="command-row mt-3 rounded-md bg-slate-900 p-3 text-sm text-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><code id="cmd-auth-status" class="break-all">jirac auth status</code><button type="button" class="copy-btn self-end sm:self-auto rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400" data-copy-target="cmd-auth-status">Copy</button></div>
-        </article>
-      </div>
-    </section>
-
-    <section id="commands" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Command Reference</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Common commands for daily workflow. Releases ship <code>jirac</code> and <code>jirac-mcp</code>; Windows installs for both binaries are available via PowerShell, Scoop, Winget, npm, or Cargo.</p>
-        <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-          <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
-            <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
-              <tr>
-                <th class="px-4 py-3 font-semibold">Use case</th>
-                <th class="px-4 py-3 font-semibold">Command</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-              <tr><td class="px-4 py-3">List assigned issues</td><td class="px-4 py-3 command-cell"><code>jirac issue list</code></td></tr>
-              <tr><td class="px-4 py-3">List by project</td><td class="px-4 py-3 command-cell"><code>jirac issue list --project MYPROJ</code></td></tr>
-              <tr><td class="px-4 py-3">Daily standup summary</td><td class="px-4 py-3 command-cell"><code>jirac issue standup</code></td></tr>
-              <tr><td class="px-4 py-3">Current sprint summary</td><td class="px-4 py-3 command-cell"><code>jirac issue sprint-summary --project MYPROJ</code></td></tr>
-              <tr><td class="px-4 py-3">View issue detail</td><td class="px-4 py-3 command-cell"><code>jirac issue view MYPROJ-123</code></td></tr>
-              <tr><td class="px-4 py-3">View issue detail with fix-version backlog preview</td><td class="px-4 py-3 command-cell"><code>jirac issue view MYPROJ-123 --versions</code></td></tr>
-              <tr><td class="px-4 py-3">Browse project fix versions</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ</code></td></tr>
-              <tr><td class="px-4 py-3">Preview backlog for one fix version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --version "v1.2.0"</code></td></tr>
-              <tr><td class="px-4 py-3">Create a project version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --create --version "v1.3.0"</code></td></tr>
-              <tr><td class="px-4 py-3">Set release date on a version</td><td class="px-4 py-3 command-cell"><code>jirac issue versions --project MYPROJ --version "v1.2.0" --set-release-date 2026-06-30 --released</code></td></tr>
-              <tr><td class="px-4 py-3">Create issue</td><td class="px-4 py-3 command-cell"><code>jirac issue create --project MYPROJ</code></td></tr>
-              <tr><td class="px-4 py-3">Transition issue</td><td class="px-4 py-3 command-cell"><code>jirac issue transition MYPROJ-123 --to Done</code></td></tr>
-              <tr><td class="px-4 py-3">Add worklog</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --comment "Worked on API"</code></td></tr>
-              <tr><td class="px-4 py-3">Add worklog with custom started time</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"</code></td></tr>
-              <tr><td class="px-4 py-3">Backfill worklog across a date range</td><td class="px-4 py-3 command-cell"><code>jirac issue worklog add MYPROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"</code></td></tr>
-              <tr><td class="px-4 py-3">Upload attachment</td><td class="px-4 py-3 command-cell"><code>jirac issue attach MYPROJ-123 ./screenshot.png</code></td></tr>
-              <tr><td class="px-4 py-3">Change backlog type natively</td><td class="px-4 py-3 command-cell"><code>jirac issue change-type MYPROJ-123 Story</code></td></tr>
-              <tr><td class="px-4 py-3">Move backlog to another project natively</td><td class="px-4 py-3 command-cell"><code>jirac issue move MYPROJ-123 OTHER</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk comment by JQL</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-comment --jql 'project = MYPROJ AND sprint = openSprints()' --body "Please post status before standup"</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk comment by explicit keys</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-comment --keys MYPROJ-123 MYPROJ-456 --file note.md</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk transition</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-transition --jql 'project = MYPROJ AND status = "To Do"' --to "In Progress"</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk update field</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-update --jql 'project = MYPROJ AND assignee = EMPTY' --assignee me</code></td></tr>
-              <tr><td class="px-4 py-3">Bulk create from manifest</td><td class="px-4 py-3 command-cell"><code>jirac issue bulk-create --manifest issues.json</code></td></tr>
-              <tr><td class="px-4 py-3">Interactive JQL builder</td><td class="px-4 py-3 command-cell"><code>jirac issue jql</code></td></tr>
-              <tr><td class="px-4 py-3">Mention notifications</td><td class="px-4 py-3 command-cell"><code>jirac issue notifications --since 7d</code></td></tr>
-              <tr><td class="px-4 py-3">Switch profile</td><td class="px-4 py-3 command-cell"><code>jirac auth use work-cloud</code></td></tr>
-              <tr><td class="px-4 py-3">Launch TUI</td><td class="px-4 py-3 command-cell"><code>jirac tui -p MYPROJ</code></td></tr>
-              <tr><td class="px-4 py-3">Raw API call</td><td class="px-4 py-3 command-cell"><code>jirac api get /rest/api/3/serverInfo</code></td></tr>
-            </tbody>
-          </table>
+          <div class="cmd-filters" id="cmd-filters" role="group" aria-label="Filter by category"></div>
+          <div class="cmd-list" id="cmd-list"></div>
         </div>
       </div>
     </section>
 
-    <section id="tui" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Interactive TUI</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Launch with <code>jirac tui</code> for keyboard- and mouse-driven issue management, including a project-level fix-version browser via <code>V</code>, modal-based backlog type changes, direct project moves, mention notifications, saved JQLs, light and dark themes (including <code>GitHub Light</code>), single worklog entry via <code>w</code>, bulk date-range worklogs via <code>b</code>, and bulk comments via <code>:</code> with confirmation. Click rows, detail tabs, and picker options; double-click to open detail; scroll the wheel to navigate; click outside any popup to dismiss it.</p>
-      <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-        <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
-          <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
-            <tr>
-              <th class="px-4 py-3 font-semibold">Keyboard</th>
-              <th class="px-4 py-3 font-semibold">Description</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr><td class="px-4 py-3"><span class="keycap">↑ / k</span></td><td class="px-4 py-3">Move to the issue above.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">↓ / j</span></td><td class="px-4 py-3">Move to the issue below.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">Enter</span></td><td class="px-4 py-3">Open details for the selected issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">n</span></td><td class="px-4 py-3">Scan and open Jira mention notifications.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">R</span></td><td class="px-4 py-3">Mark the selected notification issue as read.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">c</span></td><td class="px-4 py-3">Create a new issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">e</span></td><td class="px-4 py-3">Edit the selected issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">y</span></td><td class="px-4 py-3">Change the selected backlog item type in a modal, without leaving the TUI.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">M</span></td><td class="px-4 py-3">Move the selected backlog item to another project in a modal, using Jira native move semantics.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">t</span></td><td class="px-4 py-3">Change issue status (transition).</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">C</span></td><td class="px-4 py-3">Choose which table columns stay visible and persist that preference.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">T</span></td><td class="px-4 py-3">Open the theme picker, including Kanagawa Wave.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">p</span></td><td class="px-4 py-3">Open saved JQL queries.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">V</span></td><td class="px-4 py-3">Browse project fix versions and preview backlog for the selected version.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">;</span></td><td class="px-4 py-3">Add one comment to the selected issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">:</span></td><td class="px-4 py-3">Bulk-comment many issues by current/custom JQL or explicit issue keys.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">w</span></td><td class="px-4 py-3">Add a single worklog to the issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">b</span></td><td class="px-4 py-3">Add bulk worklogs across a date range, with confirmation before submit.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">v</span></td><td class="px-4 py-3">Edit fix versions.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">s</span></td><td class="px-4 py-3">Assign the issue to a sprint.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">u</span></td><td class="px-4 py-3">Upload an attachment to the issue.</td></tr>
-            <tr><td class="px-4 py-3"><span class="keycap">?</span></td><td class="px-4 py-3">Show shortcut help.</td></tr>
-          </tbody>
-        </table>
+    <!-- ===================== TUI ===================== -->
+    <section class="section" id="tui" style="background:var(--bg-sunken);border-block:1px solid var(--line)">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">Terminal UI</span>
+          <h2>A real interface, in your terminal.</h2>
+          <p>Launch with <code class="mono">jirac tui</code> for keyboard- and mouse-driven issue management — browse, edit, transition, log work, and more without leaving the terminal. Ships with multiple themes, including GitHub Light and Kanagawa Wave.</p>
+        </div>
+
+        <div class="feat-grid" data-reveal data-reveal-delay="1">
+          <figure class="feat-card" style="padding:14px" data-reveal>
+            <div class="hero-screenshot"><img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui.jpeg" alt="jirac TUI issue list" loading="lazy" /></div>
+            <figcaption style="font-size:13.5px;color:var(--ink-soft);margin-top:12px;padding:0 4px">Sortable issue list — browse and filter the backlog.</figcaption>
+          </figure>
+          <figure class="feat-card" style="padding:14px" data-reveal data-reveal-delay="1">
+            <div class="hero-screenshot"><img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample_tui_split.jpeg" alt="jirac split master-detail view" loading="lazy" /></div>
+            <figcaption style="font-size:13.5px;color:var(--ink-soft);margin-top:12px;padding:0 4px">Split master-detail — list plus comments, worklog, links.</figcaption>
+          </figure>
+          <figure class="feat-card" style="padding:14px" data-reveal data-reveal-delay="2">
+            <div class="hero-screenshot"><img src="https://raw.githubusercontent.com/mulhamna/jira-commands/main/assets/readme/sample-jql.jpeg" alt="jirac interactive JQL builder" loading="lazy" /></div>
+            <figcaption style="font-size:13.5px;color:var(--ink-soft);margin-top:12px;padding:0 4px">Interactive JQL builder — query without memorizing syntax.</figcaption>
+          </figure>
+        </div>
+
+        <div class="section-head" style="margin-top:64px;margin-bottom:28px" data-reveal>
+          <h2 style="font-size:22px">Keyboard shortcuts</h2>
+        </div>
+        <div class="sc-grid" id="sc-grid" data-reveal data-reveal-delay="1"></div>
       </div>
-      <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-        <table class="min-w-full bg-white dark:bg-slate-900 text-sm">
-          <thead class="bg-slate-100 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-300">
-            <tr>
-              <th class="px-4 py-3 font-semibold">Mouse</th>
-              <th class="px-4 py-3 font-semibold">Description</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr><td class="px-4 py-3">Click issue row</td><td class="px-4 py-3">Select that row.</td></tr>
-            <tr><td class="px-4 py-3">Double-click issue row</td><td class="px-4 py-3">Open the split detail view (same as <span class="keycap">Enter</span>).</td></tr>
-            <tr><td class="px-4 py-3">Click detail tab</td><td class="px-4 py-3">Switch to that tab; comments, worklog, and links lazy-load.</td></tr>
-            <tr><td class="px-4 py-3">Click detail pane</td><td class="px-4 py-3">Switch focus to detail when currently on the issue list.</td></tr>
-            <tr><td class="px-4 py-3">Click picker option</td><td class="px-4 py-3">Apply for single-select pickers (transition, assignee, sprint, saved JQL, theme, project versions); toggle for multi-select pickers (components, fix versions, columns).</td></tr>
-            <tr><td class="px-4 py-3">Click outside popup</td><td class="px-4 py-3">Close popup (equivalent to <span class="keycap">Esc</span>). Form modals are exempt to protect in-flight input.</td></tr>
-            <tr><td class="px-4 py-3">Scroll wheel on list</td><td class="px-4 py-3">Previous / next issue.</td></tr>
-            <tr><td class="px-4 py-3">Scroll wheel on picker</td><td class="px-4 py-3">Move picker selection up / down.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">To copy terminal text while the TUI is running, hold <span class="keycap">Shift</span> (iTerm2 / most Linux terminals) or <span class="keycap">Option</span> (Terminal.app) while selecting. Under tmux, set <code>set -g mouse on</code> so events reach the TUI.</p>
     </section>
 
-    <section id="mcp" class="border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">MCP Server</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use <code>jirac-mcp</code> to expose Jira tools to MCP clients. Install it with Homebrew, Cargo, npm/release binaries, or the platform installer flow, depending on your environment.</p>
-        <div class="mt-4 grid gap-6 lg:grid-cols-2">
-          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-            <h3 class="font-semibold">Install and run</h3>
-            <div class="mt-3">
-              <div class="flex items-center justify-end rounded-t bg-slate-800 px-3 py-2">
-                <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="cmd-mcp-install-run">Copy</button>
-              </div>
-              <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="cmd-mcp-install-run">brew tap mulhamna/tap && brew install jira-mcp
-cargo install jira-mcp
-# macOS / Linux: curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | BINARY=jirac-mcp bash
-# Windows: winget install mulhamna.jirac-mcp
-# Windows alt: powershell -ExecutionPolicy Bypass -Command "&amp; ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))" -Binary jirac-mcp
+    <!-- ===================== MCP ===================== -->
+    <section class="section" id="mcp">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">MCP server</span>
+          <h2>Give your agent Jira access.</h2>
+          <p>Expose Jira tools to any MCP client with <code class="mono">jirac-mcp</code>. <code class="mono">jirac</code> can even register it into your client config for you.</p>
+        </div>
+        <div class="mcp-grid">
+          <div data-reveal>
+            <div class="code-card">
+              <div class="code-card__bar"><span class="code-card__name">install &amp; run</span><button class="copy-mini" type="button" data-copy="@target" data-copy-target="mcp-run"><span data-copy-label>Copy</span></button></div>
+              <pre><code class="mono" id="mcp-run">cargo install jira-mcp
 jirac-mcp serve --transport stdio</code></pre>
             </div>
-          </article>
-          <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-            <h3 class="font-semibold">One-command client install</h3>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400"><code>jirac</code> can register <code>jirac-mcp</code> into supported client configs for you. Run with no arguments for an interactive picker; pass <code>--client</code> for scripts.</p>
-            <div class="mt-3">
-              <div class="flex items-center justify-end rounded-t bg-slate-800 px-3 py-2">
-                <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="cmd-mcp-install-interactive">Copy</button>
-              </div>
-              <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="cmd-mcp-install-interactive">jirac mcp install
-# verifies prereqs, then shows a picker</code></pre>
+            <div class="code-card" style="margin-top:16px">
+              <div class="code-card__bar"><span class="code-card__name">one-command client install</span><button class="copy-mini" type="button" data-copy="@target" data-copy-target="mcp-install"><span data-copy-label>Copy</span></button></div>
+              <pre><code class="mono" id="mcp-install">jirac mcp install
+# interactive picker, or pass --client</code></pre>
             </div>
-            <div class="mt-3">
-              <div class="flex items-center justify-end rounded-t bg-slate-800 px-3 py-2">
-                <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="cmd-mcp-install-clients">Copy</button>
-              </div>
-              <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="cmd-mcp-install-clients">jirac mcp install --client claude-code
-jirac mcp install --client claude-desktop
-jirac mcp install --client cursor
-jirac mcp install --client gemini-cli
-jirac mcp install --client codex
-jirac mcp install --client opencode
-jirac mcp install --client generic-json
-jirac mcp install --client antigravity
-jirac mcp install --client antigravity-cli</code></pre>
+            <div class="mcp-clients" aria-label="Supported MCP clients">
+              <span class="mcp-client">claude-code</span>
+              <span class="mcp-client">claude-desktop</span>
+              <span class="mcp-client">cursor</span>
+              <span class="mcp-client">gemini-cli</span>
+              <span class="mcp-client">codex</span>
+              <span class="mcp-client">opencode</span>
+              <span class="mcp-client">antigravity</span>
+              <span class="mcp-client">generic-json</span>
             </div>
-            <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-400">
-              <li><code>claude-code</code> writes user-level <code>~/.claude.json</code> (<code>mcpServers</code>); the project-scoped <code>&lt;repo&gt;/.mcp.json</code> is not written by this helper.</li>
-              <li><code>claude-desktop</code> writes the platform support dir (<code>claude_desktop_config.json</code>) on macOS, Windows, or Linux.</li>
-              <li><code>generic-json</code> prints a portable JSON snippet instead of writing a file.</li>
-              <li><code>gemini-cli</code> and <code>codex</code> delegate to their native <code>mcp add</code> commands.</li>
-              <li><code>opencode</code> writes <code>~/.config/opencode/opencode.jsonc</code> directly because its CLI flow is interactive.</li>
-              <li>Use <code>--print</code> to show the JSON snippet or delegated client command first.</li>
-              <li>Use <code>--dry-run</code> to preview without writing.</li>
-              <li>Use <code>--force</code> to overwrite an existing entry with the same name.</li>
-              <li>Install helpers use the active Jira profile by default; if you only have one Jira login configured, that is the profile the MCP server will use.</li>
-            </ul>
-          </article>
-        </div>
-        <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5">
-          <h3 class="font-semibold">Portable JSON snippet</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">If your MCP client is not supported yet, use <code>jirac mcp install --client generic-json</code> and paste the output into your client config.</p>
-          <div class="mt-3">
-            <div class="flex items-center justify-end rounded-t bg-slate-800 px-3 py-2">
-              <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="cmd-mcp-config">Copy</button>
-            </div>
-            <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="cmd-mcp-config">{
+          </div>
+          <div data-reveal data-reveal-delay="1">
+            <div class="code-card">
+              <div class="code-card__bar"><span class="code-card__name">portable JSON snippet</span><button class="copy-mini" type="button" data-copy="@target" data-copy-target="mcp-json"><span data-copy-label>Copy</span></button></div>
+              <pre><code class="mono" id="mcp-json">{
   "mcpServers": {
     "jira": {
       "command": "jirac-mcp",
@@ -565,140 +333,67 @@ jirac mcp install --client antigravity-cli</code></pre>
     }
   }
 }</code></pre>
+            </div>
+            <p class="install-hint">Flags: <code class="mono">--print</code> shows the snippet, <code class="mono">--dry-run</code> previews without writing, <code class="mono">--force</code> overwrites an existing entry. Install helpers use your active Jira profile by default.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="contributing" class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Contributing</h2>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Contributions are welcome for bug fixes, docs improvements, tests, release automation follow-through, and new features.</p>
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Quick contribution flow</h3>
-          <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-600 dark:text-slate-400">
-            <li>Fork and clone the repository.</li>
-            <li>Create a branch for your change.</li>
-            <li>Implement your update with tests/docs when relevant.</li>
-            <li>Run quality checks locally.</li>
-            <li>Open a pull request with a clear description.</li>
-          </ol>
-        </article>
-        <article class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-          <h3 class="font-semibold">Local checks before PR</h3>
-          <pre class="mt-3 overflow-x-auto rounded bg-slate-900 p-3 text-sm text-slate-100"><code>cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
-cargo build --all</code></pre>
-        </article>
-      </div>
-      <div class="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-5 text-sm text-slate-600 dark:text-slate-400">
-        <p><strong>Commit style:</strong> use Conventional Commits (for example: <code>feat:</code>, <code>fix:</code>, <code>docs:</code>, <code>refactor:</code>, <code>test:</code>).</p>
-        <p class="mt-2"><strong>Important:</strong> check <code>CLAUDE.md</code>, <code>AGENTS.md</code>, and existing project patterns before submitting major changes.</p>
-      </div>
-      <article class="mt-6 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-soft">
-        <h3 class="font-semibold">PR Checklist Template</h3>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Use this checklist in your pull request description:</p>
-        <div class="mt-3">
-          <div class="flex items-center justify-end rounded-t bg-slate-800 px-3 py-2">
-            <button type="button" class="copy-btn rounded border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:border-brand-300 hover:text-white" data-copy-target="pr-checklist-code">Copy</button>
-          </div>
-          <pre class="overflow-x-auto rounded-b bg-slate-900 p-3 text-sm text-slate-100"><code id="pr-checklist-code">## Summary
-- What changed:
-- Why this change is needed:
-
-## Validation
-- [ ] cargo fmt --all -- --check
-- [ ] cargo clippy --all-targets --all-features -- -D warnings
-- [ ] cargo test --all
-- [ ] cargo build --all
-
-## Scope & Risk
-- [ ] No breaking changes
-- [ ] Breaking changes documented
-- [ ] Docs updated (if needed)
-- [ ] Added/updated tests (if needed)
-
-## Notes
-- Jira issue / context:
-- Follow-up tasks (if any):</code></pre>
+    <!-- ===================== FAQ ===================== -->
+    <section class="section" id="faq" style="background:var(--bg-sunken);border-block:1px solid var(--line)">
+      <div class="wrap">
+        <div class="section-head" data-reveal>
+          <span class="eyebrow">FAQ</span>
+          <h2>Good to know.</h2>
         </div>
-      </article>
+        <div class="faq" data-reveal data-reveal-delay="1">
+          <details open><summary>Where do I get a Jira API token?</summary><p>From your Atlassian account security settings, under “API tokens”. Run <code class="mono">jirac auth login</code> and paste your Jira URL, email, and token — it’s stored in <code class="mono">~/.config/jira/config.toml</code> with 600 permissions.</p></details>
+          <details><summary>Is this replacing the Jira web UI?</summary><p>No. jirac complements the web UI for terminal-first and automation workflows — browsing, JQL, worklogs, transitions, versions, and MCP/agent access.</p></details>
+          <details><summary>Does it support custom fields?</summary><p>Yes. Custom fields are discovered dynamically per project at runtime, so there’s no manual field mapping to maintain.</p></details>
+          <details><summary>Can I use jirac as my main Jira CLI?</summary><p>Absolutely — it’s built to be a daily driver covering issue browsing, JQL search, worklogs, transitions, fix versions, project versions, bulk actions, and MCP workflows.</p></details>
+          <details><summary>How do I copy text out of the TUI?</summary><p>Hold <span class="keycap">Shift</span> (iTerm2 / most Linux terminals) or <span class="keycap">Option</span> (Terminal.app) while selecting. Under tmux, set <code class="mono">set -g mouse on</code> so events reach the TUI.</p></details>
+        </div>
+      </div>
     </section>
 
-    <section id="faq" class="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-      <div class="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">FAQ</h2>
-        <div class="mt-6 space-y-4">
-          <details class="rounded border border-slate-200 dark:border-slate-700 p-4" open>
-            <summary class="cursor-pointer font-semibold">Where do I get Jira API token?</summary>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">From Atlassian account security settings under API tokens.</p>
-          </details>
-          <details class="rounded border border-slate-200 dark:border-slate-700 p-4">
-            <summary class="cursor-pointer font-semibold">Is this replacing Jira web UI?</summary>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">No. It complements Jira UI for terminal-first and automation workflows.</p>
-          </details>
-          <details class="rounded border border-slate-200 dark:border-slate-700 p-4">
-            <summary class="cursor-pointer font-semibold">Does it support custom fields?</summary>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Yes, custom fields are discovered dynamically per project.</p>
-          </details>
-          <details class="rounded border border-slate-200 dark:border-slate-700 p-4">
-            <summary class="cursor-pointer font-semibold">Can I use jirac as my main Jira CLI?</summary>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Yes. jirac covers day-to-day Jira command-line work like issue browsing, JQL search, worklogs, transitions, fix versions, project versions, and MCP/automation workflows.</p>
-          </details>
+    <!-- ===================== CTA ===================== -->
+    <section class="section section--tight">
+      <div class="wrap">
+        <div class="cta-band" data-reveal>
+          <div class="cta-band__glow"></div>
+          <h2>Stop context-switching to Jira.</h2>
+          <p>Install jirac and run your backlog from the terminal in under a minute.</p>
+          <div class="hero__cta">
+            <a href="#install" class="btn btn-primary">Install jirac</a>
+            <a href="https://github.com/mulhamna/jira-commands" target="_blank" rel="noopener" class="btn btn-ghost">Star on GitHub</a>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
-    <div class="mx-auto max-w-7xl px-4 py-8 text-sm text-slate-600 dark:text-slate-400 sm:px-6 lg:px-8">
-      <p><strong>jirac / jira-commands</strong> - Rust CLI for Jira ecosystem.</p>
-      <p class="mt-1">Repository: <a class="text-brand-700 hover:underline" href="https://github.com/mulhamna/jira-commands">github.com/mulhamna/jira-commands</a></p>
-      <p class="mt-1">License: MIT OR Apache-2.0</p>
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="site-footer">
+    <div class="wrap site-footer__row">
+      <div>
+        <a href="#top" class="brand"><span class="brand__mark">jc</span><span class="brand__name"><b>jirac</b></span></a>
+        <p>A Rust CLI, TUI &amp; MCP server for the Jira ecosystem.</p>
+        <p>MIT OR Apache-2.0 · Not affiliated with Atlassian.</p>
+      </div>
+      <div class="site-footer__links">
+        <a href="https://github.com/mulhamna/jira-commands" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/mulhamna/jira-commands/blob/main/INSTALL.md" target="_blank" rel="noopener">Install guide</a>
+        <a href="#commands">Commands</a>
+        <a href="#mcp">MCP</a>
+      </div>
     </div>
   </footer>
-  <script>
-    function syncThemeToggle() {
-      const isDark = document.documentElement.classList.contains('dark');
-      const icon = document.getElementById('theme-icon');
-      const label = document.getElementById('theme-label');
-      if (icon) icon.textContent = isDark ? '☀️' : '🌙';
-      if (label) label.textContent = isDark ? 'Light' : 'Dark';
-    }
 
-    syncThemeToggle();
+  <!-- mirror of install command for copy-by-id -->
+  <textarea id="install-cmd-text" style="position:absolute;left:-9999px;top:0" aria-hidden="true"></textarea>
 
-    const toggle = document.getElementById('theme-toggle');
-    if (toggle) {
-      toggle.addEventListener('click', function () {
-        const root = document.documentElement;
-        root.classList.toggle('dark');
-        localStorage.setItem('theme', root.classList.contains('dark') ? 'dark' : 'light');
-        syncThemeToggle();
-      });
-    }
-
-    document.querySelectorAll('.copy-btn').forEach(function (button) {
-      button.addEventListener('click', async function () {
-        const targetId = button.getAttribute('data-copy-target');
-        const target = targetId ? document.getElementById(targetId) : null;
-        if (!target) return;
-        try {
-          await navigator.clipboard.writeText(target.textContent || '');
-          const oldText = button.textContent;
-          button.textContent = 'Copied';
-          setTimeout(function () {
-            button.textContent = oldText || 'Copy';
-          }, 1200);
-        } catch (_) {
-          button.textContent = 'Failed';
-          setTimeout(function () {
-            button.textContent = 'Copy';
-          }, 1200);
-        }
-      });
-    });
-  </script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

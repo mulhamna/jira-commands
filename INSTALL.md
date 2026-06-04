@@ -12,6 +12,7 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | Cargo                | ✅    | ✅    | ✅      | Best for Rust users; install `jira-commands` and/or `jira-mcp` |
 | From source          | ✅    | ✅    | ✅      | `cargo install --path` from a local checkout    |
 | npm                  | ✅    | ✅    | ✅      | Downloads the matching prebuilt release binary  |
+| ClawHub              | ✅    | ✅    | ✅      | Install the `jirac` skill or the `jirac-plugin` bundle via OpenClaw |
 | GitHub Releases      | ✅    | ✅    | ✅      | Manual download of CLI and MCP archives/binaries |
 | Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket` for `jirac` + `jirac-mcp` |
 | Winget               | ❌    | ❌    | ✅      | Windows package manager for `mulhamna.jirac` + `mulhamna.jirac-mcp` |
@@ -92,6 +93,19 @@ npm install -g @mulham28/jirac-mcp    # jirac-mcp MCP server
 ```
 
 Each package downloads the matching prebuilt release binary during install. Linux support depends on the release binary's glibc compatibility.
+
+## ClawHub
+
+If you use OpenClaw, install the published ClawHub surfaces directly:
+
+```bash
+openclaw skills install jirac
+openclaw plugins install clawhub:jirac-plugin
+```
+
+Pages:
+- Skill: <https://clawhub.ai/mulhamna/jirac>
+- Plugin: <https://clawhub.ai/plugins/jirac-plugin>
 
 ## GitHub Releases
 

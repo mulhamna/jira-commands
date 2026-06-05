@@ -2867,13 +2867,107 @@ fn build_project_version_options(
         .collect()
 }
 
+fn user_home_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("USERPROFILE").map(std::path::PathBuf::from))
+        .or_else(
+            || match (std::env::var_os("HOMEDRIVE"), std::env::var_os("HOMEPATH")) {
+                (Some(drive), Some(path)) => {
+                    let mut home = std::path::PathBuf::from(drive);
+                    home.push(path);
+                    Some(home)
+                }
+                _ => None,
+            },
+        )
+}
+
 fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
-    if let Some(stripped) = path.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
-            let mut p = std::path::PathBuf::from(home);
+    let stripped = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\"));
+
+    if let Some(stripped) = stripped {
+        if let Some(home) = user_home_dir() {
+            let mut p = home;
             p.push(stripped);
             return std::borrow::Cow::Owned(p.to_string_lossy().into_owned());
         }
     }
     std::borrow::Cow::Borrowed(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
+        match value {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+    }
+
+    #[test]
+    fn shellexpand_tilde_falls_back_to_userprofile() {
+        let _guard = env_lock().lock().unwrap();
+        let temp_dir = std::env::temp_dir().join(format!(
+            "jirac-tilde-userprofile-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let original_home = std::env::var_os("HOME");
+        let original_userprofile = std::env::var_os("USERPROFILE");
+        let original_homedrive = std::env::var_os("HOMEDRIVE");
+        let original_homepath = std::env::var_os("HOMEPATH");
+
+        std::env::remove_var("HOME");
+        std::env::set_var("USERPROFILE", &temp_dir);
+        std::env::remove_var("HOMEDRIVE");
+        std::env::remove_var("HOMEPATH");
+
+        let expanded = shellexpand_tilde("~/Desktop/file.txt");
+        assert!(expanded.starts_with(&*temp_dir.to_string_lossy()));
+        assert!(expanded.contains("Desktop"));
+
+        restore_env("HOME", original_home);
+        restore_env("USERPROFILE", original_userprofile);
+        restore_env("HOMEDRIVE", original_homedrive);
+        restore_env("HOMEPATH", original_homepath);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn shellexpand_tilde_accepts_backslash_prefix() {
+        let _guard = env_lock().lock().unwrap();
+        let temp_dir =
+            std::env::temp_dir().join(format!("jirac-tilde-backslash-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let original_home = std::env::var_os("HOME");
+        let original_userprofile = std::env::var_os("USERPROFILE");
+        let original_homedrive = std::env::var_os("HOMEDRIVE");
+        let original_homepath = std::env::var_os("HOMEPATH");
+
+        std::env::remove_var("HOME");
+        std::env::set_var("USERPROFILE", &temp_dir);
+        std::env::remove_var("HOMEDRIVE");
+        std::env::remove_var("HOMEPATH");
+
+        let expanded = shellexpand_tilde("~\\Desktop\\file.txt");
+        assert!(expanded.starts_with(&*temp_dir.to_string_lossy()));
+        assert!(expanded.contains("Desktop"));
+
+        restore_env("HOME", original_home);
+        restore_env("USERPROFILE", original_userprofile);
+        restore_env("HOMEDRIVE", original_homedrive);
+        restore_env("HOMEPATH", original_homepath);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }

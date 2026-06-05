@@ -657,7 +657,50 @@ fn config_path_from_env_or_default(env_key: &str, default: PathBuf) -> PathBuf {
 }
 
 fn home_dir() -> Option<PathBuf> {
-    env::var_os("HOME").map(PathBuf::from)
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("USERPROFILE").map(PathBuf::from))
+        .or_else(
+            || match (env::var_os("HOMEDRIVE"), env::var_os("HOMEPATH")) {
+                (Some(drive), Some(path)) => {
+                    let mut home = PathBuf::from(drive);
+                    home.push(path);
+                    Some(home)
+                }
+                _ => None,
+            },
+        )
+}
+
+#[cfg(target_os = "windows")]
+fn executable_path_candidates(path: &Path) -> Vec<PathBuf> {
+    let mut candidates = vec![path.to_path_buf()];
+    if path.extension().is_some() {
+        return candidates;
+    }
+
+    let pathext = env::var_os("PATHEXT")
+        .and_then(|value| value.into_string().ok())
+        .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string());
+
+    for ext in pathext
+        .split(';')
+        .map(str::trim)
+        .filter(|ext| !ext.is_empty())
+    {
+        let trimmed = ext.trim_start_matches('.');
+        if trimmed.is_empty() {
+            continue;
+        }
+        candidates.push(path.with_extension(trimmed));
+    }
+
+    candidates
+}
+
+#[cfg(not(target_os = "windows"))]
+fn executable_path_candidates(path: &Path) -> Vec<PathBuf> {
+    vec![path.to_path_buf()]
 }
 
 fn claude_desktop_settings_path(home: &Path) -> PathBuf {
@@ -726,13 +769,17 @@ fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) 
 fn resolve_command_path(command: &str) -> Option<PathBuf> {
     let path = PathBuf::from(command);
     if path.components().count() > 1 || path.is_absolute() {
-        return path.is_file().then_some(path);
+        return executable_path_candidates(&path)
+            .into_iter()
+            .find(|candidate| candidate.is_file());
     }
 
     env::var_os("PATH").and_then(|paths| {
         env::split_paths(&paths).find_map(|dir| {
             let candidate = dir.join(command);
-            candidate.is_file().then_some(candidate)
+            executable_path_candidates(&candidate)
+                .into_iter()
+                .find(|resolved| resolved.is_file())
         })
     })
 }
@@ -923,6 +970,12 @@ fn shell_escape(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn generic_json_snippet_contains_server_name() {
@@ -994,6 +1047,44 @@ mod tests {
     fn resolve_command_path_finds_absolute_path() {
         let path = resolve_command_path("/bin/sh").unwrap();
         assert_eq!(path, PathBuf::from("/bin/sh"));
+    }
+
+    #[test]
+    fn home_dir_falls_back_to_userprofile() {
+        let _guard = env_lock().lock().unwrap();
+        let temp_dir =
+            std::env::temp_dir().join(format!("jirac-home-dir-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let original_home = std::env::var_os("HOME");
+        let original_userprofile = std::env::var_os("USERPROFILE");
+        let original_homedrive = std::env::var_os("HOMEDRIVE");
+        let original_homepath = std::env::var_os("HOMEPATH");
+
+        std::env::remove_var("HOME");
+        std::env::set_var("USERPROFILE", &temp_dir);
+        std::env::remove_var("HOMEDRIVE");
+        std::env::remove_var("HOMEPATH");
+
+        assert_eq!(home_dir().as_deref(), Some(temp_dir.as_path()));
+
+        match original_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match original_userprofile {
+            Some(value) => std::env::set_var("USERPROFILE", value),
+            None => std::env::remove_var("USERPROFILE"),
+        }
+        match original_homedrive {
+            Some(value) => std::env::set_var("HOMEDRIVE", value),
+            None => std::env::remove_var("HOMEDRIVE"),
+        }
+        match original_homepath {
+            Some(value) => std::env::set_var("HOMEPATH", value),
+            None => std::env::remove_var("HOMEPATH"),
+        }
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

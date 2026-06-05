@@ -6,6 +6,26 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.8.0](https://github.com/mulhamna/jira-commands/compare/v1.7.0...v1.8.0) (2026-06-05)
+
+
+### Features
+
+* **docs:** refresh GitHub Pages landing page ([#345](https://github.com/mulhamna/jira-commands/issues/345)) ([999cde8](https://github.com/mulhamna/jira-commands/commit/999cde8cfbb6402e69821663c30a987af516b8ce))
+
+
+### Bug Fixes
+
+* **clawhub:** pass plugin package version to publish ([#341](https://github.com/mulhamna/jira-commands/issues/341)) ([9ea450a](https://github.com/mulhamna/jira-commands/commit/9ea450a1724be4ad2caec35964c203aa69a0fac9))
+* **clawhub:** skip republish on workflow-only pushes ([#340](https://github.com/mulhamna/jira-commands/issues/340)) ([98bef69](https://github.com/mulhamna/jira-commands/commit/98bef698baf01b834265ac33c887fd554628a639))
+* **clawhub:** stage plugin bundle for publish ([#342](https://github.com/mulhamna/jira-commands/issues/342)) ([794ae4a](https://github.com/mulhamna/jira-commands/commit/794ae4a680819c660925a26a51ed88bbc7d5cc61))
+* exclude clawhub wrapper changes from root releases ([#331](https://github.com/mulhamna/jira-commands/issues/331)) ([97acb26](https://github.com/mulhamna/jira-commands/commit/97acb26d1e22aa11dc07be26eb6df3fdab42973a))
+* ignore release infra in root release lane ([#333](https://github.com/mulhamna/jira-commands/issues/333)) ([a0d148a](https://github.com/mulhamna/jira-commands/commit/a0d148a4a7cb589516840f2b97e721ce1b0891c1))
+* publish clawhub wrapper from package root ([#329](https://github.com/mulhamna/jira-commands/issues/329)) ([d462661](https://github.com/mulhamna/jira-commands/commit/d4626618110a98978c7e3ba1814dcc1a1bb8a679))
+* **release:** isolate clawhub changes from root lane ([#338](https://github.com/mulhamna/jira-commands/issues/338)) ([e0964f7](https://github.com/mulhamna/jira-commands/commit/e0964f792d5d12549c2b830064e435d1ead7055e))
+* self-trigger clawhub publish workflows ([#334](https://github.com/mulhamna/jira-commands/issues/334)) ([496a1b3](https://github.com/mulhamna/jira-commands/commit/496a1b3ea9b261e59ac0c7cc2ad5dd36e8f4ec14))
+* **windows:** harden MCP path and home handling ([#346](https://github.com/mulhamna/jira-commands/issues/346)) ([abde638](https://github.com/mulhamna/jira-commands/commit/abde638aeb44ee37d1d781d4eaca34cdc3aa288b))
+
 ## [1.7.0](https://github.com/mulhamna/jira-commands/compare/v1.6.0...v1.7.0) (2026-06-02)
 
 

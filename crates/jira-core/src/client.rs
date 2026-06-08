@@ -31,7 +31,6 @@ use crate::{
     },
 };
 
-const AGILE_BASE: &str = "/rest/agile/1.0";
 const MAX_RETRIES: u32 = 3;
 
 #[derive(serde::Deserialize)]
@@ -67,16 +66,6 @@ impl JiraClient {
             "{}/rest/api/{}{}",
             self.config.base_url.trim_end_matches('/'),
             self.config.api_version,
-            path
-        )
-    }
-
-    #[allow(dead_code)]
-    fn agile_url(&self, path: &str) -> String {
-        format!(
-            "{}{}{}",
-            self.config.base_url.trim_end_matches('/'),
-            AGILE_BASE,
             path
         )
     }

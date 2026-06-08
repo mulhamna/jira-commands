@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
@@ -115,7 +115,7 @@ jobs:
             archive_artifact: jirac-mcp-windows-x86_64.zip
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
@@ -197,7 +197,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
       - uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
@@ -235,7 +235,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
@@ -288,7 +288,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
@@ -403,7 +403,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           ref: main
@@ -484,7 +484,7 @@ jobs:
       SHA_MCP_LINUX_X86: ${{ needs.collect-release-metadata.outputs.sha_mcp_linux_x86 }}
     steps:
       - name: Checkout homebrew-tap
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: mulhamna/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -551,13 +551,13 @@ jobs:
       SCOOP_WINDOWS_ARCHIVE: jirac-mcp-windows-x86_64.zip
     steps:
       - name: Checkout source repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
           path: repo
 
       - name: Checkout scoop bucket
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: mulhamna/scoop-bucket
           token: ${{ secrets.SCOOP_BUCKET_PAT }}

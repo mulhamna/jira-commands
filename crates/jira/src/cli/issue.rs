@@ -13,8 +13,8 @@ use inquire::{Confirm, MultiSelect, Select, Text};
 use jira_core::{
     model::{
         field::{FieldKind, FieldValue},
-        CreateIssueRequest, CreateIssueRequestV2, CreateProjectVersionRequest, Issue, Sprint,
-        UpdateIssueRequest, UpdateProjectVersionRequest,
+        CreateIssueRequestV2, CreateProjectVersionRequest, Issue, Sprint, UpdateIssueRequest,
+        UpdateProjectVersionRequest,
     },
     FieldCache, IssueType, JiraClient,
 };
@@ -4717,13 +4717,6 @@ fn read_description_file(
         "text" => Ok((None, Some(jira_core::adf::plain_text_to_adf(&content)))),
         _ => Ok((Some(content), None)), // markdown (default)
     }
-}
-
-// Keep old CreateIssueRequest available for any other callers
-#[allow(dead_code)]
-fn _use_old_request() {
-    let _ = CreateIssueRequest::default();
-    let _: Option<Value> = None;
 }
 
 fn issue_status_category(issue: &Issue) -> String {

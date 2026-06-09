@@ -820,7 +820,7 @@ impl JiraClient {
                 .get("completeDate")
                 .and_then(|v| v.as_str())
                 .map(str::to_owned),
-            })
+        })
     }
 
     fn paged_values<'a>(response: &'a Value) -> &'a [Value] {
@@ -836,7 +836,10 @@ impl JiraClient {
             return is_last;
         }
         if let Some(total) = response.get("total").and_then(|v| v.as_u64()) {
-            let start_at = response.get("startAt").and_then(|v| v.as_u64()).unwrap_or(0);
+            let start_at = response
+                .get("startAt")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             return start_at + fetched_count as u64 >= total;
         }
         if let Some(max_results) = response.get("maxResults").and_then(|v| v.as_u64()) {

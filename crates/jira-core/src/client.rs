@@ -832,6 +832,11 @@ impl JiraClient {
     }
 
     fn page_is_last(response: &Value, fetched_count: usize) -> bool {
+        // Empty page = definitely last. Prevents infinite loops when API returns
+        // a quirky page with no records but also no metadata.
+        if fetched_count == 0 {
+            return true;
+        }
         if let Some(is_last) = response.get("isLast").and_then(|v| v.as_bool()) {
             return is_last;
         }
@@ -845,6 +850,8 @@ impl JiraClient {
         if let Some(max_results) = response.get("maxResults").and_then(|v| v.as_u64()) {
             return fetched_count < max_results as usize;
         }
+        // Last resort: no metadata at all. Treat as last page to avoid an
+        // unbounded loop; callers should also enforce MAX_PAGINATION_ITERATIONS.
         true
     }
 
@@ -854,10 +861,20 @@ impl JiraClient {
         project_key: &str,
         states: &[&str],
     ) -> Result<Vec<Sprint>> {
+        const MAX_PAGES: u32 = 500;
+
         let mut board_ids = Vec::new();
         let mut board_start_at = 0u64;
+        let mut iterations = 0u32;
 
         loop {
+            iterations += 1;
+            if iterations > MAX_PAGES {
+                return Err(JiraError::Api {
+                    status: 500,
+                    message: "board pagination exceeded MAX_PAGES safeguard".to_string(),
+                });
+            }
             let boards_path = format!(
                 "/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100&startAt={board_start_at}"
             );
@@ -885,7 +902,17 @@ impl JiraClient {
 
         for board_id in board_ids {
             let mut sprint_start_at = 0u64;
+            let mut sprint_iterations = 0u32;
             loop {
+                sprint_iterations += 1;
+                if sprint_iterations > MAX_PAGES {
+                    return Err(JiraError::Api {
+                        status: 500,
+                        message: format!(
+                            "sprint pagination exceeded MAX_PAGES safeguard for board {board_id}"
+                        ),
+                    });
+                }
                 let sprint_path = format!(
                     "/rest/agile/1.0/board/{board_id}/sprint?state={state_filter}&maxResults=200&startAt={sprint_start_at}"
                 );

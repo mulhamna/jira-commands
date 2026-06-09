@@ -212,7 +212,10 @@ impl JiraClient {
         if status.is_success() {
             return Ok(());
         }
-        let body = response.text().await.unwrap_or_default();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
         if status == StatusCode::NOT_FOUND {
             return Err(JiraError::NotFound(body));
         }

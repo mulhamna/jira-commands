@@ -70,6 +70,10 @@ impl JiraClient {
         )
     }
 
+    fn platform_path(&self, path: &str) -> String {
+        format!("/rest/api/{}{}", self.config.api_version, path)
+    }
+
     fn auth_headers(&self) -> Result<HeaderMap> {
         self.build_auth_headers(true)
     }
@@ -819,42 +823,79 @@ impl JiraClient {
         })
     }
 
+    fn paged_values(response: &Value) -> &[Value] {
+        response
+            .get("values")
+            .and_then(|v| v.as_array())
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    fn page_is_last(response: &Value, fetched_count: usize) -> bool {
+        if let Some(is_last) = response.get("isLast").and_then(|v| v.as_bool()) {
+            return is_last;
+        }
+        if let Some(total) = response.get("total").and_then(|v| v.as_u64()) {
+            let start_at = response
+                .get("startAt")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            return start_at + fetched_count as u64 >= total;
+        }
+        if let Some(max_results) = response.get("maxResults").and_then(|v| v.as_u64()) {
+            return fetched_count < max_results as usize;
+        }
+        true
+    }
+
     /// List project sprints for the given sprint states via the Agile API.
     pub async fn list_sprints_for_project_with_states(
         &self,
         project_key: &str,
         states: &[&str],
     ) -> Result<Vec<Sprint>> {
-        let boards_path =
-            format!("/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100");
-        let boards_resp = self
-            .raw_request("GET", &boards_path, None)
-            .await?
-            .unwrap_or_default();
+        let mut board_ids = Vec::new();
+        let mut board_start_at = 0u64;
 
-        let board_ids: Vec<u64> = boards_resp
-            .get("values")
-            .and_then(|v| v.as_array())
-            .map(|boards| {
+        loop {
+            let boards_path = format!(
+                "/rest/agile/1.0/board?projectKeyOrId={project_key}&maxResults=100&startAt={board_start_at}"
+            );
+            let boards_resp = self
+                .raw_request("GET", &boards_path, None)
+                .await?
+                .unwrap_or_default();
+            let boards = Self::paged_values(&boards_resp);
+
+            board_ids.extend(
                 boards
                     .iter()
-                    .filter_map(|b| b.get("id").and_then(|id| id.as_u64()))
-                    .collect()
-            })
-            .unwrap_or_default();
+                    .filter_map(|b| b.get("id").and_then(|id| id.as_u64())),
+            );
+
+            if Self::page_is_last(&boards_resp, boards.len()) {
+                break;
+            }
+            board_start_at += boards.len() as u64;
+        }
 
         let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
         let mut sprints: Vec<Sprint> = Vec::new();
         let state_filter = states.join(",");
 
         for board_id in board_ids {
-            let sprint_path = format!(
-                "/rest/agile/1.0/board/{board_id}/sprint?state={state_filter}&maxResults=200"
-            );
-            let Ok(Some(resp)) = self.raw_request("GET", &sprint_path, None).await else {
-                continue;
-            };
-            if let Some(values) = resp.get("values").and_then(|v| v.as_array()) {
+            let mut sprint_start_at = 0u64;
+            loop {
+                let sprint_path = format!(
+                    "/rest/agile/1.0/board/{board_id}/sprint?state={state_filter}&maxResults=200&startAt={sprint_start_at}"
+                );
+                let resp = match self.raw_request("GET", &sprint_path, None).await {
+                    Ok(Some(resp)) => resp,
+                    Ok(None) => break,
+                    Err(JiraError::NotFound(_)) => break,
+                    Err(err) => return Err(err),
+                };
+                let values = Self::paged_values(&resp);
                 for value in values {
                     let Some(sprint) = self.parse_sprint_value(value, Some(board_id)) else {
                         continue;
@@ -864,6 +905,11 @@ impl JiraClient {
                     }
                     sprints.push(sprint);
                 }
+
+                if Self::page_is_last(&resp, values.len()) {
+                    break;
+                }
+                sprint_start_at += values.len() as u64;
             }
         }
 
@@ -1354,8 +1400,9 @@ impl JiraClient {
             }
         });
 
+        let bulk_move_path = self.platform_path("/bulk/issues/move");
         let submitted = self
-            .raw_request("POST", "/rest/api/3/bulk/issues/move", Some(body))
+            .raw_request("POST", &bulk_move_path, Some(body))
             .await?
             .ok_or_else(|| JiraError::Api {
                 status: 0,
@@ -1374,8 +1421,9 @@ impl JiraClient {
         for _ in 0..MAX_POLLS {
             tokio::time::sleep(Duration::from_secs(2)).await;
 
+            let progress_path = self.platform_path(&format!("/bulk/queue/{task_id}"));
             let progress = self
-                .raw_request("GET", &format!("/rest/api/3/bulk/queue/{task_id}"), None)
+                .raw_request("GET", &progress_path, None)
                 .await?
                 .ok_or_else(|| JiraError::Api {
                     status: 0,
@@ -2098,6 +2146,140 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn list_sprints_for_project_paginates_boards_and_sprints() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .and(query_param("startAt", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 1 }],
+                "isLast": false
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .and(query_param("startAt", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 2 }],
+                "isLast": true
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/1/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .and(query_param("startAt", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{
+                    "id": 10,
+                    "name": "Sprint 10",
+                    "state": "active"
+                }],
+                "isLast": false
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/1/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .and(query_param("startAt", "1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{
+                    "id": 11,
+                    "name": "Sprint 11",
+                    "state": "future"
+                }],
+                "isLast": true
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/2/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .and(query_param("startAt", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{
+                    "id": 12,
+                    "name": "Sprint 12",
+                    "state": "future"
+                }],
+                "isLast": true
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("pagination should collect all pages");
+
+        assert_eq!(sprints.len(), 3);
+        assert_eq!(sprints[0].id, 10);
+        assert_eq!(sprints[1].id, 11);
+        assert_eq!(sprints[2].id, 12);
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_propagates_non_not_found_board_errors() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 9 }]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/9/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("jira exploded"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect_err("500 should propagate");
+
+        match err {
+            JiraError::Api { status, message } => {
+                assert_eq!(status, 500);
+                assert!(message.contains("jira exploded"));
+            }
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn create_sprint_posts_expected_payload() {
         let server = MockServer::start().await;
         let expected_auth = cloud_auth();
@@ -2638,6 +2820,63 @@ mod tests {
             JiraError::Api { message, .. } => assert!(message.contains("FAILED")),
             other => panic!("expected JiraError::Api, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn move_issue_uses_configured_api_version_for_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/bulk/issues/move"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-dc" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/bulk/queue/task-dc"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "20001",
+                "key": "DC-1",
+                "fields": {
+                    "summary": "Moved issue",
+                    "status": { "name": "Done" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "OPS" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("dc-main".into()),
+            base_url: server.uri(),
+            email: String::new(),
+            token: Some("dc-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+        });
+
+        let issue = client
+            .move_issue("DC-1", "OPS", "10002", None)
+            .await
+            .expect("data center move should use api v2");
+
+        assert_eq!(issue.key, "DC-1");
+        assert_eq!(issue.project_key, "OPS");
     }
 
     #[tokio::test]

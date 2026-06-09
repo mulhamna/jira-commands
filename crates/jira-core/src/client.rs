@@ -70,6 +70,10 @@ impl JiraClient {
         )
     }
 
+    fn platform_path(&self, path: &str) -> String {
+        format!("/rest/api/{}{}", self.config.api_version, path)
+    }
+
     fn auth_headers(&self) -> Result<HeaderMap> {
         self.build_auth_headers(true)
     }
@@ -1393,8 +1397,9 @@ impl JiraClient {
             }
         });
 
+        let bulk_move_path = self.platform_path("/bulk/issues/move");
         let submitted = self
-            .raw_request("POST", "/rest/api/3/bulk/issues/move", Some(body))
+            .raw_request("POST", &bulk_move_path, Some(body))
             .await?
             .ok_or_else(|| JiraError::Api {
                 status: 0,
@@ -1413,8 +1418,9 @@ impl JiraClient {
         for _ in 0..MAX_POLLS {
             tokio::time::sleep(Duration::from_secs(2)).await;
 
+            let progress_path = self.platform_path(&format!("/bulk/queue/{task_id}"));
             let progress = self
-                .raw_request("GET", &format!("/rest/api/3/bulk/queue/{task_id}"), None)
+                .raw_request("GET", &progress_path, None)
                 .await?
                 .ok_or_else(|| JiraError::Api {
                     status: 0,
@@ -2811,6 +2817,63 @@ mod tests {
             JiraError::Api { message, .. } => assert!(message.contains("FAILED")),
             other => panic!("expected JiraError::Api, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn move_issue_uses_configured_api_version_for_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/bulk/issues/move"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-dc" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/bulk/queue/task-dc"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(header("authorization", "Bearer dc-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "20001",
+                "key": "DC-1",
+                "fields": {
+                    "summary": "Moved issue",
+                    "status": { "name": "Done" },
+                    "issuetype": { "name": "Task" },
+                    "project": { "key": "OPS" },
+                    "created": "2023-01-01T00:00:00.000+0000",
+                    "updated": "2023-01-01T00:00:00.000+0000"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = JiraClient::new(JiraConfig {
+            profile_name: Some("dc-main".into()),
+            base_url: server.uri(),
+            email: String::new(),
+            token: Some("dc-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+        });
+
+        let issue = client
+            .move_issue("DC-1", "OPS", "10002", None)
+            .await
+            .expect("data center move should use api v2");
+
+        assert_eq!(issue.key, "DC-1");
+        assert_eq!(issue.project_key, "OPS");
     }
 
     #[tokio::test]

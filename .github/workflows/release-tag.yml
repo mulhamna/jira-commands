@@ -647,6 +647,7 @@ jobs:
     env:
       VERSION: ${{ needs.collect-release-metadata.outputs.version }}
       SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
+      SHA_WINDOWS_ARM: ${{ needs.collect-release-metadata.outputs.sha_windows_arm }}
       REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout scoop bucket
@@ -669,17 +670,32 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          sha = os.environ["SHA_WINDOWS_X86"]
+          sha_x86 = os.environ["SHA_WINDOWS_X86"]
+          sha_arm = os.environ["SHA_WINDOWS_ARM"]
           repo = os.environ.get("REPOSITORY", "mulhamna/jira-commands")
           manifest_path = Path(os.environ["SCOOP_MANIFEST_PATH"])
 
           manifest = json.loads(manifest_path.read_text())
           manifest["version"] = version
-          manifest["url"] = f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-x86_64.zip"
-          manifest["hash"] = sha
+          manifest.pop("url", None)
+          manifest.pop("hash", None)
+          manifest["architecture"] = {
+              "64bit": {
+                  "url": f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-x86_64.zip",
+                  "hash": sha_x86,
+              },
+              "arm64": {
+                  "url": f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-aarch64.zip",
+                  "hash": sha_arm,
+              },
+          }
           manifest.setdefault("checkver", {})
-          manifest.setdefault("autoupdate", {})
-          manifest["autoupdate"]["url"] = f"https://github.com/{repo}/releases/download/v$version/jirac-windows-x86_64.zip"
+          autoupdate = manifest.setdefault("autoupdate", {})
+          autoupdate.pop("url", None)
+          autoupdate["architecture"] = {
+              "64bit": {"url": f"https://github.com/{repo}/releases/download/v$version/jirac-windows-x86_64.zip"},
+              "arm64": {"url": f"https://github.com/{repo}/releases/download/v$version/jirac-windows-aarch64.zip"},
+          }
           manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
           print(f"updated {manifest_path} -> v{version}")
           PY

@@ -823,7 +823,7 @@ impl JiraClient {
         })
     }
 
-    fn paged_values<'a>(response: &'a Value) -> &'a [Value] {
+    fn paged_values(response: &Value) -> &[Value] {
         response
             .get("values")
             .and_then(|v| v.as_array())

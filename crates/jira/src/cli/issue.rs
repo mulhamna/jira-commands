@@ -2622,7 +2622,7 @@ async fn collect_custom_fields(
         return Ok(HashMap::new());
     }
 
-    let mut cache = FieldCache::new();
+    let cache = FieldCache::new();
     let fields = cache.get_or_fetch(client, project_key, issue_type_id).await;
 
     let fields = match fields {

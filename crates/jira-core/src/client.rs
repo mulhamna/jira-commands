@@ -816,7 +816,7 @@ impl JiraClient {
                 .get("completeDate")
                 .and_then(|v| v.as_str())
                 .map(str::to_owned),
-        })
+            })
     }
 
     /// List project sprints for the given sprint states via the Agile API.
@@ -851,8 +851,11 @@ impl JiraClient {
             let sprint_path = format!(
                 "/rest/agile/1.0/board/{board_id}/sprint?state={state_filter}&maxResults=200"
             );
-            let Ok(Some(resp)) = self.raw_request("GET", &sprint_path, None).await else {
-                continue;
+            let resp = match self.raw_request("GET", &sprint_path, None).await {
+                Ok(Some(resp)) => resp,
+                Ok(None) => continue,
+                Err(JiraError::NotFound(_)) => continue,
+                Err(err) => return Err(err),
             };
             if let Some(values) = resp.get("values").and_then(|v| v.as_array()) {
                 for value in values {
@@ -2095,6 +2098,46 @@ mod tests {
         assert_eq!(sprints[0].id, 1);
         assert_eq!(sprints[0].state, "active");
         assert_eq!(sprints[59].id, 60);
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_propagates_non_not_found_board_errors() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{ "id": 9 }]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/9/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("state", "active,future"))
+            .and(query_param("maxResults", "200"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("jira exploded"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let err = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect_err("500 should propagate");
+
+        match err {
+            JiraError::Api { status, message } => {
+                assert_eq!(status, 500);
+                assert!(message.contains("jira exploded"));
+            }
+            other => panic!("expected JiraError::Api, got {other:?}"),
+        }
     }
 
     #[tokio::test]

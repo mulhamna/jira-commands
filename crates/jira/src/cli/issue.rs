@@ -2547,7 +2547,15 @@ async fn create_issue(
     if json {
         // Re-fetch to include any attachment metadata
         let full = if had_attachments {
-            client.get_issue(&issue.key).await.unwrap_or(issue)
+            match client.get_issue(&issue.key).await {
+                Ok(refreshed) => refreshed,
+                Err(e) => {
+                    eprintln!(
+                        "warning: re-fetch after attach failed ({e}); attachment metadata may be missing"
+                    );
+                    issue
+                }
+            }
         } else {
             issue
         };
@@ -2622,7 +2630,7 @@ async fn collect_custom_fields(
         return Ok(HashMap::new());
     }
 
-    let mut cache = FieldCache::new();
+    let cache = FieldCache::new();
     let fields = cache.get_or_fetch(client, project_key, issue_type_id).await;
 
     let fields = match fields {
@@ -3110,7 +3118,7 @@ fn spinner_new(msg: impl Into<String>) -> ProgressBar {
     pb.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
-            .unwrap(),
+            .expect("spinner template is a compile-time constant"),
     );
     pb.set_message(msg.into());
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -3126,7 +3134,7 @@ fn progress_bar(len: u64) -> ProgressBar {
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.cyan} [{bar:40}] {pos}/{len} {msg}")
-            .unwrap()
+            .expect("progress bar template is a compile-time constant")
             .progress_chars("=> "),
     );
     pb

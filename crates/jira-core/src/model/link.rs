@@ -36,7 +36,14 @@ impl LinkedIssue {
         let key = value.get("key")?.as_str()?.to_string();
         let fields = value.get("fields")?;
 
-        let summary = fields.get("summary")?.as_str()?.to_string();
+        // Use the same defaulting pattern as `RawIssue::into_issue`: missing
+        // textual fields fall back to a placeholder instead of dropping the
+        // whole linked issue. Caller relies on `id`/`key` being present.
+        let summary = fields
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         let status = fields
             .get("status")
             .and_then(|s| s.get("name"))

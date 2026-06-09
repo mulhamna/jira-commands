@@ -5,6 +5,28 @@ use std::{collections::BTreeMap, env, path::PathBuf};
 
 use crate::error::{JiraError, Result};
 
+/// Emit an `eprintln!` warning if the config file is readable by group/other.
+/// Tokens are stored in this file, so loose permissions are a security risk.
+#[cfg(unix)]
+fn warn_if_world_readable(path: &std::path::Path) {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return;
+    };
+    let mode = meta.permissions().mode() & 0o077;
+    if mode != 0 {
+        eprintln!(
+            "warning: {} is group/world accessible (mode {:o}); contains an API token. \
+             Run: chmod 600 {}",
+            path.display(),
+            meta.permissions().mode() & 0o777,
+            path.display(),
+        );
+    }
+}
+
+#[cfg(not(unix))]
+fn warn_if_world_readable(_path: &std::path::Path) {}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum JiraDeployment {
@@ -209,6 +231,15 @@ impl JiraConfig {
         }
     }
 
+    /// Apply `JIRA_*` environment variables on top of the loaded profile.
+    ///
+    /// Precedence (highest first):
+    ///   1. Environment variables (`JIRA_URL`, `JIRA_EMAIL`, `JIRA_TOKEN`, ...)
+    ///   2. Profile values from the config file
+    ///   3. Built-in defaults
+    ///
+    /// Env vars always win because this runs *after* the file has been parsed
+    /// into `self`. Empty `JIRA_PROJECT` is treated as "unset" (clears project).
     fn apply_env_overrides(&mut self) {
         if let Ok(url) = env::var("JIRA_URL") {
             self.base_url = url;
@@ -262,6 +293,8 @@ impl JiraProfilesFile {
         if !config_path.exists() {
             return Ok(Self::default());
         }
+
+        warn_if_world_readable(&config_path);
 
         let content = std::fs::read_to_string(&config_path)
             .map_err(|e| JiraError::Config(format!("Failed to read config: {e}")))?;

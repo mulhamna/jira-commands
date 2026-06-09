@@ -1644,10 +1644,12 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(inner);
-        let left = Paragraph::new(col1).wrap(Wrap { trim: false });
-        let right = Paragraph::new(col2).wrap(Wrap { trim: false });
-        f.render_widget(left, cols[0]);
-        f.render_widget(right, cols[1]);
+        if let (Some(&left_rect), Some(&right_rect)) = (cols.first(), cols.get(1)) {
+            let left = Paragraph::new(col1).wrap(Wrap { trim: false });
+            let right = Paragraph::new(col2).wrap(Wrap { trim: false });
+            f.render_widget(left, left_rect);
+            f.render_widget(right, right_rect);
+        }
     } else {
         let max_scroll = total_lines.saturating_sub(inner.height);
         let scroll = scroll_offset.min(max_scroll);
@@ -1676,14 +1678,20 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         ])
         .split(r);
 
-    Layout::default()
+    let Some(&middle) = popup_layout.get(1) else {
+        return r;
+    };
+
+    let horizontal = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage((100 - percent_x) / 2),
             Constraint::Percentage(percent_x),
             Constraint::Percentage((100 - percent_x) / 2),
         ])
-        .split(popup_layout[1])[1]
+        .split(middle);
+
+    horizontal.get(1).copied().unwrap_or(r)
 }
 
 fn bottom_bar_rect(r: Rect) -> Rect {

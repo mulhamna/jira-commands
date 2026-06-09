@@ -799,6 +799,44 @@ async fn search_visible(
         .await
 }
 
+/// RAII guard that restores the terminal on drop, even if the TUI panics.
+struct TerminalGuard {
+    pushed_keyboard_flags: bool,
+}
+
+impl TerminalGuard {
+    fn install() -> io::Result<Self> {
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        // Best-effort: ask for Kitty keyboard protocol so SUPER (Cmd) modifier and
+        // distinct shifted keys reach the app. Terminals that don't implement it
+        // ignore the sequence — failure is silent on purpose.
+        let pushed_keyboard_flags = execute!(
+            stdout,
+            PushKeyboardEnhancementFlags(
+                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
+            )
+        )
+        .is_ok();
+        Ok(Self {
+            pushed_keyboard_flags,
+        })
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let mut stdout = io::stdout();
+        if self.pushed_keyboard_flags {
+            let _ = execute!(stdout, PopKeyboardEnhancementFlags);
+        }
+        let _ = execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
+        let _ = disable_raw_mode();
+    }
+}
+
 pub async fn run_tui(
     client: JiraClient,
     project: Option<String>,
@@ -812,19 +850,8 @@ pub async fn run_tui(
 
     let base_url = client.base_url().to_string();
 
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    // Best-effort: ask for Kitty keyboard protocol so SUPER (Cmd) modifier and
-    // distinct shifted keys reach the app. Terminals that don't implement it
-    // ignore the sequence — failure is silent on purpose.
-    let _ = execute!(
-        stdout,
-        PushKeyboardEnhancementFlags(
-            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-        )
-    );
+    let _terminal_guard = TerminalGuard::install()?;
+    let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -2786,16 +2813,9 @@ pub async fn run_tui(
         }
     }
 
-    disable_raw_mode()?;
-    // Pop only if we successfully pushed (silent failure either way — pairs
-    // with the best-effort push above).
-    let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
     terminal.show_cursor()?;
+    // TerminalGuard's Drop restores raw mode, alt-screen, mouse capture, and
+    // keyboard enhancement flags.
 
     Ok(())
 }

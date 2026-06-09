@@ -1,5 +1,9 @@
 use serde_json::{json, Value};
 
+/// Maximum recursion depth for ADF node rendering. Guards against
+/// stack overflow from maliciously deep or cyclic documents.
+const MAX_RENDER_DEPTH: usize = 128;
+
 /// Convert an ADF (Atlassian Document Format) JSON value to plain text.
 pub fn adf_to_text(value: &Value) -> String {
     let mut output = String::new();
@@ -8,6 +12,9 @@ pub fn adf_to_text(value: &Value) -> String {
 }
 
 fn render_node(node: &Value, out: &mut String, depth: usize) {
+    if depth > MAX_RENDER_DEPTH {
+        return;
+    }
     let node_type = node.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
     match node_type {
@@ -197,10 +204,13 @@ pub fn inject_mentions(node: &mut Value, mention_map: &[(String, String)]) {
     if mention_map.is_empty() {
         return;
     }
-    inject_mentions_node(node, mention_map);
+    inject_mentions_node(node, mention_map, 0);
 }
 
-fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)]) {
+fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)], depth: usize) {
+    if depth > MAX_RENDER_DEPTH {
+        return;
+    }
     if let Some(Value::Array(content)) = node.get_mut("content") {
         let old = std::mem::take(content);
         let mut new_content: Vec<Value> = Vec::new();
@@ -225,7 +235,7 @@ fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)]) {
     }
     if let Some(Value::Array(content)) = node.get_mut("content") {
         for child in content.iter_mut() {
-            inject_mentions_node(child, mention_map);
+            inject_mentions_node(child, mention_map, depth + 1);
         }
     }
 }
@@ -267,11 +277,14 @@ fn expand_text_mentions(text: &str, mention_map: &[(String, String)]) -> Vec<Val
 /// Collect all mentioned Jira account IDs found in an ADF document.
 pub fn mentioned_account_ids(value: &Value) -> Vec<String> {
     let mut out = Vec::new();
-    collect_mentioned_account_ids(value, &mut out);
+    collect_mentioned_account_ids(value, &mut out, 0);
     out
 }
 
-fn collect_mentioned_account_ids(node: &Value, out: &mut Vec<String>) {
+fn collect_mentioned_account_ids(node: &Value, out: &mut Vec<String>, depth: usize) {
+    if depth > MAX_RENDER_DEPTH {
+        return;
+    }
     if node.get("type").and_then(|v| v.as_str()) == Some("mention") {
         if let Some(id) = node
             .get("attrs")
@@ -286,7 +299,7 @@ fn collect_mentioned_account_ids(node: &Value, out: &mut Vec<String>) {
 
     if let Some(children) = node.get("content").and_then(|v| v.as_array()) {
         for child in children {
-            collect_mentioned_account_ids(child, out);
+            collect_mentioned_account_ids(child, out, depth + 1);
         }
     }
 }

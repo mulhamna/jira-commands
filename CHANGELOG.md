@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [1.8.1](https://github.com/mulhamna/jira-commands/compare/v1.8.0...v1.8.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* address audit findings (HIGH + MED + LOW) ([#354](https://github.com/mulhamna/jira-commands/issues/354)) ([5a52bd1](https://github.com/mulhamna/jira-commands/commit/5a52bd18d630732ebe82b09df24497be01ec773b))
+* address jira-core audit findings ([#352](https://github.com/mulhamna/jira-commands/issues/352)) ([1edb83d](https://github.com/mulhamna/jira-commands/commit/1edb83d0bd9acbcb65525162bfa8df2349450e6d))
+
 ## [1.8.0](https://github.com/mulhamna/jira-commands/compare/v1.7.0...v1.8.0) (2026-06-05)
 
 

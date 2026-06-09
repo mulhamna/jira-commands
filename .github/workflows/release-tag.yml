@@ -123,6 +123,10 @@ jobs:
             os: windows-latest
             artifact: jirac-windows-x86_64.exe
             archive_artifact: jirac-windows-x86_64.zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            artifact: jirac-windows-aarch64.exe
+            archive_artifact: jirac-windows-aarch64.zip
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -157,18 +161,18 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p jira-commands
 
       - name: Copy binaries (Unix)
-        if: matrix.os != 'windows-latest'
+        if: runner.os != 'Windows'
         run: |
           cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
 
       - name: Copy binaries (Windows)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
 
       - name: Package archives (Unix)
-        if: matrix.os != 'windows-latest'
+        if: runner.os != 'Windows'
         run: |
           mkdir -p dist/jirac
           cp ${{ matrix.artifact }} dist/jirac/
@@ -176,7 +180,7 @@ jobs:
           tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
 
       - name: Package archives (Windows)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/jirac | Out-Null

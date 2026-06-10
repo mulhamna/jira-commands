@@ -33,6 +33,9 @@ config.local.toml
 # Claude working checklist — internal only, tidak perlu di repo
 TASK.md
 
+# Claude Code local config and notes
+.claude/
+
 # Local scratch and staging
 /tmp/
 tmp/

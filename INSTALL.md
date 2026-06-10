@@ -47,6 +47,8 @@ curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.
 
 ## PowerShell installer (Windows)
 
+The installer detects the host architecture (`AMD64` or `ARM64`) and downloads the matching release archive.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-WebRequest 'https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.ps1').Content))"
 ```
@@ -58,6 +60,8 @@ powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-We
 ```
 
 ## Scoop (Windows)
+
+The `mulhamna/jirac` manifest publishes both `64bit` and `arm64` URLs; Scoop picks the right one for the host.
 
 ```powershell
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
@@ -122,6 +126,7 @@ Preferred CLI (`vX.Y.Z`) archives:
 | Linux x86_64        | `jirac-linux-x86_64.tar.gz`  |
 | Linux ARM64         | `jirac-linux-aarch64.tar.gz` |
 | Windows x86_64      | `jirac-windows-x86_64.zip`   |
+| Windows ARM64       | `jirac-windows-aarch64.zip`  |
 
 Preferred MCP (`jira-mcp-vX.Y.Z`) archives:
 

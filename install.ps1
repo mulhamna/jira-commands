@@ -17,6 +17,15 @@ function Write-Info($msg) {
     Write-Host "==> $msg" -ForegroundColor Green
 }
 
+function Get-ArchSlug {
+    $arch = $env:PROCESSOR_ARCHITECTURE
+    switch ($arch) {
+        "AMD64" { return "x86_64" }
+        "ARM64" { return "aarch64" }
+        default { throw "Unsupported Windows architecture '$arch'. Supported: AMD64, ARM64." }
+    }
+}
+
 function Get-LatestReleaseTag {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest"
     if (-not $release.tag_name) {
@@ -25,10 +34,18 @@ function Get-LatestReleaseTag {
     return $release.tag_name
 }
 
-function Get-AssetName($BinaryName) {
+function Get-AssetName($BinaryName, $ArchSlug) {
     switch ($BinaryName) {
-        "jirac" { return "jirac-windows-x86_64.zip" }
-        "jirac-mcp" { return "jirac-mcp-windows-x86_64.zip" }
+        "jirac" { return "jirac-windows-$ArchSlug.zip" }
+        "jirac-mcp" { return "jirac-mcp-windows-$ArchSlug.zip" }
+        default { throw "Unsupported binary '$BinaryName'." }
+    }
+}
+
+function Get-ArchivedExeName($BinaryName, $ArchSlug) {
+    switch ($BinaryName) {
+        "jirac" { return "jirac-windows-$ArchSlug.exe" }
+        "jirac-mcp" { return "jirac-mcp-windows-$ArchSlug.exe" }
         default { throw "Unsupported binary '$BinaryName'." }
     }
 }
@@ -60,12 +77,15 @@ Write-Host "$Binary installer" -ForegroundColor Cyan
 Write-Host "  Jira tooling for Windows terminals and MCP clients"
 Write-Host ""
 
+$archSlug = Get-ArchSlug
 $tag = Get-LatestReleaseTag
-$assetName = Get-AssetName $Binary
+$assetName = Get-AssetName $Binary $archSlug
+$archivedExeName = Get-ArchivedExeName $Binary $archSlug
 $baseUrl = "https://github.com/$Repo/releases/download/$tag"
 $assetUrl = "$baseUrl/$assetName"
 
 Write-Info "Latest release: $tag"
+Write-Info "Detected architecture: $archSlug"
 Write-Info "Downloading $assetName"
 
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("jirac-install-" + [System.Guid]::NewGuid().ToString("N"))
@@ -79,13 +99,13 @@ try {
 
     Ensure-InstallDir $InstallDir
 
-    $exeName = if ($Binary -eq "jirac") { "jirac.exe" } else { "jirac-mcp.exe" }
-    $sourceExe = Get-ChildItem -Path $extractDir -Recurse -Filter $exeName | Select-Object -First 1
+    $installedExeName = if ($Binary -eq "jirac") { "jirac.exe" } else { "jirac-mcp.exe" }
+    $sourceExe = Get-ChildItem -Path $extractDir -Recurse -Filter $archivedExeName | Select-Object -First 1
     if (-not $sourceExe) {
-        throw "Could not find $exeName inside downloaded archive."
+        throw "Could not find $archivedExeName inside downloaded archive."
     }
 
-    $targetExe = Join-Path $InstallDir $exeName
+    $targetExe = Join-Path $InstallDir $installedExeName
     Copy-Item -LiteralPath $sourceExe.FullName -Destination $targetExe -Force
 
     Write-Host ""

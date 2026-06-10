@@ -590,10 +590,12 @@ jobs:
     env:
       VERSION: ${{ needs.collect-release-metadata.outputs.version }}
       SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
+      SHA_WINDOWS_ARM: ${{ needs.collect-release-metadata.outputs.sha_windows_arm }}
       REPOSITORY: ${{ github.repository }}
       SCOOP_BINARY: jirac-mcp
       SCOOP_RELEASE_TAG_PREFIX: jira-mcp-v
       SCOOP_WINDOWS_ARCHIVE: jirac-mcp-windows-x86_64.zip
+      SCOOP_WINDOWS_ARCHIVE_ARM: jirac-mcp-windows-aarch64.zip
     steps:
       - name: Checkout source repo
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -618,15 +620,30 @@ jobs:
             "description": "Typed Jira MCP server built in Rust.",
             "homepage": "https://github.com/mulhamna/jira-commands",
             "license": ["MIT", "Apache-2.0"],
-            "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-x86_64.zip",
-            "hash": "",
             "bin": "jirac-mcp.exe",
+            "architecture": {
+              "64bit": {
+                "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-x86_64.zip",
+                "hash": ""
+              },
+              "arm64": {
+                "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v0.0.0/jirac-mcp-windows-aarch64.zip",
+                "hash": ""
+              }
+            },
             "checkver": {
               "url": "https://api.github.com/repos/mulhamna/jira-commands/releases?per_page=20",
               "regex": "\"tag_name\":\\s*\"jira-mcp-v([^\"]+)\""
             },
             "autoupdate": {
-              "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-x86_64.zip"
+              "architecture": {
+                "64bit": {
+                  "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-x86_64.zip"
+                },
+                "arm64": {
+                  "url": "https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v$version/jirac-mcp-windows-aarch64.zip"
+                }
+              }
             }
           }
           JSON

@@ -137,6 +137,7 @@ Preferred MCP (`jira-mcp-vX.Y.Z`) archives:
 | Linux x86_64        | `jirac-mcp-linux-x86_64.tar.gz`  |
 | Linux ARM64         | `jirac-mcp-linux-aarch64.tar.gz` |
 | Windows x86_64      | `jirac-mcp-windows-x86_64.zip`   |
+| Windows ARM64       | `jirac-mcp-windows-aarch64.zip`  |
 
 ## Winget (Windows)
 

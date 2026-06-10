@@ -8,6 +8,12 @@
       "package-name": "jira-mcp",
       "version-file": "VERSION",
       "changelog-path": "CHANGELOG.md",
+      "include-paths": [
+        "crates/jira-mcp",
+        "packaging/npm-mcp",
+        "packaging/winget-mcp",
+        ".github/workflows/release-tag-mcp.yml"
+      ],
       "extra-files": [
         { "type": "generic", "path": "Cargo.toml" },
         { "type": "generic", "path": "/packaging/npm-mcp/package.json" }

@@ -18,11 +18,12 @@ function getPlatformAsset() {
   const platform = process.platform;
   const arch = process.arch;
 
-  if (platform === 'darwin' && arch === 'arm64') return { archive: 'jirac-mcp-macos-aarch64.tar.gz', binary: 'jirac-mcp' };
-  if (platform === 'darwin' && arch === 'x64') return { archive: 'jirac-mcp-macos-x86_64.tar.gz', binary: 'jirac-mcp' };
-  if (platform === 'linux' && arch === 'x64') return { archive: 'jirac-mcp-linux-x86_64.tar.gz', binary: 'jirac-mcp' };
-  if (platform === 'linux' && arch === 'arm64') return { archive: 'jirac-mcp-linux-aarch64.tar.gz', binary: 'jirac-mcp' };
-  if (platform === 'win32' && arch === 'x64') return { archive: 'jirac-mcp-windows-x86_64.zip', binary: 'jirac-mcp.exe' };
+  if (platform === 'darwin' && arch === 'arm64') return { archive: 'jirac-mcp-macos-aarch64.tar.gz', binary: 'jirac-mcp', archivedBinary: 'jirac-mcp' };
+  if (platform === 'darwin' && arch === 'x64') return { archive: 'jirac-mcp-macos-x86_64.tar.gz', binary: 'jirac-mcp', archivedBinary: 'jirac-mcp' };
+  if (platform === 'linux' && arch === 'x64') return { archive: 'jirac-mcp-linux-x86_64.tar.gz', binary: 'jirac-mcp', archivedBinary: 'jirac-mcp' };
+  if (platform === 'linux' && arch === 'arm64') return { archive: 'jirac-mcp-linux-aarch64.tar.gz', binary: 'jirac-mcp', archivedBinary: 'jirac-mcp' };
+  if (platform === 'win32' && arch === 'x64') return { archive: 'jirac-mcp-windows-x86_64.zip', binary: 'jirac-mcp.exe', archivedBinary: 'jirac-mcp-windows-x86_64.exe' };
+  if (platform === 'win32' && arch === 'arm64') return { archive: 'jirac-mcp-windows-aarch64.zip', binary: 'jirac-mcp.exe', archivedBinary: 'jirac-mcp-windows-aarch64.exe' };
 
   throw new Error(`Unsupported platform for jirac-mcp npm install: ${platform}/${arch}`);
 }
@@ -75,7 +76,7 @@ async function extractArchive(archivePath, destDir) {
 }
 
 async function main() {
-  const { archive, binary } = getPlatformAsset();
+  const { archive, binary, archivedBinary } = getPlatformAsset();
   const archiveUrl = `${BASE_URL}/${archive}`;
   const checksumsUrl = `${BASE_URL}/checksums.txt`;
   const archivePath = path.join(TMP_DIR, archive);
@@ -100,12 +101,13 @@ async function main() {
   await extractArchive(archivePath, extractDir);
 
   const candidates = [
+    path.join(extractDir, archivedBinary),
     path.join(extractDir, binary),
     path.join(extractDir, archive.replace(/\.tar\.gz$/, '').replace(/\.zip$/, ''))
   ];
   const extractedBinary = candidates.find((candidate) => fs.existsSync(candidate));
   if (!extractedBinary) {
-    throw new Error(`Extracted binary not found in archive: ${binary}`);
+    throw new Error(`Extracted binary not found in archive: ${archivedBinary}`);
   }
 
   await fs.promises.mkdir(BIN_DIR, { recursive: true });

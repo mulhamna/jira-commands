@@ -6,6 +6,17 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.0.0](https://github.com/mulhamna/jira-commands/compare/v1.8.1...v2.0.0) (2026-06-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **release:** companion release-pipeline changes in this PR change two manifest schemas that downstream tooling may consume.
+
+### Features
+
+* **release:** add windows aarch64 support and fix x86_64 installers ([#356](https://github.com/mulhamna/jira-commands/issues/356)) ([e3069d6](https://github.com/mulhamna/jira-commands/commit/e3069d62ef7f9683c8cb3154b59d9bf474e9bbce))
+
 ## [1.8.1](https://github.com/mulhamna/jira-commands/compare/v1.8.0...v1.8.1) (2026-06-09)
 
 

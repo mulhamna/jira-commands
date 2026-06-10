@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.1.0](https://github.com/mulhamna/jira-commands/compare/v2.0.0...v2.1.0) (2026-06-10)
+
+
+### Features
+
+* **mcp:** windows arm64 support and dual-publish to GitHub Packages ([#359](https://github.com/mulhamna/jira-commands/issues/359)) ([2ec7008](https://github.com/mulhamna/jira-commands/commit/2ec70081bd63234c4db61a21bed1c40fee0c9c49))
+
 ## [2.0.0](https://github.com/mulhamna/jira-commands/compare/v1.8.1...v2.0.0) (2026-06-10)
 
 

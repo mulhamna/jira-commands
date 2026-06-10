@@ -355,6 +355,7 @@ jobs:
     outputs:
       version: ${{ steps.vars.outputs.version }}
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
+      sha_windows_arm: ${{ steps.vars.outputs.sha_windows_arm }}
       sha_mcp_macos_arm: ${{ steps.vars.outputs.sha_mcp_macos_arm }}
       sha_mcp_macos_x86: ${{ steps.vars.outputs.sha_mcp_macos_x86 }}
       sha_mcp_linux_arm: ${{ steps.vars.outputs.sha_mcp_linux_arm }}
@@ -381,16 +382,19 @@ jobs:
           SHA_MCP_LINUX_ARM=$(grep -E '(^|/)jirac-mcp-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_MCP_LINUX_X86=$(grep -E '(^|/)jirac-mcp-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
           SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-mcp-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_ARM=$(grep -E '(^|/)jirac-mcp-windows-aarch64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MCP_MACOS_ARM"
           test -n "$SHA_MCP_MACOS_X86"
           test -n "$SHA_MCP_LINUX_ARM"
           test -n "$SHA_MCP_LINUX_X86"
           test -n "$SHA_WINDOWS_X86"
+          test -n "$SHA_WINDOWS_ARM"
 
           {
             echo "version=$VERSION"
             echo "sha_windows_x86=$SHA_WINDOWS_X86"
+            echo "sha_windows_arm=$SHA_WINDOWS_ARM"
             echo "sha_mcp_macos_arm=$SHA_MCP_MACOS_ARM"
             echo "sha_mcp_macos_x86=$SHA_MCP_MACOS_X86"
             echo "sha_mcp_linux_arm=$SHA_MCP_LINUX_ARM"
@@ -420,24 +424,48 @@ jobs:
 
           version = os.environ['VERSION']
           release_date = os.environ['RELEASE_DATE']
-          sha_windows = os.environ['SHA_WINDOWS_X86']
+          sha_windows_x86 = os.environ['SHA_WINDOWS_X86']
+          sha_windows_arm = os.environ['SHA_WINDOWS_ARM']
 
-          files = {
+          installer_path = Path('packaging/winget-mcp/jirac-mcp.installer.yaml')
+
+          def patch_installer(content, arch, asset, sha):
+              # Within the block starting at `- Architecture: <arch>` up to the
+              # next `- Architecture:` (or EOF), rewrite InstallerUrl + Sha256.
+              block_re = re.compile(
+                  rf'(- Architecture: {arch}\b.*?)(?=^  - Architecture:|\Z)',
+                  re.MULTILINE | re.DOTALL,
+              )
+              m = block_re.search(content)
+              if not m:
+                  raise SystemExit(f'No installer block for Architecture: {arch} in {installer_path}')
+              block = m.group(0)
+              new_block, n_url = re.subn(
+                  r'(?m)^(\s+InstallerUrl: ).*$',
+                  rf'\g<1>https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v{version}/{asset}',
+                  block,
+                  count=1,
+              )
+              new_block, n_sha = re.subn(
+                  r'(?m)^(\s+InstallerSha256: ).*$',
+                  rf'\g<1>{sha}',
+                  new_block,
+                  count=1,
+              )
+              if n_url != 1 or n_sha != 1:
+                  raise SystemExit(f'Expected one Url and one Sha replacement for {arch}, got {n_url}/{n_sha}')
+              return content.replace(block, new_block, 1)
+
+          simple_files = {
               Path('packaging/winget-mcp/jirac-mcp.yaml'): [
                   (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
               ],
               Path('packaging/winget-mcp/jirac-mcp.locale.en-US.yaml'): [
                   (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
               ],
-              Path('packaging/winget-mcp/jirac-mcp.installer.yaml'): [
-                  (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
-                  (r'(?m)^ReleaseDate: .*$', f'ReleaseDate: {release_date}'),
-                  (r'(?m)^    InstallerUrl: .*$', f'    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v{version}/jirac-mcp-windows-x86_64.zip'),
-                  (r'(?m)^    InstallerSha256: .*$', f'    InstallerSha256: {sha_windows}'),
-              ],
           }
 
-          for path, replacements in files.items():
+          for path, replacements in simple_files.items():
               content = path.read_text()
               for pattern, repl in replacements:
                   content, count = re.subn(pattern, repl, content, count=1)
@@ -445,11 +473,24 @@ jobs:
                       raise SystemExit(f'Expected exactly one match for {pattern!r} in {path}')
               path.write_text(content)
               print(f'updated {path}')
+
+          content = installer_path.read_text()
+          content, count = re.subn(r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}', content, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected PackageVersion replacement in {installer_path}')
+          content, count = re.subn(r'(?m)^ReleaseDate: .*$', f'ReleaseDate: {release_date}', content, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected ReleaseDate replacement in {installer_path}')
+          content = patch_installer(content, 'x64', f'jirac-mcp-windows-x86_64.zip', sha_windows_x86)
+          content = patch_installer(content, 'arm64', f'jirac-mcp-windows-aarch64.zip', sha_windows_arm)
+          installer_path.write_text(content)
+          print(f'updated {installer_path}')
           EOF
         env:
           VERSION: ${{ needs.collect-release-metadata.outputs.version }}
           RELEASE_DATE: ${{ needs.collect-release-metadata.outputs.release_date }}
           SHA_WINDOWS_X86: ${{ needs.collect-release-metadata.outputs.sha_windows_x86 }}
+          SHA_WINDOWS_ARM: ${{ needs.collect-release-metadata.outputs.sha_windows_arm }}
 
       - name: Create manifest refresh pull request (jira-mcp)
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7

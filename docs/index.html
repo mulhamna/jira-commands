@@ -37,6 +37,7 @@
       </a>
       <nav class="nav" aria-label="Primary">
         <a href="#install" data-spy>Install</a>
+        <a href="#setup" data-spy>Setup</a>
         <a href="#features" data-spy>Features</a>
         <a href="#commands" data-spy>Commands</a>
         <a href="#tui" data-spy>TUI</a>
@@ -59,6 +60,7 @@
     </div>
     <div class="mobile-nav" id="mobile-nav">
       <a href="#install">Install</a>
+      <a href="#setup">Setup</a>
       <a href="#features">Features</a>
       <a href="#commands">Commands</a>
       <a href="#tui">TUI</a>
@@ -191,6 +193,91 @@
             <p class="install-hint">Need the full matrix or the standalone MCP binary? See <a class="link" href="https://github.com/mulhamna/jira-commands/blob/main/INSTALL.md" target="_blank" rel="noopener">INSTALL.md</a>. OpenClaw users can grab the published skill or plugin:</p>
             <div class="claw" id="install-claw"></div>
           </div>
+        </div>
+
+        <div id="setup" class="setup-wrap" data-reveal data-reveal-delay="2" style="margin-top:48px">
+          <div class="section-head">
+            <span class="eyebrow">Getting started</span>
+            <h2>From zero to MCP in 5 steps.</h2>
+            <p>For non-technical users — once the binary is installed, copy each line in order. Works the same for Codex and Claude Desktop.</p>
+          </div>
+          <ol class="steps steps--quickstart" style="list-style:none;padding:0;margin:0">
+            <li class="step" data-reveal>
+              <div class="step__num">1</div>
+              <h3>Install <code>jirac</code></h3>
+              <p>Scroll up, pick your OS, and copy the single install line. It bundles both <code>jirac</code> and <code>jirac-mcp</code>.</p>
+              <div class="step__cmd">
+                <code><a class="link" href="#install" style="text-decoration:none">↑ Use the picker above</a></code>
+              </div>
+            </li>
+            <li class="step" data-reveal data-reveal-delay="1">
+              <div class="step__num">2</div>
+              <h3>Confirm it works</h3>
+              <p>Open a fresh terminal and check that both binaries are on your PATH.</p>
+              <div class="step__cmd">
+                <code>jirac --version</code>
+                <button class="copy-mini" type="button" data-copy="jirac --version"><span data-copy-label>Copy</span></button>
+              </div>
+            </li>
+            <li class="step" data-reveal data-reveal-delay="2">
+              <div class="step__num">3</div>
+              <h3>Log in to Jira</h3>
+              <p>You'll be prompted for your Jira site URL, email, and an <a class="link" href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">API token</a>. Credentials stay in your OS keyring.</p>
+              <div class="step__cmd">
+                <code>jirac auth login</code>
+                <button class="copy-mini" type="button" data-copy="jirac auth login"><span data-copy-label>Copy</span></button>
+              </div>
+            </li>
+            <li class="step" data-reveal>
+              <div class="step__num">4</div>
+              <h3>Register the MCP server</h3>
+              <p>Pick your AI app from the interactive picker — or pass <code class="mono">--client &lt;name&gt;</code> to skip the prompt.</p>
+              <div class="step__cmd">
+                <code>jirac mcp install</code>
+                <button class="copy-mini" type="button" data-copy="jirac mcp install"><span data-copy-label>Copy</span></button>
+              </div>
+              <div class="tty" aria-label="Interactive client picker preview"><span class="tty-prompt">$</span> jirac mcp install
+<span class="tty-q">?</span> Pick the MCP client to install into:
+  claude-code        <span class="tty-comment">(writes ~/.claude.json)</span>
+<span class="tty-caret">&gt;</span> <span class="tty-sel">claude-desktop</span>     <span class="tty-comment">(writes claude_desktop_config.json)</span>
+  cursor             <span class="tty-comment">(writes ~/.cursor/mcp.json)</span>
+  codex              <span class="tty-comment">(delegates to `codex mcp add` — cli + desktop)</span>
+  gemini-cli         <span class="tty-comment">(delegates to `gemini mcp add`)</span>
+  opencode           <span class="tty-comment">(writes opencode.jsonc)</span>
+  <span class="tty-dim">… 3 more</span>
+<span class="tty-dim">[↑↓ to move · enter to select · type to filter]</span></div>
+              <p style="font-size:12.5px;color:var(--ink-dim);margin:12px 0 0;line-height:1.55">Direct shortcut: <code class="mono">--client claude-desktop</code>, <code class="mono">--client codex</code>, <code class="mono">--client claude-code</code>. Other targets: <code class="mono">cursor</code>, <code class="mono">gemini-cli</code>, <code class="mono">opencode</code>, <code class="mono">antigravity</code>, <code class="mono">antigravity-cli</code>, <code class="mono">generic-json</code>.</p>
+            </li>
+            <li class="step" data-reveal data-reveal-delay="1">
+              <div class="step__num">5</div>
+              <h3>Restart your AI app</h3>
+              <p><strong>Fully quit</strong> Claude Desktop or Codex (<code>Cmd+Q</code> on macOS — closing the window isn't enough) and reopen it. The <code>jira</code> tools should appear in the tool list.</p>
+              <div class="step__cmd">
+                <code>jirac mcp doctor</code>
+                <button class="copy-mini" type="button" data-copy="jirac mcp doctor"><span data-copy-label>Copy</span></button>
+              </div>
+            </li>
+          </ol>
+
+          <div class="setup-proof" data-reveal style="margin-top:36px">
+            <div class="section-head" style="margin-bottom:18px">
+              <span class="eyebrow">What success looks like</span>
+              <h3 style="font-size:20px;font-weight:700;margin:6px 0 8px;letter-spacing:-0.01em">Real installs, real apps.</h3>
+              <p style="font-size:14.5px;color:var(--ink-soft);line-height:1.6;margin:0">After step 5, your AI app shows the <code class="mono">jira</code> MCP server enabled and running. Here's what it looks like in Claude Desktop and Codex.</p>
+            </div>
+            <div class="proof-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:18px">
+              <figure class="proof-card" data-reveal style="margin:0;border:1px solid var(--line);border-radius:14px;background:var(--bg-elev);overflow:hidden;box-shadow:var(--shadow)">
+                <img src="assets/mcp-claude-desktop.png" alt="Claude Desktop showing jira MCP server running with command /bin/jirac-mcp serve --transport stdio" loading="lazy" style="display:block;width:100%;height:auto;border-bottom:1px solid var(--line)" />
+                <figcaption style="padding:12px 14px;font-size:13.5px;color:var(--ink-soft)"><strong style="color:var(--ink)">Claude Desktop</strong> — <code class="mono">jira</code> MCP server status <em>running</em>.</figcaption>
+              </figure>
+              <figure class="proof-card" data-reveal data-reveal-delay="1" style="margin:0;border:1px solid var(--line);border-radius:14px;background:var(--bg-elev);overflow:hidden;box-shadow:var(--shadow)">
+                <img src="assets/mcp-codex.png" alt="Codex MCP servers settings showing jira server enabled" loading="lazy" style="display:block;width:100%;height:auto;border-bottom:1px solid var(--line)" />
+                <figcaption style="padding:12px 14px;font-size:13.5px;color:var(--ink-soft)"><strong style="color:var(--ink)">Codex</strong> — <code class="mono">jira</code> server enabled under MCP servers.</figcaption>
+              </figure>
+            </div>
+          </div>
+
+          <p class="install-hint" style="margin-top:18px">Stuck? <code class="mono">jirac mcp doctor</code> diagnoses missing binaries, broken config, and auth issues. Full reference in the <a class="link" href="https://github.com/mulhamna/jira-commands#mcp-server" target="_blank" rel="noopener">MCP docs</a>.</p>
         </div>
       </div>
     </section>

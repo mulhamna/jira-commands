@@ -60,7 +60,9 @@ impl std::fmt::Display for McpClient {
                 "claude-desktop     (writes claude_desktop_config.json in Claude support dir)"
             }
             McpClient::Cursor => "cursor             (writes ~/.cursor/mcp.json)",
-            McpClient::Codex => "codex              (delegates to `codex mcp add` for codex cli & codex desktop)",
+            McpClient::Codex => {
+                "codex              (delegates to `codex mcp add` for codex cli & codex desktop)"
+            }
             McpClient::GeminiCli => "gemini-cli         (delegates to `gemini mcp add`)",
             McpClient::OpenCode => "opencode           (writes opencode.jsonc)",
             McpClient::Antigravity => {

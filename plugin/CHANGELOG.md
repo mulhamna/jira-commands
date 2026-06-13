@@ -2,6 +2,11 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.18.0] - 2026-06-14
+
+### Added
+- New `/jira:watch` skill covering issue watcher management (add the current user, add a specific accountId, list watchers, remove a watcher).
+
 ## [0.17.0] - 2026-05-21
 
 ### Added

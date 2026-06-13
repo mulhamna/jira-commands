@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.1.0...jira-mcp-v2.1.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* **release:** route mcp work to the mcp lane and stop jirac leakage ([#361](https://github.com/mulhamna/jira-commands/issues/361)) ([2c3f6fd](https://github.com/mulhamna/jira-commands/commit/2c3f6fde483bfbdd923d4f769addec572f13b96d))
+
 ## [2.1.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.0.1...jira-mcp-v2.1.0) (2026-06-02)
 
 

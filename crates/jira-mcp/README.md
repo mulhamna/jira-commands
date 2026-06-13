@@ -30,7 +30,7 @@ scoop install mulhamna/jirac-mcp
 cargo install --path crates/jira-mcp --locked
 ```
 
-You can also use the workspace shell installer on macOS/Linux, the PowerShell installer flow on Windows, or download packaged release archives from GitHub Releases.
+You can also use the workspace shell installer on macOS/Linux, the PowerShell installer flow on Windows (x64 + ARM64), or download packaged release archives from GitHub Releases. Native Windows ARM64 binaries ship as `jirac-mcp-windows-aarch64.zip`.
 
 ## Run
 

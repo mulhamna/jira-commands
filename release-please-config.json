@@ -15,6 +15,14 @@
         "crates/jira-core",
         "packaging/npm"
       ],
+      "exclude-paths": [
+        "crates/jira-mcp",
+        "packaging/npm-mcp",
+        "packaging/winget-mcp",
+        ".github/workflows/release-tag-mcp.yml",
+        "release-please-config-mcp.json",
+        ".release-please-manifest-mcp.json"
+      ],
       "extra-files": [
         { "type": "generic", "path": "/Cargo.toml" },
         { "type": "generic", "path": "/crates/jira/Cargo.toml" },

@@ -978,6 +978,42 @@ pub enum IssueCommand {
         #[command(subcommand)]
         command: LinkCommand,
     },
+
+    /// Manage issue watchers (add/list/remove)
+    ///
+    /// Examples:
+    ///   jirac issue watch PROJ-123 add
+    ///   jirac issue watch PROJ-123 add --account-id 5b10ac8d82e05b22cc7d4ef5
+    ///   jirac issue watch PROJ-123 list
+    ///   jirac issue watch PROJ-123 rm 5b10ac8d82e05b22cc7d4ef5
+    Watch {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        #[command(subcommand)]
+        command: WatchCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum WatchCommand {
+    /// Add a watcher to the issue (defaults to the current user)
+    Add {
+        /// AccountId of the user to add (defaults to the current authenticated user)
+        #[arg(long, value_name = "ACCOUNT_ID")]
+        account_id: Option<String>,
+    },
+
+    /// List all watchers on the issue
+    List,
+
+    /// Remove a watcher from the issue
+    Rm {
+        /// AccountId of the user to remove
+        account_id: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1361,6 +1397,7 @@ pub async fn handle(
             output,
         } => render_issue_content(input, format, output),
         IssueCommand::Comment { key, command } => comment(client, key, command).await,
+        IssueCommand::Watch { key, command } => watch(client, key, command).await,
         IssueCommand::BulkComment {
             jql,
             keys,
@@ -3272,6 +3309,88 @@ async fn resolve_sprint_id_by_name(
             )
         }
     }
+}
+
+// ─── watch ───────────────────────────────────────────────────────────────────
+
+async fn watch(client: JiraClient, key: String, cmd: WatchCommand) -> Result<()> {
+    match cmd {
+        WatchCommand::Add { account_id } => watch_add(client, key, account_id).await,
+        WatchCommand::List => watch_list(client, key).await,
+        WatchCommand::Rm { account_id, force } => watch_rm(client, key, account_id, force).await,
+    }
+}
+
+async fn watch_add(client: JiraClient, key: String, account_id: Option<String>) -> Result<()> {
+    let target = match account_id {
+        Some(id) => id,
+        None => {
+            let spinner = spinner_new("Resolving current user...".to_string());
+            let me = client
+                .get_myself()
+                .await
+                .context("Failed to resolve current user")?;
+            spinner.finish_and_clear();
+            me
+        }
+    };
+
+    let spinner = spinner_new(format!("Adding watcher to {key}..."));
+    client
+        .add_watcher(&key, &target)
+        .await
+        .context("Failed to add watcher")?;
+    spinner.finish_and_clear();
+
+    println!("✓ Added watcher {target} to {key}");
+    Ok(())
+}
+
+async fn watch_list(client: JiraClient, key: String) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching watchers for {key}..."));
+    let watchers = client
+        .list_watchers(&key)
+        .await
+        .context("Failed to fetch watchers")?;
+    spinner.finish_and_clear();
+
+    if watchers.watchers.is_empty() {
+        println!("No watchers on {key}.");
+        return Ok(());
+    }
+
+    println!("Watchers on {} ({} total):", key, watchers.watch_count);
+    for w in &watchers.watchers {
+        let status = if w.active { "active" } else { "inactive" };
+        println!("  - {} ({}) [{}]", w.display_name, w.account_id, status);
+    }
+    if watchers.is_watching {
+        println!("\nYou are currently watching this issue.");
+    }
+    Ok(())
+}
+
+async fn watch_rm(client: JiraClient, key: String, account_id: String, force: bool) -> Result<()> {
+    if !force {
+        let confirm = inquire::Confirm::new(&format!("Remove watcher {account_id} from {key}?"))
+            .with_default(false)
+            .prompt()
+            .context("Failed to read confirmation")?;
+        if !confirm {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    let spinner = spinner_new(format!("Removing watcher from {key}..."));
+    client
+        .remove_watcher(&key, &account_id)
+        .await
+        .context("Failed to remove watcher")?;
+    spinner.finish_and_clear();
+
+    println!("✓ Removed watcher {account_id} from {key}");
+    Ok(())
 }
 
 // ─── comment ─────────────────────────────────────────────────────────────────

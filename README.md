@@ -35,7 +35,7 @@ Jira on the command line.
 
 ## Highlights
 
-- **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, bulk-comment, worklog, upload, and inspect issues without leaving the terminal
+- **Interactive TUI** — browse, search, create, edit, change type, move between projects, transition, assign, comment, bulk-comment, worklog, watch, upload, and inspect issues without leaving the terminal
 - **Mouse-driven TUI** — click rows, tabs, picker options, and outside-popup; scroll wheel navigates lists; double-click opens detail
 - **Split master-detail UI** — keep the issue list visible while opening summary, comments, worklog, attachments, subtasks, and links
 - **Saved query and theme preferences** — reuse saved JQLs, persist visible columns, and switch TUI themes (including GitHub Light)
@@ -189,6 +189,17 @@ jirac issue worklog delete PROJ-123 --id 10234
 
 `jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
 
+### Watchers
+
+```bash
+jirac issue watch PROJ-123 add
+jirac issue watch PROJ-123 add --account-id 5b10ac8d82e05b22cc7d4ef5
+jirac issue watch PROJ-123 list
+jirac issue watch PROJ-123 rm 5b10ac8d82e05b22cc7d4ef5
+```
+
+`add` defaults to the current authenticated user (resolved via `/myself`). `rm` prompts for confirmation unless `--force` is given. In the TUI, the Summary tab shows the watcher count and the first few display names, and pressing `W` adds yourself as a watcher in place.
+
 ### Bulk operations
 
 ```bash
@@ -248,7 +259,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version creation (`n`) and metadata editing (`e`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, and both single (`w`) and bulk (`b`) worklog flows. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version creation (`n`) and metadata editing (`e`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, both single (`w`) and bulk (`b`) worklog flows, and a self-watch shortcut (`W`) with watcher count rendered on the Summary tab. Press `?` inside the TUI for a complete shortcut reference.
 
 The TUI also accepts full mouse input: click any issue row to select, double-click (or click a tab) to open the detail view, click picker options to apply or toggle, scroll the wheel to navigate, and click outside any popup to dismiss it. Form modals stay keyboard-only so in-flight input isn't lost.
 

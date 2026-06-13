@@ -2,6 +2,11 @@
 
 All notable changes to the ClawHub wrapper package for the `jirac` Claude plugin will be documented in this file.
 
+## [0.1.2] - 2026-06-14
+
+### Changed
+- Republish wrapper to track the upstream plugin 0.18.0 release, which ships the new `/jira:watch` skill.
+
 ## [0.1.1] - 2026-06-03
 
 ### Fixed

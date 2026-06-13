@@ -415,7 +415,7 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let body = match app.active_tab {
         DetailTab::Summary => {
             let issue = app.selected_issue().expect("issue exists");
-            build_summary_lines(issue, palette)
+            build_summary_lines(issue, app.detail.watchers.as_ref(), palette)
         }
         DetailTab::Comments => build_comment_lines(app, palette),
         DetailTab::Worklog => build_worklog_lines(app, palette),
@@ -442,7 +442,11 @@ fn render_detail(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     f.render_widget(paragraph, chunks[1]);
 }
 
-fn build_summary_lines(issue: &jira_core::model::Issue, palette: Palette) -> Vec<Line<'static>> {
+fn build_summary_lines(
+    issue: &jira_core::model::Issue,
+    watchers: Option<&jira_core::model::Watchers>,
+    palette: Palette,
+) -> Vec<Line<'static>> {
     let created = &issue.created[..10.min(issue.created.len())];
     let updated = &issue.updated[..10.min(issue.updated.len())];
 
@@ -477,6 +481,28 @@ fn build_summary_lines(issue: &jira_core::model::Issue, palette: Palette) -> Vec
     }
     lines.push(owned_field_line("Created", created.to_string(), palette));
     lines.push(owned_field_line("Updated", updated.to_string(), palette));
+
+    if let Some(ws) = watchers {
+        let marker = if ws.is_watching { " (watching)" } else { "" };
+        lines.push(owned_field_line(
+            "Watchers",
+            format!("{}{}", ws.watch_count, marker),
+            palette,
+        ));
+        if !ws.watchers.is_empty() {
+            let names: Vec<String> = ws
+                .watchers
+                .iter()
+                .take(5)
+                .map(|w| w.display_name.clone())
+                .collect();
+            let mut joined = names.join(", ");
+            if ws.watchers.len() > 5 {
+                joined.push_str(&format!(" (+{} more)", ws.watchers.len() - 5));
+            }
+            lines.push(Line::from(format!("           {joined}")));
+        }
+    }
 
     if let Some(desc) = &issue.description {
         let text = jira_core::adf::adf_to_text(desc);
@@ -1518,6 +1544,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
         Line::from("  V         Browse project fix versions + backlog preview"),
         Line::from("            Enter refreshes preview, n creates, e edits metadata"),
         Line::from("  w         Add single worklog"),
+        Line::from("  W         Watch issue (add yourself as a watcher)"),
         Line::from("  y         Change issue type (native Jira move semantics)"),
         Line::from("  /         Search with JQL"),
         Line::from("  :         Add the same comment to many issues (JQL or explicit keys)"),
@@ -1533,7 +1560,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
         Line::from("  Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links"),
-        Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
+        Line::from("  e,y,M,a,;,w,W,b,m,v,s,u,t,o also work from detail view"),
     ];
 
     let mouse_section: Vec<Line<'static>> = vec![

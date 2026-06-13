@@ -10,6 +10,7 @@ pub mod sprint;
 pub mod transition;
 pub mod user;
 pub mod version;
+pub mod watcher;
 pub mod worklog;
 
 pub use attachment::Attachment;
@@ -26,4 +27,5 @@ pub use sprint::Sprint;
 pub use transition::{Transition, TransitionStatus};
 pub use user::JiraUser;
 pub use version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest};
+pub use watcher::{Watcher, Watchers};
 pub use worklog::Worklog;

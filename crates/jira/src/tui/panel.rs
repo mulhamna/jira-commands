@@ -1,4 +1,4 @@
-use jira_core::model::{Comment, RemoteLink, Worklog};
+use jira_core::model::{Comment, RemoteLink, Watchers, Worklog};
 use ratatui::layout::Rect;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +53,7 @@ pub(super) struct DetailData {
     pub(super) comments: Option<Vec<Comment>>,
     pub(super) worklogs: Option<Vec<Worklog>>,
     pub(super) remote_links: Option<Vec<RemoteLink>>,
+    pub(super) watchers: Option<Watchers>,
 }
 
 impl DetailData {

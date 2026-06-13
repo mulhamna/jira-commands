@@ -128,6 +128,10 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::AddWorklog)
             .unwrap_or(AppAction::None),
+        KeyCode::Char('W') => app
+            .selected_issue_key()
+            .map(AppAction::AddSelfWatcher)
+            .unwrap_or(AppAction::None),
         KeyCode::Char('b') => app
             .selected_issue_key()
             .map(AppAction::AddBulkWorklog)
@@ -224,6 +228,10 @@ fn handle_view_key(app: &mut App, code: KeyCode) -> AppAction {
         KeyCode::Char('w') => app
             .selected_issue_key()
             .map(AppAction::AddWorklog)
+            .unwrap_or(AppAction::None),
+        KeyCode::Char('W') => app
+            .selected_issue_key()
+            .map(AppAction::AddSelfWatcher)
             .unwrap_or(AppAction::None),
         KeyCode::Char('b') => app
             .selected_issue_key()

@@ -201,6 +201,7 @@ pub(super) enum AppAction {
     BulkComment,
     AddWorklog(String),
     AddBulkWorklog(String),
+    AddSelfWatcher(String),
     EditLabels(String),
     EditComponents(String),
     OpenComponentPicker(String),
@@ -262,7 +263,14 @@ impl App {
                     }
                 }
             }
-            DetailTab::Attachments | DetailTab::Subtasks | DetailTab::Summary => {}
+            DetailTab::Summary => {
+                if self.detail.watchers.is_none() {
+                    if let Ok(watchers) = client.list_watchers(&key).await {
+                        self.detail.watchers = Some(watchers);
+                    }
+                }
+            }
+            DetailTab::Attachments | DetailTab::Subtasks => {}
         }
     }
 
@@ -1678,6 +1686,21 @@ pub async fn run_tui(
             AppAction::AddBulkWorklog(key) => {
                 app.open_modal(Modal::add_bulk_worklog(key));
             }
+
+            AppAction::AddSelfWatcher(key) => match client.get_myself().await {
+                Ok(account_id) => match client.add_watcher(&key, &account_id).await {
+                    Ok(()) => {
+                        if let Ok(watchers) = client.list_watchers(&key).await {
+                            if app.detail.issue_key == key {
+                                app.detail.watchers = Some(watchers);
+                            }
+                        }
+                        app.set_status(format!("✓ Watching {key}"), false);
+                    }
+                    Err(e) => app.set_status(format!("Add watcher failed: {e}"), true),
+                },
+                Err(e) => app.set_status(format!("Resolve current user failed: {e}"), true),
+            },
 
             AppAction::EditLabels(key) => {
                 suspend_tui(&mut terminal)?;

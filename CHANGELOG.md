@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.2.0](https://github.com/mulhamna/jira-commands/compare/v2.1.0...v2.2.0) (2026-06-13)
+
+
+### Features
+
+* issue watcher support (CLI + TUI) ([#367](https://github.com/mulhamna/jira-commands/issues/367)) ([099c22f](https://github.com/mulhamna/jira-commands/commit/099c22fb07c3b174978ed8771fc1ef9d4faaf07e))
+
 ## [2.1.0](https://github.com/mulhamna/jira-commands/compare/v2.0.0...v2.1.0) (2026-06-11)
 
 

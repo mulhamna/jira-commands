@@ -27,6 +27,7 @@ use crate::{
         transition::Transition,
         user::JiraUser,
         version::{CreateProjectVersionRequest, ProjectVersion, UpdateProjectVersionRequest},
+        watcher::Watchers,
         worklog::Worklog,
     },
 };
@@ -561,6 +562,47 @@ impl JiraClient {
             .await?;
 
         Ok(resp.transitions)
+    }
+
+    /// Add a watcher to an issue. Jira REST expects the request body to be a
+    /// raw JSON string containing the accountId (not an object).
+    pub async fn add_watcher(&self, key: &str, account_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{key}/watchers"));
+        let body = Value::String(account_id.to_string());
+
+        let http = &self.http;
+        self.request_no_body(|| http.post(&url).headers(headers.clone()).json(&body))
+            .await
+    }
+
+    /// Remove a watcher from an issue (accountId passed as query parameter).
+    pub async fn remove_watcher(&self, key: &str, account_id: &str) -> Result<()> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{key}/watchers"));
+
+        let http = &self.http;
+        self.request_no_body(|| {
+            http.delete(&url)
+                .headers(headers.clone())
+                .query(&[("accountId", account_id)])
+        })
+        .await
+    }
+
+    /// List all watchers on an issue.
+    pub async fn list_watchers(&self, key: &str) -> Result<Watchers> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{key}/watchers"));
+
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+        Watchers::from_value(&raw, key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse watchers".into(),
+        })
     }
 
     /// Get available issue types for a project (id + name).

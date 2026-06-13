@@ -1544,6 +1544,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
         Line::from("  V         Browse project fix versions + backlog preview"),
         Line::from("            Enter refreshes preview, n creates, e edits metadata"),
         Line::from("  w         Add single worklog"),
+        Line::from("  W         Watch issue (add yourself as a watcher)"),
         Line::from("  y         Change issue type (native Jira move semantics)"),
         Line::from("  /         Search with JQL"),
         Line::from("  :         Add the same comment to many issues (JQL or explicit keys)"),
@@ -1559,7 +1560,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
         Line::from("  Esc / q   Back to list"),
         Line::from("  ←/→ / Tab Switch detail tabs"),
         Line::from("  Summary / Versions / Comments / Worklog / Attachments / Subtasks / Links"),
-        Line::from("  e,y,M,a,;,w,b,m,v,s,u,t,o also work from detail view"),
+        Line::from("  e,y,M,a,;,w,W,b,m,v,s,u,t,o also work from detail view"),
     ];
 
     let mouse_section: Vec<Line<'static>> = vec![

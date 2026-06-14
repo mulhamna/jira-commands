@@ -1342,6 +1342,86 @@ impl JiraClient {
             .await
     }
 
+    /// List attachments on an issue.
+    pub async fn list_attachments(&self, issue_key: &str) -> Result<Vec<Attachment>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}?fields=attachment"));
+
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        let arr = raw
+            .get("fields")
+            .and_then(|f| f.get("attachment"))
+            .and_then(|a| a.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        Ok(arr
+            .iter()
+            .filter_map(crate::model::attachment::Attachment::from_value)
+            .collect())
+    }
+
+    /// Download an attachment by ID.
+    ///
+    /// Returns `(filename, bytes, mime_type)`. The filename comes from the
+    /// `Content-Disposition` header when present, otherwise the trailing
+    /// path segment of the redirect URL, otherwise `"attachment-<id>"`.
+    pub async fn download_attachment(
+        &self,
+        attachment_id: &str,
+    ) -> Result<(String, Vec<u8>, String)> {
+        let headers = self.auth_headers_no_content_type()?;
+        let url = self.platform_url(&format!("/attachment/content/{attachment_id}"));
+
+        let http = &self.http;
+        let response = self
+            .execute_with_retry(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
+            if status == StatusCode::NOT_FOUND {
+                return Err(JiraError::NotFound(body));
+            }
+            return Err(JiraError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let mime_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        let filename = response
+            .headers()
+            .get(reqwest::header::CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_content_disposition_filename)
+            .or_else(|| {
+                response
+                    .url()
+                    .path_segments()
+                    .and_then(|mut s| s.next_back().map(|s| s.to_string()))
+                    .filter(|s| !s.is_empty())
+            })
+            .unwrap_or_else(|| format!("attachment-{attachment_id}"));
+
+        let bytes = response.bytes().await?.to_vec();
+        Ok((filename, bytes, mime_type))
+    }
+
     /// Delete an attachment by ID.
     pub async fn delete_attachment(&self, attachment_id: &str) -> Result<()> {
         let headers = self.auth_headers()?;
@@ -1733,6 +1813,46 @@ where
             message: body,
         }),
     }
+}
+
+/// Parse `filename` (or RFC 5987 `filename*`) from a Content-Disposition header.
+fn parse_content_disposition_filename(value: &str) -> Option<String> {
+    for part in value.split(';') {
+        let part = part.trim();
+        if let Some(rest) = part.strip_prefix("filename*=") {
+            // RFC 5987: charset'lang'percent-encoded-value
+            let payload = rest.splitn(3, '\'').nth(2)?;
+            return Some(percent_decode(payload));
+        }
+        if let Some(rest) = part.strip_prefix("filename=") {
+            let trimmed = rest.trim_matches('"').to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(h), Some(l)) = (
+                (bytes[i + 1] as char).to_digit(16),
+                (bytes[i + 2] as char).to_digit(16),
+            ) {
+                out.push(((h << 4) | l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
 }
 
 /// Returns current UTC time in Jira worklog format: "2006-01-02T15:04:05.000+0000"
@@ -3236,6 +3356,90 @@ mod tests {
 
         assert_eq!(transitions[1].id, "31");
         assert!(transitions[1].to.is_some());
+    }
+
+    #[test]
+    fn parses_content_disposition_plain() {
+        assert_eq!(
+            parse_content_disposition_filename("attachment; filename=\"report.pdf\""),
+            Some("report.pdf".to_string())
+        );
+        assert_eq!(
+            parse_content_disposition_filename("attachment; filename=plain.txt"),
+            Some("plain.txt".to_string())
+        );
+    }
+
+    #[test]
+    fn parses_content_disposition_rfc5987() {
+        assert_eq!(
+            parse_content_disposition_filename(
+                "attachment; filename*=UTF-8''na%C3%AFve%20file.txt"
+            ),
+            Some("naïve file.txt".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn list_attachments_extracts_fields() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1"))
+            .and(query_param("fields", "attachment"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": {
+                    "attachment": [
+                        {
+                            "id": "10001",
+                            "filename": "a.txt",
+                            "size": 12,
+                            "mimeType": "text/plain",
+                            "content": "https://example/c/10001",
+                            "created": "2026-06-14T00:00:00.000+0000"
+                        }
+                    ]
+                }
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let items = client.list_attachments("TEST-1").await.expect("ok");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "10001");
+        assert_eq!(items[0].filename, "a.txt");
+    }
+
+    #[tokio::test]
+    async fn download_attachment_returns_bytes_and_filename() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/attachment/content/42"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/pdf")
+                    .insert_header("Content-Disposition", "attachment; filename=\"file.pdf\"")
+                    .set_body_bytes(vec![0x25u8, 0x50, 0x44, 0x46]),
+            )
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let (name, bytes, mime) = client.download_attachment("42").await.expect("ok");
+        assert_eq!(name, "file.pdf");
+        assert_eq!(mime, "application/pdf");
+        assert_eq!(bytes, vec![0x25, 0x50, 0x44, 0x46]);
+    }
+
+    #[tokio::test]
+    async fn download_attachment_404_returns_not_found() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/attachment/content/99"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("missing"))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let err = client.download_attachment("99").await.expect_err("err");
+        assert!(matches!(err, JiraError::NotFound(_)));
     }
 
     #[tokio::test]

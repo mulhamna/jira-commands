@@ -127,6 +127,20 @@ pub struct SprintAddIssueArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct WatcherAddArgs {
+    pub issue_key: String,
+    /// Defaults to the current authenticated user.
+    pub account_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct WatcherRemoveArgs {
+    pub issue_key: String,
+    pub account_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectVersionCreateArgs {
     pub project_key: String,
     pub name: String,

@@ -24,8 +24,8 @@ use crate::{
         IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
         ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
         RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs,
-        WorklogDeleteArgs,
+        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
+        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -230,6 +230,36 @@ impl JiraMcpServer {
         Parameters(args): Parameters<SprintAddIssueArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.sprint_add_issue(args).await)
+    }
+
+    #[tool(name = "jira_watcher_list", description = "List watchers on a Jira issue")]
+    pub async fn jira_watcher_list(
+        &self,
+        Parameters(args): Parameters<IssueKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_watcher_add",
+        description = "Add a watcher to a Jira issue (defaults to the current authenticated user)"
+    )]
+    pub async fn jira_watcher_add(
+        &self,
+        Parameters(args): Parameters<WatcherAddArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_watcher_remove",
+        description = "Remove a watcher from a Jira issue (destructive, requires confirm=true)"
+    )]
+    pub async fn jira_watcher_remove(
+        &self,
+        Parameters(args): Parameters<WatcherRemoveArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_remove(args).await)
     }
 
     #[tool(

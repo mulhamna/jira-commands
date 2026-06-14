@@ -10,6 +10,7 @@ pub mod project;
 pub mod request;
 pub mod shared;
 pub mod sprint;
+pub mod watcher;
 pub mod worklog;
 
 #[derive(Debug, Clone, Default)]

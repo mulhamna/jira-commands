@@ -71,6 +71,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         Mode::ComponentPicker => " Jira CLI — Component Picker ".to_string(),
         Mode::FixVersionPicker => " Jira CLI — Fix Version Picker ".to_string(),
         Mode::SprintPicker => " Jira CLI — Sprint Picker ".to_string(),
+        Mode::BoardPicker => " Jira CLI — Board Picker ".to_string(),
         Mode::SavedJqlPicker => " Jira CLI — Saved Queries ".to_string(),
         Mode::ServerInfo => " Jira CLI — Server ".to_string(),
         Mode::ConfigView => " Jira CLI — Config ".to_string(),
@@ -128,6 +129,10 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
             render_browse(f, app, chunks[1], palette);
             render_sprint_picker_popup(f, app, size, palette);
         }
+        Mode::BoardPicker => {
+            render_browse(f, app, chunks[1], palette);
+            render_board_picker_popup(f, app, size, palette);
+        }
         Mode::SavedJqlPicker => {
             render_browse(f, app, chunks[1], palette);
             render_saved_jql_popup(f, app, size, palette);
@@ -163,7 +168,7 @@ fn render_footer(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
                 .to_string()
         }
         Mode::Browse => {
-            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
+            " j/k:move  Enter:detail  p:queries  n:mentions  R:mark-read  T:theme  S:server  g:config  t:transition  C:columns  c:create  e:edit  y:type  M:move  a:assign  ;:comment  ::bulk-comment  w:worklog  b:bulk-log  l:labels  m:comps  v:versions  s:sprint  B:boards  u:upload  o:browser  r:refresh  /:search  ?:help  q:quit"
                 .to_string()
         }
         Mode::Search => " Type JQL  Enter:search  Esc:cancel".to_string(),
@@ -177,6 +182,7 @@ fn render_footer(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
         Mode::ComponentPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::FixVersionPicker => " type:search  j/k:move  Space:toggle  Enter:save  Esc:cancel".to_string(),
         Mode::SprintPicker => " type:filter  j/k:move  Enter:assign to sprint  Esc:cancel".to_string(),
+        Mode::BoardPicker => " type:filter  j/k:move  Enter:select board  Esc:cancel".to_string(),
         Mode::SavedJqlPicker => " ↑/↓:move  Enter:run  type:filter  Tab:clear  c:new  e:edit  d:delete  Esc:cancel".to_string(),
         Mode::ThemePicker => " j/k:move  Enter:apply theme  Esc:cancel".to_string(),
         Mode::Modal => {
@@ -1152,6 +1158,36 @@ fn render_sprint_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette:
     ));
 }
 
+fn render_board_picker_popup(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
+    let scope = if app.board_project_key.is_empty() {
+        "all projects".to_string()
+    } else {
+        app.board_project_key.clone()
+    };
+    let title = format!(" Boards: {scope} ");
+    let option_count = app.board_options.len();
+    let (popup_area, list_area) = render_single_select_picker_popup(
+        f,
+        area,
+        palette,
+        &app.board_query,
+        app.board_cursor,
+        &app.board_options.clone(),
+        &mut app.board_state,
+        &title,
+        &[
+            "Type to filter boards",
+            "↑/↓ move   Enter select   Esc cancel",
+        ],
+    );
+    app.hit_zones.popup = Some(popup_area);
+    app.hit_zones.picker = Some(picker_hit_for_bordered(
+        list_area,
+        app.board_state.offset(),
+        option_count,
+    ));
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_multi_select_picker_popup(
     f: &mut Frame,
@@ -1536,6 +1572,7 @@ fn render_help_popup(f: &mut Frame, area: Rect, palette: Palette, scroll_offset:
         Line::from("  r         Refresh list"),
         Line::from("  R         Mark selected notification issue as read"),
         Line::from("  s         Add to sprint"),
+        Line::from("  B         Browse boards (filtered by active project)"),
         Line::from("  S         Show server info"),
         Line::from("  t         Transition issue"),
         Line::from("  T         Open theme picker"),

@@ -21,7 +21,7 @@ use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
 use jira_core::{
     adf::{inject_mentions, markdown_to_adf},
     model::{
-        field::Field, CreateProjectVersionRequest, Issue, Sprint, UpdateIssueRequest,
+        field::Field, Board, CreateProjectVersionRequest, Issue, Sprint, UpdateIssueRequest,
         UpdateProjectVersionRequest,
     },
     IssueType, JiraClient,
@@ -156,6 +156,14 @@ pub(super) struct App {
     pub(super) sprint_project_key: String,
     pub(super) sprint_catalog: Vec<Sprint>,
     pub(super) sprint_cache: HashMap<String, Vec<Sprint>>,
+    pub(super) board_query: String,
+    pub(super) board_cursor: usize,
+    pub(super) board_options: Vec<PickerOption>,
+    pub(super) board_state: ListState,
+    pub(super) board_project_key: String,
+    pub(super) board_catalog: Vec<Board>,
+    /// Keyed by project key; empty string `""` caches the "all boards" listing.
+    pub(super) board_cache: HashMap<String, Vec<Board>>,
     pub(super) prefs: TuiPreferences,
     pub(super) saved_jql_state: ListState,
     pub(super) jql_picker_filter: String,
@@ -212,6 +220,11 @@ pub(super) enum AppAction {
     OpenSprintPicker(String),
     RefreshSprintOptions,
     ApplySprintSelection(String),
+    /// Open the board picker. The argument is the project key to scope the
+    /// board listing; `None` means "list all boards".
+    OpenBoardPicker(Option<String>),
+    RefreshBoardOptions,
+    ApplyBoardSelection,
     OpenChangeTypeModal(String),
     OpenMoveIssueModal(String),
     RefreshMentionOptions,
@@ -344,6 +357,13 @@ impl App {
             sprint_project_key: String::new(),
             sprint_catalog: Vec::new(),
             sprint_cache: HashMap::new(),
+            board_query: String::new(),
+            board_cursor: 0,
+            board_options: Vec::new(),
+            board_state: ListState::default(),
+            board_project_key: String::new(),
+            board_catalog: Vec::new(),
+            board_cache: HashMap::new(),
             prefs,
             saved_jql_state,
             jql_picker_filter: String::new(),
@@ -1552,6 +1572,94 @@ pub async fn run_tui(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            AppAction::OpenBoardPicker(project_key_opt) => {
+                app.board_query.clear();
+                app.board_cursor = 0;
+                app.board_options.clear();
+                app.board_catalog.clear();
+                app.board_state = ListState::default();
+                let project_key = project_key_opt.unwrap_or_default();
+                app.board_project_key = project_key.clone();
+                app.mode = Mode::BoardPicker;
+                app.focus = Focus::List;
+
+                if let Some(cached) = app.board_cache.get(&project_key).cloned() {
+                    app.board_options = cached
+                        .iter()
+                        .map(|b| PickerOption {
+                            value: b.id.to_string(),
+                            label: format!("{}  [{}]", b.name, b.board_type),
+                        })
+                        .collect();
+                    app.board_catalog = cached;
+                    if !app.board_options.is_empty() {
+                        app.board_state.select(Some(0));
+                    }
+                    app.clear_status();
+                    continue;
+                }
+
+                let load_label = if project_key.is_empty() {
+                    "all projects".to_string()
+                } else {
+                    project_key.clone()
+                };
+                app.set_status(format!("Loading boards for {load_label}..."), false);
+                let project_arg = if project_key.is_empty() {
+                    None
+                } else {
+                    Some(project_key.as_str())
+                };
+                match client.list_boards(project_arg, None).await {
+                    Ok(boards) => {
+                        app.board_options = boards
+                            .iter()
+                            .map(|b| PickerOption {
+                                value: b.id.to_string(),
+                                label: format!("{}  [{}]", b.name, b.board_type),
+                            })
+                            .collect();
+                        app.board_catalog = boards.clone();
+                        app.board_cache.insert(project_key, boards);
+                        if !app.board_options.is_empty() {
+                            app.board_state.select(Some(0));
+                        }
+                        app.clear_status();
+                    }
+                    Err(e) => app.set_status(format!("Board lookup failed: {e}"), true),
+                }
+            }
+
+            AppAction::RefreshBoardOptions => {
+                let query = app.board_query.to_lowercase();
+                app.board_options = app
+                    .board_catalog
+                    .iter()
+                    .filter(|b| {
+                        query.is_empty()
+                            || b.name.to_lowercase().contains(&query)
+                            || b.board_type.to_lowercase().contains(&query)
+                    })
+                    .map(|b| PickerOption {
+                        value: b.id.to_string(),
+                        label: format!("{}  [{}]", b.name, b.board_type),
+                    })
+                    .collect();
+                app.board_state.select(Some(0));
+            }
+
+            AppAction::ApplyBoardSelection => {
+                if let Some(idx) = app.board_state.selected() {
+                    if let Some(option) = app.board_options.get(idx).cloned() {
+                        app.mode = Mode::Browse;
+                        app.set_status(
+                            format!("Selected board: {} (id={})", option.label, option.value),
+                            false,
+                        );
                     }
                 }
             }

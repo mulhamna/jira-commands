@@ -24,8 +24,9 @@ use crate::{
         IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
         ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
         RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        JqlBuildArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse,
-        WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        AttachmentDeleteArgs, AttachmentDownloadArgs, AttachmentListArgs, JqlBuildArgs,
+        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
+        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -272,6 +273,40 @@ Set dry_run=true to also preview the first matching issue keys."
         Parameters(args): Parameters<JqlBuildArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.jql_build(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_list",
+        description = "List attachments on a Jira issue"
+    )]
+    pub async fn jira_attachment_list(
+        &self,
+        Parameters(args): Parameters<AttachmentListArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_download",
+        description = "Download a Jira attachment by ID and save it to disk. \
+save_path must be an absolute path inside $HOME unless force_path=true."
+    )]
+    pub async fn jira_attachment_download(
+        &self,
+        Parameters(args): Parameters<AttachmentDownloadArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_download(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_delete",
+        description = "Delete a Jira attachment by ID (destructive, requires confirm=true)"
+    )]
+    pub async fn jira_attachment_delete(
+        &self,
+        Parameters(args): Parameters<AttachmentDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_delete(args).await)
     }
 
     #[tool(

@@ -1,4 +1,5 @@
 pub mod api;
+pub mod attachment;
 pub mod auth;
 pub mod comment;
 pub mod issue;

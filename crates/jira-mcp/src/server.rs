@@ -24,8 +24,8 @@ use crate::{
         IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
         ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
         RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
-        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        JqlBuildArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse,
+        WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -260,6 +260,18 @@ impl JiraMcpServer {
         Parameters(args): Parameters<WatcherRemoveArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.watcher_remove(args).await)
+    }
+
+    #[tool(
+        name = "jira_jql_build",
+        description = "Compose a safe JQL query from structured parameters. \
+Set dry_run=true to also preview the first matching issue keys."
+    )]
+    pub async fn jira_jql_build(
+        &self,
+        Parameters(args): Parameters<JqlBuildArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.jql_build(args).await)
     }
 
     #[tool(

@@ -1,6 +1,40 @@
 use chrono::Duration;
+use jira_core::jql::{compose_jql, JqlParams};
+use serde_json::{json, Value};
 
-use crate::error::{AppError, AppResult};
+use crate::{
+    error::{AppError, AppResult},
+    models::JqlBuildArgs,
+};
+
+use super::JiraApp;
+
+impl JiraApp {
+    pub async fn jql_build(&self, args: JqlBuildArgs) -> AppResult<Value> {
+        let params: JqlParams = serde_json::from_value(args.params)
+            .map_err(|e| AppError::validation(format!("Invalid JqlParams: {e}")))?;
+        let jql =
+            compose_jql(&params).map_err(|e| AppError::validation(format!("Bad JQL: {e}")))?;
+
+        let mut out = json!({ "jql": jql });
+
+        if args.dry_run.unwrap_or(false) {
+            let client = self.build_client()?;
+            let max = args.max_preview.unwrap_or(10).min(100);
+            let result = client.search_issues(&jql, None, Some(max)).await?;
+            out["preview_keys"] = json!(result
+                .issues
+                .iter()
+                .map(|i| i.key.clone())
+                .collect::<Vec<_>>());
+            if let Some(total) = result.total {
+                out["total"] = json!(total);
+            }
+        }
+
+        Ok(out)
+    }
+}
 
 pub(super) fn escape_jql_literal(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")

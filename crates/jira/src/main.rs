@@ -61,6 +61,11 @@ enum Commands {
         #[command(subcommand)]
         command: cli::mcp::McpCommand,
     },
+    /// Browse Agile boards: list boards, show details, fetch issues or backlog
+    Board {
+        #[command(subcommand)]
+        command: cli::board::BoardCommand,
+    },
 }
 
 #[tokio::main]
@@ -143,6 +148,13 @@ async fn main() -> Result<()> {
         }
         Commands::Mcp { command } => {
             cli::mcp::handle(command)?;
+            if let Some(notice) = &update_notice {
+                eprintln!("{}", version_check::cli_message(notice));
+            }
+        }
+        Commands::Board { command } => {
+            let client = build_client().context("Failed to initialize Jira client")?;
+            cli::board::handle(command, client).await?;
             if let Some(notice) = &update_notice {
                 eprintln!("{}", version_check::cli_message(notice));
             }

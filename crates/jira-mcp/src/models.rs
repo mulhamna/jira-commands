@@ -164,6 +164,25 @@ pub struct AttachmentDeleteArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardListArgs {
+    pub project_key: Option<String>,
+    /// Board type filter: scrum | kanban | simple
+    pub board_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardGetArgs {
+    pub board_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardIssuesArgs {
+    pub board_id: u64,
+    pub jql: Option<String>,
+    pub max_results: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct JqlBuildArgs {
     /// Structured JqlParams object (see jira_core::jql::JqlParams).
     /// Example: {"project":"ABC","status":["In Progress"],

@@ -17,16 +17,16 @@ use crate::{
     app::JiraApp,
     error::AppResult,
     models::{
-        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs,
-        BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
-        IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs,
-        IssueLinkDeleteArgs, IssueListArgs, IssueNotificationsArgs, IssueStandupArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
-        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        AttachmentDeleteArgs, AttachmentDownloadArgs, AttachmentListArgs, JqlBuildArgs,
-        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
-        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        ApiRequestArgs, ArchiveArgs, AttachmentDeleteArgs, AttachmentDownloadArgs,
+        AttachmentListArgs, AuthSetCredentialsArgs, BatchArgs, BoardGetArgs, BoardIssuesArgs,
+        BoardListArgs, BulkCommentArgs, BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs,
+        IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
+        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, JqlBuildArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
+        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
+        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs,
+        ToolResponse, WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -233,7 +233,10 @@ impl JiraMcpServer {
         self.respond(self.app.sprint_add_issue(args).await)
     }
 
-    #[tool(name = "jira_watcher_list", description = "List watchers on a Jira issue")]
+    #[tool(
+        name = "jira_watcher_list",
+        description = "List watchers on a Jira issue"
+    )]
     pub async fn jira_watcher_list(
         &self,
         Parameters(args): Parameters<IssueKeyArgs>,
@@ -307,6 +310,50 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         Parameters(args): Parameters<AttachmentDeleteArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.attachment_delete(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_list",
+        description = "List Agile boards, optionally filtered by project key and board type"
+    )]
+    pub async fn jira_board_list(
+        &self,
+        Parameters(args): Parameters<BoardListArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_get",
+        description = "Show a single Agile board by ID"
+    )]
+    pub async fn jira_board_get(
+        &self,
+        Parameters(args): Parameters<BoardGetArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_get(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_issues",
+        description = "List issues on an Agile board (optional JQL filter)"
+    )]
+    pub async fn jira_board_issues(
+        &self,
+        Parameters(args): Parameters<BoardIssuesArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_issues(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_backlog",
+        description = "List backlog issues on an Agile board (issues not in an active or future sprint)"
+    )]
+    pub async fn jira_board_backlog(
+        &self,
+        Parameters(args): Parameters<BoardIssuesArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_backlog(args).await)
     }
 
     #[tool(

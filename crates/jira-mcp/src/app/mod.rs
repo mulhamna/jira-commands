@@ -1,6 +1,7 @@
 pub mod api;
 pub mod attachment;
 pub mod auth;
+pub mod board;
 pub mod comment;
 pub mod issue;
 pub mod jql;

@@ -906,6 +906,15 @@ pub enum IssueCommand {
         /// Execute the generated JQL immediately (shows up to 25 results)
         #[arg(long)]
         run: bool,
+        /// JQL builder params as JSON. Accepts a literal JSON object or @path/to/file.json.
+        /// Skips the interactive prompts.
+        ///
+        /// Schema: see `jira_core::jql::JqlParams`. Example:
+        ///   {"project":"PROJ","status":["In Progress"],
+        ///    "assignee":[{"type":"current_user"}],
+        ///    "order_by":[["updated","desc"]]}
+        #[arg(long, value_name = "JSON")]
+        params: Option<String>,
     },
 
     /// Run mixed operations from a JSON manifest file
@@ -1469,7 +1478,7 @@ pub async fn handle(
             json,
         } => bulk_update(client, jql, assignee, priority, force, json).await,
         IssueCommand::Archive { jql, force } => archive(client, jql, force).await,
-        IssueCommand::Jql { run } => jql_builder(client, run).await,
+        IssueCommand::Jql { run, params } => jql_builder(client, run, params).await,
         IssueCommand::BulkCreate { manifest, json } => bulk_create(client, manifest, json).await,
         IssueCommand::Clone {
             key,
@@ -3114,9 +3123,13 @@ async fn attachment_download(
             dest.display()
         );
     }
-    std::fs::write(&dest, &bytes)
-        .with_context(|| format!("Failed to write {}", dest.display()))?;
-    println!("✓ Saved {} ({} bytes, {})", dest.display(), bytes.len(), mime);
+    std::fs::write(&dest, &bytes).with_context(|| format!("Failed to write {}", dest.display()))?;
+    println!(
+        "✓ Saved {} ({} bytes, {})",
+        dest.display(),
+        bytes.len(),
+        mime
+    );
     Ok(())
 }
 
@@ -4165,7 +4178,32 @@ async fn archive(client: JiraClient, jql: String, force: bool) -> Result<()> {
 
 // ─── jql builder ─────────────────────────────────────────────────────────────
 
-async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
+fn jql_params_filters_empty(p: &jira_core::jql::JqlParams) -> bool {
+    p.project.is_none()
+        && p.status.is_empty()
+        && p.assignee.is_empty()
+        && p.priority.is_empty()
+        && p.labels.is_empty()
+        && p.components.is_empty()
+        && p.fix_versions.is_empty()
+        && p.text.is_none()
+        && p.created_after.is_none()
+        && p.updated_after.is_none()
+        && p.extra_clauses.is_empty()
+}
+
+fn load_jql_params(spec: &str) -> Result<jira_core::jql::JqlParams> {
+    let raw = if let Some(path) = spec.strip_prefix('@') {
+        std::fs::read_to_string(path).with_context(|| format!("Failed to read {path}"))?
+    } else {
+        spec.to_string()
+    };
+    serde_json::from_str(&raw).context("Failed to parse JqlParams JSON")
+}
+
+fn prompt_jql_params() -> Result<jira_core::jql::JqlParams> {
+    use jira_core::jql::{AssigneeFilter, JqlParams, OrderDir};
+
     println!("JQL Builder — press Enter to skip any field\n");
 
     let project = Text::new("Project key (e.g. PROJ):")
@@ -4186,9 +4224,9 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read status")?;
     let status = if status_sel == "(any)" {
-        None
+        Vec::new()
     } else {
-        Some(status_sel.to_string())
+        vec![status_sel.to_string()]
     };
 
     let assignee_opts = vec!["Me (currentUser)", "Unassigned", "Custom email", "(any)"];
@@ -4196,15 +4234,15 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read assignee")?;
     let assignee = match assignee_sel {
-        "Me (currentUser)" => Some("currentUser()".to_string()),
-        "Unassigned" => Some("EMPTY".to_string()),
+        "Me (currentUser)" => vec![AssigneeFilter::CurrentUser],
+        "Unassigned" => vec![AssigneeFilter::Empty],
         "Custom email" => {
             let email = Text::new("Email:")
                 .prompt()
                 .context("Failed to read email")?;
-            Some(format!("\"{email}\""))
+            vec![AssigneeFilter::Email { email }]
         }
-        _ => None,
+        _ => Vec::new(),
     };
 
     let priority_opts = vec!["Highest", "High", "Medium", "Low", "Lowest", "(any)"];
@@ -4212,37 +4250,51 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read priority")?;
     let priority = if priority_sel == "(any)" {
-        None
+        Vec::new()
     } else {
-        Some(priority_sel.to_string())
+        vec![priority_sel.to_string()]
     };
 
     let order_opts = vec!["updated DESC", "created DESC", "priority DESC", "key ASC"];
-    let order = Select::new("Order by:", order_opts)
+    let order_sel = Select::new("Order by:", order_opts)
         .prompt()
         .context("Failed to read order")?;
+    let order_by = vec![match order_sel {
+        "updated DESC" => ("updated".to_string(), OrderDir::Desc),
+        "created DESC" => ("created".to_string(), OrderDir::Desc),
+        "priority DESC" => ("priority".to_string(), OrderDir::Desc),
+        _ => ("key".to_string(), OrderDir::Asc),
+    }];
 
-    // Build JQL
-    let mut parts: Vec<String> = Vec::new();
-    if let Some(p) = project {
-        parts.push(format!("project = {p}"));
+    Ok(JqlParams {
+        project,
+        status,
+        assignee,
+        priority,
+        order_by,
+        ..Default::default()
+    })
+}
+
+async fn jql_builder(client: JiraClient, run: bool, params: Option<String>) -> Result<()> {
+    let mut jql_params = if let Some(spec) = params {
+        load_jql_params(&spec)?
+    } else {
+        prompt_jql_params()?
+    };
+
+    if jql_params_filters_empty(&jql_params) {
+        jql_params
+            .assignee
+            .push(jira_core::jql::AssigneeFilter::CurrentUser);
     }
-    if let Some(s) = status {
-        parts.push(format!("status = \"{s}\""));
-    }
-    if let Some(a) = assignee {
-        parts.push(format!("assignee = {a}"));
-    }
-    if let Some(p) = priority {
-        parts.push(format!("priority = \"{p}\""));
+    if jql_params.order_by.is_empty() {
+        jql_params
+            .order_by
+            .push(("updated".into(), jira_core::jql::OrderDir::Desc));
     }
 
-    if parts.is_empty() {
-        parts.push("assignee = currentUser()".to_string());
-    }
-
-    let jql = format!("{} ORDER BY {}", parts.join(" AND "), order);
-
+    let jql = jira_core::jql::compose_jql(&jql_params).context("Failed to compose JQL")?;
     println!("\nGenerated JQL:\n  {jql}\n");
 
     if run {

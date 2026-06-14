@@ -565,6 +565,17 @@ pub enum IssueCommand {
         files: Vec<std::path::PathBuf>,
     },
 
+    /// Manage attachments on an issue (list, download, delete)
+    ///
+    /// Examples:
+    ///   jirac issue attachment list PROJ-123
+    ///   jirac issue attachment download 10100 --out ./tmp
+    ///   jirac issue attachment delete 10100 --force
+    Attachment {
+        #[command(subcommand)]
+        command: AttachmentCommand,
+    },
+
     /// List available fields for a project and issue type
     ///
     /// Shows field name, ID, type (text, select, number, user, etc.),
@@ -1017,6 +1028,42 @@ pub enum WatchCommand {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum AttachmentCommand {
+    /// List all attachments on an issue
+    List {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        /// Output as JSON array
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Download an attachment by ID
+    Download {
+        /// Attachment ID (visible via `jirac issue attachment list`)
+        id: String,
+        /// Output directory (defaults to current directory)
+        #[arg(long, value_name = "DIR")]
+        out: Option<std::path::PathBuf>,
+        /// Override the filename (defaults to the server-provided name)
+        #[arg(long, value_name = "NAME")]
+        filename: Option<String>,
+        /// Overwrite if the destination file already exists
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Delete an attachment by ID
+    Delete {
+        /// Attachment ID to delete
+        id: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
 pub enum CommentCommand {
     /// List all comments on the issue
     List,
@@ -1376,6 +1423,7 @@ pub async fn handle(
         } => transition_issue(client, key, transition, json).await,
         IssueCommand::Link { command } => handle_link_command(client, command).await,
         IssueCommand::Attach { key, files } => attach_files(client, key, files).await,
+        IssueCommand::Attachment { command } => attachment(client, command).await,
         IssueCommand::Fields {
             project,
             issue_type,
@@ -2994,6 +3042,102 @@ async fn attach_files(
         }
     }
 
+    Ok(())
+}
+
+// ─── attachment ──────────────────────────────────────────────────────────────
+
+async fn attachment(client: JiraClient, cmd: AttachmentCommand) -> Result<()> {
+    match cmd {
+        AttachmentCommand::List { key, json } => attachment_list(client, key, json).await,
+        AttachmentCommand::Download {
+            id,
+            out,
+            filename,
+            force,
+        } => attachment_download(client, id, out, filename, force).await,
+        AttachmentCommand::Delete { id, force } => attachment_delete(client, id, force).await,
+    }
+}
+
+async fn attachment_list(client: JiraClient, key: String, json: bool) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching attachments for {key}..."));
+    let attachments = client
+        .list_attachments(&key)
+        .await
+        .with_context(|| format!("Failed to list attachments for {key}"))?;
+    spinner.finish_and_clear();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&attachments)?);
+        return Ok(());
+    }
+
+    if attachments.is_empty() {
+        println!("No attachments on {key}.");
+        return Ok(());
+    }
+
+    for a in &attachments {
+        println!(
+            "{:<10} {:<10} {:>10}  {}",
+            a.id, a.mime_type, a.size, a.filename
+        );
+    }
+    Ok(())
+}
+
+async fn attachment_download(
+    client: JiraClient,
+    id: String,
+    out: Option<std::path::PathBuf>,
+    filename: Option<String>,
+    force: bool,
+) -> Result<()> {
+    let spinner = spinner_new(format!("Downloading attachment {id}..."));
+    let (server_name, bytes, mime) = client
+        .download_attachment(&id)
+        .await
+        .with_context(|| format!("Failed to download attachment {id}"))?;
+    spinner.finish_and_clear();
+
+    let out_dir = out.unwrap_or_else(|| std::path::PathBuf::from("."));
+    if !out_dir.exists() {
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("Failed to create {}", out_dir.display()))?;
+    }
+    let name = filename.unwrap_or(server_name);
+    let dest = out_dir.join(&name);
+    if dest.exists() && !force {
+        anyhow::bail!(
+            "{} already exists. Use --force to overwrite.",
+            dest.display()
+        );
+    }
+    std::fs::write(&dest, &bytes)
+        .with_context(|| format!("Failed to write {}", dest.display()))?;
+    println!("✓ Saved {} ({} bytes, {})", dest.display(), bytes.len(), mime);
+    Ok(())
+}
+
+async fn attachment_delete(client: JiraClient, id: String, force: bool) -> Result<()> {
+    if !force {
+        let ok = Confirm::new(&format!("Delete attachment {id}?"))
+            .with_default(false)
+            .prompt()
+            .context("Failed to read confirmation")?;
+        if !ok {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+    let spinner = spinner_new(format!("Deleting attachment {id}..."));
+    client
+        .delete_attachment(&id)
+        .await
+        .with_context(|| format!("Failed to delete attachment {id}"))?;
+    spinner.finish_and_clear();
+    println!("✓ Deleted attachment {id}");
     Ok(())
 }
 

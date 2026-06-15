@@ -66,8 +66,11 @@ The MCP server includes tools for:
 - issue list, view, create, update, delete, clone, batch flows, standups, sprint summaries, and notifications
 - field and transition discovery
 - comments (single + bulk)
-- attachment upload
+- attachments: upload, list, download (writes to disk with `$HOME` guard and `force_path` opt-out), and delete (`confirm: true` required)
+- watchers: list, add (defaults to the current authenticated user via `/myself`), and remove (`confirm: true` required)
 - worklog operations
+- structured JQL builder: `jira_jql_build` composes safe JQL from a `JqlParams` object, with optional `dry_run` preview of matching issue keys
+- Agile boards: list (project + type filter), get, list issues (JQL + max), and list backlog
 - bulk transition, bulk update, and archive flows
 - plans
 - raw Jira REST API requests

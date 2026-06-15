@@ -17,15 +17,16 @@ use crate::{
     app::JiraApp,
     error::AppResult,
     models::{
-        ApiRequestArgs, ArchiveArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs,
-        BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs, IssueAttachArgs, IssueCloneArgs,
-        IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs,
-        IssueLinkDeleteArgs, IssueListArgs, IssueNotificationsArgs, IssueStandupArgs,
-        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, ProjectKeyArgs,
-        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WorklogAddArgs,
-        WorklogDeleteArgs,
+        ApiRequestArgs, ArchiveArgs, AttachmentDeleteArgs, AttachmentDownloadArgs,
+        AttachmentListArgs, AuthSetCredentialsArgs, BatchArgs, BoardGetArgs, BoardIssuesArgs,
+        BoardListArgs, BulkCommentArgs, BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs,
+        IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
+        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, JqlBuildArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
+        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
+        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs,
+        ToolResponse, WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -230,6 +231,129 @@ impl JiraMcpServer {
         Parameters(args): Parameters<SprintAddIssueArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.sprint_add_issue(args).await)
+    }
+
+    #[tool(
+        name = "jira_watcher_list",
+        description = "List watchers on a Jira issue"
+    )]
+    pub async fn jira_watcher_list(
+        &self,
+        Parameters(args): Parameters<IssueKeyArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_watcher_add",
+        description = "Add a watcher to a Jira issue (defaults to the current authenticated user)"
+    )]
+    pub async fn jira_watcher_add(
+        &self,
+        Parameters(args): Parameters<WatcherAddArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_watcher_remove",
+        description = "Remove a watcher from a Jira issue (destructive, requires confirm=true)"
+    )]
+    pub async fn jira_watcher_remove(
+        &self,
+        Parameters(args): Parameters<WatcherRemoveArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.watcher_remove(args).await)
+    }
+
+    #[tool(
+        name = "jira_jql_build",
+        description = "Compose a safe JQL query from structured parameters. \
+Set dry_run=true to also preview the first matching issue keys."
+    )]
+    pub async fn jira_jql_build(
+        &self,
+        Parameters(args): Parameters<JqlBuildArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.jql_build(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_list",
+        description = "List attachments on a Jira issue"
+    )]
+    pub async fn jira_attachment_list(
+        &self,
+        Parameters(args): Parameters<AttachmentListArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_download",
+        description = "Download a Jira attachment by ID and save it to disk. \
+save_path must be an absolute path inside $HOME unless force_path=true."
+    )]
+    pub async fn jira_attachment_download(
+        &self,
+        Parameters(args): Parameters<AttachmentDownloadArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_download(args).await)
+    }
+
+    #[tool(
+        name = "jira_attachment_delete",
+        description = "Delete a Jira attachment by ID (destructive, requires confirm=true)"
+    )]
+    pub async fn jira_attachment_delete(
+        &self,
+        Parameters(args): Parameters<AttachmentDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.attachment_delete(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_list",
+        description = "List Agile boards, optionally filtered by project key and board type"
+    )]
+    pub async fn jira_board_list(
+        &self,
+        Parameters(args): Parameters<BoardListArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_list(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_get",
+        description = "Show a single Agile board by ID"
+    )]
+    pub async fn jira_board_get(
+        &self,
+        Parameters(args): Parameters<BoardGetArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_get(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_issues",
+        description = "List issues on an Agile board (optional JQL filter)"
+    )]
+    pub async fn jira_board_issues(
+        &self,
+        Parameters(args): Parameters<BoardIssuesArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_issues(args).await)
+    }
+
+    #[tool(
+        name = "jira_board_backlog",
+        description = "List backlog issues on an Agile board (issues not in an active or future sprint)"
+    )]
+    pub async fn jira_board_backlog(
+        &self,
+        Parameters(args): Parameters<BoardIssuesArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.board_backlog(args).await)
     }
 
     #[tool(

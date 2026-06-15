@@ -20,6 +20,7 @@ The TUI provides a full-screen terminal interface for browsing and managing Jira
 | `Enter`     | Open split detail view                                        |
 | `p`         | Open saved JQL queries                                        |
 | `V`         | Browse project fix versions and preview one version backlog   |
+| `B`         | Open project-scoped Agile board picker                        |
 | `T`         | Open theme picker                                             |
 | `S`         | Show server summary                                           |
 | `g`         | Show config summary                                           |
@@ -134,6 +135,19 @@ Detail tabs:
 | `n`       | Create a new project fix version    |
 | `e`       | Edit name, description, dates, status |
 | `Esc`     | Close browser                       |
+
+### Board picker
+
+Press `B` from the issue list. The picker is project-scoped: it pre-fills the active issue's project key and falls back to listing all boards when no issue context is available. Results are cached per project for the session.
+
+| Key         | Action                                              |
+| ----------- | --------------------------------------------------- |
+| Type        | Filter boards by name or type (scrum/kanban/simple) |
+| `j` / `k`   | Move selection                                      |
+| `Enter`     | Confirm — board name + ID shown in the status line  |
+| `Esc` / `q` | Close picker                                        |
+
+Selecting a board does not mutate the issue list; the picker is informational. Use `jirac board issues <id>` or `jirac board backlog <id>` from the CLI for full board content.
 
 ### Version create / edit modal
 

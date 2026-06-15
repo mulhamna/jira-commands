@@ -162,6 +162,9 @@ jirac issue transition PROJ-123                     # interactive picker
 jirac issue transition PROJ-123 --to "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
+jirac issue attachment list PROJ-123                # list attachments on an issue
+jirac issue attachment download 10100 --out ./tmp   # download by attachment ID
+jirac issue attachment delete 10100 --force         # delete by attachment ID
 jirac issue bulk-comment --jql 'project = PROJ AND status = "In Progress"' --body "QA is reviewing this now"
 jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md
 jirac issue delete PROJ-123
@@ -200,6 +203,21 @@ jirac issue watch PROJ-123 rm 5b10ac8d82e05b22cc7d4ef5
 
 `add` defaults to the current authenticated user (resolved via `/myself`). `rm` prompts for confirmation unless `--force` is given. In the TUI, the Summary tab shows the watcher count and the first few display names, and pressing `W` adds yourself as a watcher in place.
 
+### Boards (Agile)
+
+```bash
+jirac board list                                    # all boards
+jirac board list -p PROJ                            # filter by project
+jirac board list -p PROJ -t scrum                   # filter by board type (scrum|kanban|simple)
+jirac board get 12                                  # board detail
+jirac board issues 12                               # issues currently on the board
+jirac board issues 12 --jql 'status = "To Do"' --max 50
+jirac board backlog 12                              # issues not in an active/future sprint
+jirac board list -p PROJ --json                     # JSON output for scripting
+```
+
+Each board subcommand accepts `--json` for machine-readable output. Wraps the same `/rest/agile/1.0/board` endpoints used by the TUI board picker (press `B`).
+
 ### Bulk operations
 
 ```bash
@@ -217,8 +235,13 @@ In the TUI, press `:` to open a bulk-comment modal. It supports the current JQL 
 ### JQL builder
 
 ```bash
-jirac issue jql    # interactive query builder
+jirac issue jql                                                    # interactive prompts
+jirac issue jql --run                                              # run the generated query
+jirac issue jql --params '{"project":"PROJ","status":["In Progress"]}'
+jirac issue jql --params @query.json --run                         # load params from a file
 ```
+
+The builder composes JQL through `jira_core::jql::compose_jql`, escaping user-supplied values and rejecting control characters / unsafe field names. The same structured `JqlParams` schema is exposed over MCP as the `jira_jql_build` tool.
 
 ### Raw API passthrough
 
@@ -259,7 +282,7 @@ jirac auth use client-dc
 
 ## Interactive TUI
 
-The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version creation (`n`) and metadata editing (`e`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, both single (`w`) and bulk (`b`) worklog flows, and a self-watch shortcut (`W`) with watcher count rendered on the Summary tab. Press `?` inside the TUI for a complete shortcut reference.
+The TUI is a full-screen terminal interface for browsing and managing issues. Recent builds include a split master-detail layout, a project-level fix-version browser (`V`) with backlog preview plus in-place version creation (`n`) and metadata editing (`e`), a project-scoped Agile board picker (`B`), saved JQL picker, theme picker, server summary, config summary overlays, in-TUI modals for native issue type changes and project moves, both single (`w`) and bulk (`b`) worklog flows, and a self-watch shortcut (`W`) with watcher count rendered on the Summary tab. Press `?` inside the TUI for a complete shortcut reference.
 
 The TUI also accepts full mouse input: click any issue row to select, double-click (or click a tab) to open the detail view, click picker options to apply or toggle, scroll the wheel to navigate, and click outside any popup to dismiss it. Form modals stay keyboard-only so in-flight input isn't lost.
 

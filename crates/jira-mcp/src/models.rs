@@ -127,6 +127,76 @@ pub struct SprintAddIssueArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct WatcherAddArgs {
+    pub issue_key: String,
+    /// Defaults to the current authenticated user.
+    pub account_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct WatcherRemoveArgs {
+    pub issue_key: String,
+    pub account_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AttachmentListArgs {
+    pub issue_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AttachmentDownloadArgs {
+    pub attachment_id: String,
+    /// Absolute path to save the downloaded file to. By default the path
+    /// must be inside $HOME; set force_path=true to override.
+    pub save_path: String,
+    /// Allow save_path outside $HOME (still rejects /etc, /System, /usr, /bin, /sbin, /var).
+    pub force_path: Option<bool>,
+    /// Overwrite if the destination file already exists.
+    pub overwrite: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct AttachmentDeleteArgs {
+    pub attachment_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardListArgs {
+    pub project_key: Option<String>,
+    /// Board type filter: scrum | kanban | simple
+    pub board_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardGetArgs {
+    pub board_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BoardIssuesArgs {
+    pub board_id: u64,
+    pub jql: Option<String>,
+    pub max_results: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct JqlBuildArgs {
+    /// Structured JqlParams object (see jira_core::jql::JqlParams).
+    /// Example: {"project":"ABC","status":["In Progress"],
+    ///           "assignee":[{"type":"current_user"}],
+    ///           "order_by":[["updated","desc"]]}
+    #[schemars(schema_with = "any_json_object")]
+    pub params: Value,
+    /// If true, also runs the composed JQL and returns the first matching issue keys.
+    pub dry_run: Option<bool>,
+    /// Max number of preview keys to return when dry_run is true (default 10).
+    pub max_preview: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProjectVersionCreateArgs {
     pub project_key: String,
     pub name: String,

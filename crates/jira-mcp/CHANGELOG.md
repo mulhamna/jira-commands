@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.1.1...jira-mcp-v2.2.0) (2026-06-15)
+
+
+### Features
+
+* **jira-mcp:** refactor app.rs + add watcher/jql/attachment/board tools ([#372](https://github.com/mulhamna/jira-commands/issues/372)) ([e1d17b6](https://github.com/mulhamna/jira-commands/commit/e1d17b650e28521ff46a2e43bcf840ea0d209435))
+
 ## [2.1.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.1.0...jira-mcp-v2.1.1) (2026-06-10)
 
 

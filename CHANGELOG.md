@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.3.0](https://github.com/mulhamna/jira-commands/compare/v2.2.0...v2.3.0) (2026-06-15)
+
+
+### Features
+
+* **jira-core,cli,tui:** JQL builder, attachment download, Agile board ops ([#371](https://github.com/mulhamna/jira-commands/issues/371)) ([2829371](https://github.com/mulhamna/jira-commands/commit/28293718bdb149e848c884948f1cd387d98c4c8a))
+
 ## [2.2.0](https://github.com/mulhamna/jira-commands/compare/v2.1.0...v2.2.0) (2026-06-13)
 
 

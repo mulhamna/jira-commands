@@ -4,6 +4,7 @@ pub mod client;
 pub mod config;
 pub mod error;
 pub mod field_cache;
+pub mod jql;
 pub mod model;
 
 pub use client::JiraClient;

@@ -147,6 +147,14 @@ pub(super) fn handle_mouse(app: &mut App, event: MouseEvent) -> AppAction {
                                     KeyCode::Enter,
                                 );
                             }
+                            Mode::BoardPicker => {
+                                return select_and_press(
+                                    app,
+                                    |a| &mut a.board_state,
+                                    idx,
+                                    KeyCode::Enter,
+                                );
+                            }
                             Mode::SavedJqlPicker => {
                                 return select_and_press(
                                     app,
@@ -333,6 +341,7 @@ fn is_popup_mode(mode: &Mode) -> bool {
             | Mode::ComponentPicker
             | Mode::FixVersionPicker
             | Mode::SprintPicker
+            | Mode::BoardPicker
             | Mode::SavedJqlPicker
             | Mode::ThemePicker
             | Mode::ServerInfo

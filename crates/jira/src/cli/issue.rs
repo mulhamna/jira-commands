@@ -565,6 +565,17 @@ pub enum IssueCommand {
         files: Vec<std::path::PathBuf>,
     },
 
+    /// Manage attachments on an issue (list, download, delete)
+    ///
+    /// Examples:
+    ///   jirac issue attachment list PROJ-123
+    ///   jirac issue attachment download 10100 --out ./tmp
+    ///   jirac issue attachment delete 10100 --force
+    Attachment {
+        #[command(subcommand)]
+        command: AttachmentCommand,
+    },
+
     /// List available fields for a project and issue type
     ///
     /// Shows field name, ID, type (text, select, number, user, etc.),
@@ -895,6 +906,15 @@ pub enum IssueCommand {
         /// Execute the generated JQL immediately (shows up to 25 results)
         #[arg(long)]
         run: bool,
+        /// JQL builder params as JSON. Accepts a literal JSON object or @path/to/file.json.
+        /// Skips the interactive prompts.
+        ///
+        /// Schema: see `jira_core::jql::JqlParams`. Example:
+        ///   {"project":"PROJ","status":["In Progress"],
+        ///    "assignee":[{"type":"current_user"}],
+        ///    "order_by":[["updated","desc"]]}
+        #[arg(long, value_name = "JSON")]
+        params: Option<String>,
     },
 
     /// Run mixed operations from a JSON manifest file
@@ -1010,6 +1030,42 @@ pub enum WatchCommand {
     Rm {
         /// AccountId of the user to remove
         account_id: String,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AttachmentCommand {
+    /// List all attachments on an issue
+    List {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+        /// Output as JSON array
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Download an attachment by ID
+    Download {
+        /// Attachment ID (visible via `jirac issue attachment list`)
+        id: String,
+        /// Output directory (defaults to current directory)
+        #[arg(long, value_name = "DIR")]
+        out: Option<std::path::PathBuf>,
+        /// Override the filename (defaults to the server-provided name)
+        #[arg(long, value_name = "NAME")]
+        filename: Option<String>,
+        /// Overwrite if the destination file already exists
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Delete an attachment by ID
+    Delete {
+        /// Attachment ID to delete
+        id: String,
         /// Skip confirmation prompt
         #[arg(short, long)]
         force: bool,
@@ -1376,6 +1432,7 @@ pub async fn handle(
         } => transition_issue(client, key, transition, json).await,
         IssueCommand::Link { command } => handle_link_command(client, command).await,
         IssueCommand::Attach { key, files } => attach_files(client, key, files).await,
+        IssueCommand::Attachment { command } => attachment(client, command).await,
         IssueCommand::Fields {
             project,
             issue_type,
@@ -1421,7 +1478,7 @@ pub async fn handle(
             json,
         } => bulk_update(client, jql, assignee, priority, force, json).await,
         IssueCommand::Archive { jql, force } => archive(client, jql, force).await,
-        IssueCommand::Jql { run } => jql_builder(client, run).await,
+        IssueCommand::Jql { run, params } => jql_builder(client, run, params).await,
         IssueCommand::BulkCreate { manifest, json } => bulk_create(client, manifest, json).await,
         IssueCommand::Clone {
             key,
@@ -2997,6 +3054,106 @@ async fn attach_files(
     Ok(())
 }
 
+// ─── attachment ──────────────────────────────────────────────────────────────
+
+async fn attachment(client: JiraClient, cmd: AttachmentCommand) -> Result<()> {
+    match cmd {
+        AttachmentCommand::List { key, json } => attachment_list(client, key, json).await,
+        AttachmentCommand::Download {
+            id,
+            out,
+            filename,
+            force,
+        } => attachment_download(client, id, out, filename, force).await,
+        AttachmentCommand::Delete { id, force } => attachment_delete(client, id, force).await,
+    }
+}
+
+async fn attachment_list(client: JiraClient, key: String, json: bool) -> Result<()> {
+    let spinner = spinner_new(format!("Fetching attachments for {key}..."));
+    let attachments = client
+        .list_attachments(&key)
+        .await
+        .with_context(|| format!("Failed to list attachments for {key}"))?;
+    spinner.finish_and_clear();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&attachments)?);
+        return Ok(());
+    }
+
+    if attachments.is_empty() {
+        println!("No attachments on {key}.");
+        return Ok(());
+    }
+
+    for a in &attachments {
+        println!(
+            "{:<10} {:<10} {:>10}  {}",
+            a.id, a.mime_type, a.size, a.filename
+        );
+    }
+    Ok(())
+}
+
+async fn attachment_download(
+    client: JiraClient,
+    id: String,
+    out: Option<std::path::PathBuf>,
+    filename: Option<String>,
+    force: bool,
+) -> Result<()> {
+    let spinner = spinner_new(format!("Downloading attachment {id}..."));
+    let (server_name, bytes, mime) = client
+        .download_attachment(&id)
+        .await
+        .with_context(|| format!("Failed to download attachment {id}"))?;
+    spinner.finish_and_clear();
+
+    let out_dir = out.unwrap_or_else(|| std::path::PathBuf::from("."));
+    if !out_dir.exists() {
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("Failed to create {}", out_dir.display()))?;
+    }
+    let name = filename.unwrap_or(server_name);
+    let dest = out_dir.join(&name);
+    if dest.exists() && !force {
+        anyhow::bail!(
+            "{} already exists. Use --force to overwrite.",
+            dest.display()
+        );
+    }
+    std::fs::write(&dest, &bytes).with_context(|| format!("Failed to write {}", dest.display()))?;
+    println!(
+        "✓ Saved {} ({} bytes, {})",
+        dest.display(),
+        bytes.len(),
+        mime
+    );
+    Ok(())
+}
+
+async fn attachment_delete(client: JiraClient, id: String, force: bool) -> Result<()> {
+    if !force {
+        let ok = Confirm::new(&format!("Delete attachment {id}?"))
+            .with_default(false)
+            .prompt()
+            .context("Failed to read confirmation")?;
+        if !ok {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+    let spinner = spinner_new(format!("Deleting attachment {id}..."));
+    client
+        .delete_attachment(&id)
+        .await
+        .with_context(|| format!("Failed to delete attachment {id}"))?;
+    spinner.finish_and_clear();
+    println!("✓ Deleted attachment {id}");
+    Ok(())
+}
+
 // ─── fields ──────────────────────────────────────────────────────────────────
 
 async fn list_fields(
@@ -4021,7 +4178,32 @@ async fn archive(client: JiraClient, jql: String, force: bool) -> Result<()> {
 
 // ─── jql builder ─────────────────────────────────────────────────────────────
 
-async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
+fn jql_params_filters_empty(p: &jira_core::jql::JqlParams) -> bool {
+    p.project.is_none()
+        && p.status.is_empty()
+        && p.assignee.is_empty()
+        && p.priority.is_empty()
+        && p.labels.is_empty()
+        && p.components.is_empty()
+        && p.fix_versions.is_empty()
+        && p.text.is_none()
+        && p.created_after.is_none()
+        && p.updated_after.is_none()
+        && p.extra_clauses.is_empty()
+}
+
+fn load_jql_params(spec: &str) -> Result<jira_core::jql::JqlParams> {
+    let raw = if let Some(path) = spec.strip_prefix('@') {
+        std::fs::read_to_string(path).with_context(|| format!("Failed to read {path}"))?
+    } else {
+        spec.to_string()
+    };
+    serde_json::from_str(&raw).context("Failed to parse JqlParams JSON")
+}
+
+fn prompt_jql_params() -> Result<jira_core::jql::JqlParams> {
+    use jira_core::jql::{AssigneeFilter, JqlParams, OrderDir};
+
     println!("JQL Builder — press Enter to skip any field\n");
 
     let project = Text::new("Project key (e.g. PROJ):")
@@ -4042,9 +4224,9 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read status")?;
     let status = if status_sel == "(any)" {
-        None
+        Vec::new()
     } else {
-        Some(status_sel.to_string())
+        vec![status_sel.to_string()]
     };
 
     let assignee_opts = vec!["Me (currentUser)", "Unassigned", "Custom email", "(any)"];
@@ -4052,15 +4234,15 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read assignee")?;
     let assignee = match assignee_sel {
-        "Me (currentUser)" => Some("currentUser()".to_string()),
-        "Unassigned" => Some("EMPTY".to_string()),
+        "Me (currentUser)" => vec![AssigneeFilter::CurrentUser],
+        "Unassigned" => vec![AssigneeFilter::Empty],
         "Custom email" => {
             let email = Text::new("Email:")
                 .prompt()
                 .context("Failed to read email")?;
-            Some(format!("\"{email}\""))
+            vec![AssigneeFilter::Email { email }]
         }
-        _ => None,
+        _ => Vec::new(),
     };
 
     let priority_opts = vec!["Highest", "High", "Medium", "Low", "Lowest", "(any)"];
@@ -4068,37 +4250,51 @@ async fn jql_builder(client: JiraClient, run: bool) -> Result<()> {
         .prompt()
         .context("Failed to read priority")?;
     let priority = if priority_sel == "(any)" {
-        None
+        Vec::new()
     } else {
-        Some(priority_sel.to_string())
+        vec![priority_sel.to_string()]
     };
 
     let order_opts = vec!["updated DESC", "created DESC", "priority DESC", "key ASC"];
-    let order = Select::new("Order by:", order_opts)
+    let order_sel = Select::new("Order by:", order_opts)
         .prompt()
         .context("Failed to read order")?;
+    let order_by = vec![match order_sel {
+        "updated DESC" => ("updated".to_string(), OrderDir::Desc),
+        "created DESC" => ("created".to_string(), OrderDir::Desc),
+        "priority DESC" => ("priority".to_string(), OrderDir::Desc),
+        _ => ("key".to_string(), OrderDir::Asc),
+    }];
 
-    // Build JQL
-    let mut parts: Vec<String> = Vec::new();
-    if let Some(p) = project {
-        parts.push(format!("project = {p}"));
+    Ok(JqlParams {
+        project,
+        status,
+        assignee,
+        priority,
+        order_by,
+        ..Default::default()
+    })
+}
+
+async fn jql_builder(client: JiraClient, run: bool, params: Option<String>) -> Result<()> {
+    let mut jql_params = if let Some(spec) = params {
+        load_jql_params(&spec)?
+    } else {
+        prompt_jql_params()?
+    };
+
+    if jql_params_filters_empty(&jql_params) {
+        jql_params
+            .assignee
+            .push(jira_core::jql::AssigneeFilter::CurrentUser);
     }
-    if let Some(s) = status {
-        parts.push(format!("status = \"{s}\""));
-    }
-    if let Some(a) = assignee {
-        parts.push(format!("assignee = {a}"));
-    }
-    if let Some(p) = priority {
-        parts.push(format!("priority = \"{p}\""));
+    if jql_params.order_by.is_empty() {
+        jql_params
+            .order_by
+            .push(("updated".into(), jira_core::jql::OrderDir::Desc));
     }
 
-    if parts.is_empty() {
-        parts.push("assignee = currentUser()".to_string());
-    }
-
-    let jql = format!("{} ORDER BY {}", parts.join(" AND "), order);
-
+    let jql = jira_core::jql::compose_jql(&jql_params).context("Failed to compose JQL")?;
     println!("\nGenerated JQL:\n  {jql}\n");
 
     if run {

@@ -39,6 +39,7 @@ pub(super) fn handle_key(app: &mut App, event: KeyEvent) -> AppAction {
         Mode::ComponentPicker => handle_component_picker_key(app, code),
         Mode::FixVersionPicker => handle_fix_version_picker_key(app, code),
         Mode::SprintPicker => handle_sprint_picker_key(app, code),
+        Mode::BoardPicker => handle_board_picker_key(app, code),
         Mode::Help => handle_help_key(app, code),
         Mode::SavedJqlPicker => handle_saved_jql_key(app, code),
         Mode::ThemePicker => handle_theme_picker_key(app, code),
@@ -152,6 +153,7 @@ fn handle_browse_key(app: &mut App, code: KeyCode) -> AppAction {
             .selected_issue_key()
             .map(AppAction::OpenSprintPicker)
             .unwrap_or(AppAction::None),
+        KeyCode::Char('B') => AppAction::OpenBoardPicker(app.active_project_key()),
         KeyCode::Char('u') => app
             .selected_issue_key()
             .map(AppAction::UploadAttachment)
@@ -978,6 +980,44 @@ fn handle_sprint_picker_key(app: &mut App, code: KeyCode) -> AppAction {
             AppAction::RefreshSprintOptions
         }
         KeyCode::Enter => AppAction::ApplySprintSelection(app.sprint_issue_key.clone()),
+        _ => AppAction::None,
+    }
+}
+
+fn handle_board_picker_key(app: &mut App, code: KeyCode) -> AppAction {
+    match code {
+        KeyCode::Esc | KeyCode::Char('q') => {
+            app.mode = Mode::Browse;
+            AppAction::None
+        }
+        KeyCode::Down => {
+            picker_nav_down(&mut app.board_state, app.board_options.len());
+            AppAction::None
+        }
+        KeyCode::Up => {
+            picker_nav_up(&mut app.board_state);
+            AppAction::None
+        }
+        KeyCode::Left => {
+            picker_cursor_left(&mut app.board_cursor);
+            AppAction::None
+        }
+        KeyCode::Right => {
+            picker_cursor_right(&mut app.board_cursor, &app.board_query);
+            AppAction::None
+        }
+        KeyCode::Backspace => {
+            if picker_backspace(&mut app.board_query, &mut app.board_cursor) {
+                AppAction::RefreshBoardOptions
+            } else {
+                AppAction::None
+            }
+        }
+        KeyCode::Char(c) => {
+            picker_type_char(&mut app.board_query, &mut app.board_cursor, c);
+            AppAction::RefreshBoardOptions
+        }
+        KeyCode::Enter => AppAction::ApplyBoardSelection,
         _ => AppAction::None,
     }
 }

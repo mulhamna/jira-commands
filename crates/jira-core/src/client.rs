@@ -1005,6 +1005,116 @@ impl JiraClient {
             .await
     }
 
+    /// List Agile boards, optionally filtered by project key and board type.
+    pub async fn list_boards(
+        &self,
+        project_key: Option<&str>,
+        board_type: Option<&str>,
+    ) -> Result<Vec<crate::model::Board>> {
+        const MAX_PAGES: u32 = 500;
+        let mut boards: Vec<crate::model::Board> = Vec::new();
+        let mut start_at = 0u64;
+        let mut iterations = 0u32;
+
+        loop {
+            iterations += 1;
+            if iterations > MAX_PAGES {
+                return Err(JiraError::Api {
+                    status: 500,
+                    message: "board pagination exceeded MAX_PAGES safeguard".into(),
+                });
+            }
+            let mut query = format!("maxResults=50&startAt={start_at}");
+            if let Some(p) = project_key {
+                query.push_str(&format!("&projectKeyOrId={p}"));
+            }
+            if let Some(t) = board_type {
+                query.push_str(&format!("&type={t}"));
+            }
+            let path = format!("/rest/agile/1.0/board?{query}");
+            let resp = self
+                .raw_request("GET", &path, None)
+                .await?
+                .unwrap_or_default();
+            let values = Self::paged_values(&resp);
+            for v in values {
+                if let Some(b) = crate::model::Board::from_value(v) {
+                    boards.push(b);
+                }
+            }
+            if Self::page_is_last(&resp, values.len()) {
+                break;
+            }
+            start_at += values.len() as u64;
+        }
+
+        Ok(boards)
+    }
+
+    /// Fetch a single Agile board by ID.
+    pub async fn get_board(&self, board_id: u64) -> Result<crate::model::Board> {
+        let path = format!("/rest/agile/1.0/board/{board_id}");
+        let resp = self
+            .raw_request("GET", &path, None)
+            .await?
+            .ok_or_else(|| JiraError::NotFound(format!("board {board_id}")))?;
+        crate::model::Board::from_value(&resp).ok_or_else(|| JiraError::Api {
+            status: 500,
+            message: "could not parse board response".into(),
+        })
+    }
+
+    async fn board_issue_list(
+        &self,
+        board_id: u64,
+        endpoint: &str,
+        jql: Option<&str>,
+        max_results: Option<u32>,
+    ) -> Result<Vec<Issue>> {
+        let max = max_results.unwrap_or(50).min(1000);
+        let mut path =
+            format!("/rest/agile/1.0/board/{board_id}/{endpoint}?maxResults={max}&startAt=0");
+        if let Some(j) = jql {
+            path.push_str(&format!("&jql={}", url_encode_component(j)));
+        }
+        let resp = self
+            .raw_request("GET", &path, None)
+            .await?
+            .unwrap_or_default();
+        let issues = resp
+            .get("issues")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        Ok(issues
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<RawIssue>(v).ok())
+            .map(|r| r.into_issue())
+            .collect())
+    }
+
+    /// List issues on a board (optionally filtered by JQL).
+    pub async fn board_issues(
+        &self,
+        board_id: u64,
+        jql: Option<&str>,
+        max_results: Option<u32>,
+    ) -> Result<Vec<Issue>> {
+        self.board_issue_list(board_id, "issue", jql, max_results)
+            .await
+    }
+
+    /// List backlog issues on a board (issues not in an active or future sprint).
+    pub async fn board_backlog(
+        &self,
+        board_id: u64,
+        jql: Option<&str>,
+        max_results: Option<u32>,
+    ) -> Result<Vec<Issue>> {
+        self.board_issue_list(board_id, "backlog", jql, max_results)
+            .await
+    }
+
     /// Create a sprint on a Jira board.
     pub async fn create_sprint(
         &self,
@@ -1340,6 +1450,86 @@ impl JiraClient {
         let http = &self.http;
         self.request_no_body(|| http.delete(&url).headers(headers.clone()))
             .await
+    }
+
+    /// List attachments on an issue.
+    pub async fn list_attachments(&self, issue_key: &str) -> Result<Vec<Attachment>> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}?fields=attachment"));
+
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        let arr = raw
+            .get("fields")
+            .and_then(|f| f.get("attachment"))
+            .and_then(|a| a.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        Ok(arr
+            .iter()
+            .filter_map(crate::model::attachment::Attachment::from_value)
+            .collect())
+    }
+
+    /// Download an attachment by ID.
+    ///
+    /// Returns `(filename, bytes, mime_type)`. The filename comes from the
+    /// `Content-Disposition` header when present, otherwise the trailing
+    /// path segment of the redirect URL, otherwise `"attachment-<id>"`.
+    pub async fn download_attachment(
+        &self,
+        attachment_id: &str,
+    ) -> Result<(String, Vec<u8>, String)> {
+        let headers = self.auth_headers_no_content_type()?;
+        let url = self.platform_url(&format!("/attachment/content/{attachment_id}"));
+
+        let http = &self.http;
+        let response = self
+            .execute_with_retry(|| http.get(&url).headers(headers.clone()))
+            .await?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|e| format!("<failed to read response body: {e}>"));
+            if status == StatusCode::NOT_FOUND {
+                return Err(JiraError::NotFound(body));
+            }
+            return Err(JiraError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        let mime_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        let filename = response
+            .headers()
+            .get(reqwest::header::CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(parse_content_disposition_filename)
+            .or_else(|| {
+                response
+                    .url()
+                    .path_segments()
+                    .and_then(|mut s| s.next_back().map(|s| s.to_string()))
+                    .filter(|s| !s.is_empty())
+            })
+            .unwrap_or_else(|| format!("attachment-{attachment_id}"));
+
+        let bytes = response.bytes().await?.to_vec();
+        Ok((filename, bytes, mime_type))
     }
 
     /// Delete an attachment by ID.
@@ -1733,6 +1923,60 @@ where
             message: body,
         }),
     }
+}
+
+/// Parse `filename` (or RFC 5987 `filename*`) from a Content-Disposition header.
+fn parse_content_disposition_filename(value: &str) -> Option<String> {
+    for part in value.split(';') {
+        let part = part.trim();
+        if let Some(rest) = part.strip_prefix("filename*=") {
+            // RFC 5987: charset'lang'percent-encoded-value
+            let payload = rest.splitn(3, '\'').nth(2)?;
+            return Some(percent_decode(payload));
+        }
+        if let Some(rest) = part.strip_prefix("filename=") {
+            let trimmed = rest.trim_matches('"').to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(h), Some(l)) = (
+                (bytes[i + 1] as char).to_digit(16),
+                (bytes[i + 2] as char).to_digit(16),
+            ) {
+                out.push(((h << 4) | l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+}
+
+/// Percent-encode a query-string component (unreserved chars per RFC 3986 are left as-is).
+fn url_encode_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.as_bytes() {
+        match *b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(*b as char);
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
 }
 
 /// Returns current UTC time in Jira worklog format: "2006-01-02T15:04:05.000+0000"
@@ -3236,6 +3480,176 @@ mod tests {
 
         assert_eq!(transitions[1].id, "31");
         assert!(transitions[1].to.is_some());
+    }
+
+    #[test]
+    fn parses_content_disposition_plain() {
+        assert_eq!(
+            parse_content_disposition_filename("attachment; filename=\"report.pdf\""),
+            Some("report.pdf".to_string())
+        );
+        assert_eq!(
+            parse_content_disposition_filename("attachment; filename=plain.txt"),
+            Some("plain.txt".to_string())
+        );
+    }
+
+    #[test]
+    fn parses_content_disposition_rfc5987() {
+        assert_eq!(
+            parse_content_disposition_filename(
+                "attachment; filename*=UTF-8''na%C3%AFve%20file.txt"
+            ),
+            Some("naïve file.txt".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn list_attachments_extracts_fields() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/TEST-1"))
+            .and(query_param("fields", "attachment"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": {
+                    "attachment": [
+                        {
+                            "id": "10001",
+                            "filename": "a.txt",
+                            "size": 12,
+                            "mimeType": "text/plain",
+                            "content": "https://example/c/10001",
+                            "created": "2026-06-14T00:00:00.000+0000"
+                        }
+                    ]
+                }
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let items = client.list_attachments("TEST-1").await.expect("ok");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, "10001");
+        assert_eq!(items[0].filename, "a.txt");
+    }
+
+    #[tokio::test]
+    async fn download_attachment_returns_bytes_and_filename() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/attachment/content/42"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Content-Type", "application/pdf")
+                    .insert_header("Content-Disposition", "attachment; filename=\"file.pdf\"")
+                    .set_body_bytes(vec![0x25u8, 0x50, 0x44, 0x46]),
+            )
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let (name, bytes, mime) = client.download_attachment("42").await.expect("ok");
+        assert_eq!(name, "file.pdf");
+        assert_eq!(mime, "application/pdf");
+        assert_eq!(bytes, vec![0x25, 0x50, 0x44, 0x46]);
+    }
+
+    #[tokio::test]
+    async fn download_attachment_404_returns_not_found() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/attachment/content/99"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("missing"))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let err = client.download_attachment("99").await.expect_err("err");
+        assert!(matches!(err, JiraError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn list_boards_paginates() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(query_param("startAt", "0"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "maxResults": 50, "startAt": 0, "isLast": false,
+                "values": [
+                    { "id": 1, "name": "B1", "type": "scrum" },
+                    { "id": 2, "name": "B2", "type": "kanban",
+                      "location": { "projectKey": "ABC", "projectId": 10 } }
+                ]
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(query_param("startAt", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "maxResults": 50, "startAt": 2, "isLast": true,
+                "values": []
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let boards = client.list_boards(None, None).await.expect("ok");
+        assert_eq!(boards.len(), 2);
+        assert_eq!(boards[1].project_key.as_deref(), Some("ABC"));
+    }
+
+    #[tokio::test]
+    async fn get_board_parses_single() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/9"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": 9, "name": "X", "type": "scrum"
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let b = client.get_board(9).await.expect("ok");
+        assert_eq!(b.id, 9);
+        assert_eq!(b.name, "X");
+    }
+
+    #[tokio::test]
+    async fn board_issues_returns_issues() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/5/issue"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [
+                    { "id": "1", "key": "ABC-1", "fields": { "summary": "s",
+                      "status": { "name": "To Do" }, "issuetype": { "name": "Task" },
+                      "project": { "key": "ABC" }, "created": "", "updated": "" } }
+                ]
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let issues = client.board_issues(5, None, Some(50)).await.expect("ok");
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].key, "ABC-1");
+    }
+
+    #[tokio::test]
+    async fn board_backlog_passes_jql() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/5/backlog"))
+            .and(query_param("jql", "labels = \"x\""))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": []
+            })))
+            .mount(&server)
+            .await;
+        let client = cloud_client(&server);
+        let issues = client
+            .board_backlog(5, Some("labels = \"x\""), None)
+            .await
+            .expect("ok");
+        assert!(issues.is_empty());
     }
 
     #[tokio::test]

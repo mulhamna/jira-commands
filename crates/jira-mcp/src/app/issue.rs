@@ -25,7 +25,7 @@ use super::{
         create_issue_request_from_batch_create, create_issue_request_from_issue, issue_is_blocked,
         issue_status_category, issue_updated_at,
     },
-    shared::{normalize_issue_keys, require_confirm, to_value},
+    shared::{normalize_issue_keys, require_confirm, slim_issue, to_value},
     JiraApp,
 };
 
@@ -46,9 +46,10 @@ impl JiraApp {
         };
 
         let result = client.search_issues(&jql, None, Some(limit)).await?;
+        let issues: Vec<Value> = result.issues.iter().map(slim_issue).collect();
         Ok(json!({
             "jql": jql,
-            "issues": result.issues,
+            "issues": issues,
             "next_page_token": result.next_page_token,
             "total": result.total
         }))
@@ -102,14 +103,15 @@ impl JiraApp {
             }
         }
 
+        let slim = |issues: &[Issue]| issues.iter().map(slim_issue).collect::<Vec<_>>();
         Ok(json!({
             "query": query,
             "since": since,
-            "recently_done": done,
-            "in_progress": in_progress,
-            "next_up": next_up,
-            "blocked": blocked,
-            "other": other,
+            "recently_done": slim(&done),
+            "in_progress": slim(&in_progress),
+            "next_up": slim(&next_up),
+            "blocked": slim(&blocked),
+            "other": slim(&other),
         }))
     }
 
@@ -170,6 +172,10 @@ impl JiraApp {
         }
 
         let total: usize = by_status.values().map(Vec::len).sum();
+        let by_status: HashMap<String, Vec<Value>> = by_status
+            .into_iter()
+            .map(|(status, issues)| (status, issues.iter().map(slim_issue).collect()))
+            .collect();
 
         Ok(json!({
             "project": args.project_key,
@@ -259,7 +265,7 @@ impl JiraApp {
             .create_issue_v2(create_issue_request_from_issue(args))
             .await?;
 
-        to_value(issue)
+        Ok(slim_issue(&issue))
     }
 
     pub async fn issue_update(&self, args: IssueUpdateArgs) -> AppResult<Value> {
@@ -269,7 +275,7 @@ impl JiraApp {
 
         client.update_issue(&key, request).await?;
         let issue = client.get_issue(&key).await?;
-        to_value(issue)
+        Ok(slim_issue(&issue))
     }
 
     pub async fn issue_bulk_comment(&self, args: BulkCommentArgs) -> AppResult<Value> {
@@ -350,7 +356,7 @@ impl JiraApp {
                                 "op": "create",
                                 "key": issue.key,
                                 "status": "created",
-                                "issue": issue
+                                "issue": slim_issue(&issue)
                             })
                         }
                         Err(err) => json!({

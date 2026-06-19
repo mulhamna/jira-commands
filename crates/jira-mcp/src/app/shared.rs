@@ -1,8 +1,8 @@
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use url::form_urlencoded;
 
-use jira_core::{config::JiraConfig, JiraClient};
+use jira_core::{adf::adf_to_text, config::JiraConfig, model::Issue, JiraClient};
 
 use crate::error::{AppError, AppResult};
 
@@ -103,6 +103,47 @@ where
     T: Serialize,
 {
     serde_json::to_value(value).map_err(Into::into)
+}
+
+/// Max characters of a flattened ADF description kept in a slimmed issue.
+const DESCRIPTION_EXCERPT_LEN: usize = 500;
+
+/// Project a full [`Issue`] down to the LLM-useful fields, replacing the heavy
+/// ADF `description` (and the raw `fields` map) with a short plain-text excerpt.
+///
+/// MCP stdio responses are newline-delimited JSON on a single line; many clients
+/// cap line length (e.g. Python `asyncio.StreamReader` defaults to 64 KB), so a
+/// list of full issues with ADF bodies can overflow and surface as a truncated
+/// `Unexpected EOF` parse error. Slimming keeps responses well under that cap.
+pub(super) fn slim_issue(issue: &Issue) -> Value {
+    let excerpt = issue.description.as_ref().map(|adf| {
+        let text = adf_to_text(adf);
+        truncate_chars(text.trim(), DESCRIPTION_EXCERPT_LEN)
+    });
+
+    json!({
+        "id": issue.id,
+        "key": issue.key,
+        "summary": issue.summary,
+        "status": issue.status,
+        "issue_type": issue.issue_type,
+        "project_key": issue.project_key,
+        "assignee": issue.assignee,
+        "priority": issue.priority,
+        "created": issue.created,
+        "updated": issue.updated,
+        "description_excerpt": excerpt,
+    })
+}
+
+/// Truncate a string to at most `max` characters (not bytes), appending an
+/// ellipsis marker when content was dropped.
+pub(super) fn truncate_chars(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_string();
+    }
+    let kept: String = text.chars().take(max).collect();
+    format!("{kept}…[truncated]")
 }
 
 pub(super) fn value_or_null(value: String) -> Value {

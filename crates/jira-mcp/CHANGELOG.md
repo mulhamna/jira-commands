@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.2.0...jira-mcp-v2.2.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **jira-mcp:** bound tool responses under stdio line limits ([#378](https://github.com/mulhamna/jira-commands/issues/378)) ([c1d058a](https://github.com/mulhamna/jira-commands/commit/c1d058a6e5888ec0136f196f6c329288783cc114))
+
 ## [2.2.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.1.1...jira-mcp-v2.2.0) (2026-06-15)
 
 

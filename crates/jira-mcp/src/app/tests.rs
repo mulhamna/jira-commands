@@ -465,3 +465,60 @@ async fn remote_link_list_returns_links() {
 
     clear_test_env();
 }
+
+fn issue_with_description(desc_len: usize) -> jira_core::model::Issue {
+    let body = "x".repeat(desc_len);
+    jira_core::model::Issue {
+        id: "10001".into(),
+        key: "PROJ-1".into(),
+        summary: "Compact me".into(),
+        description: Some(jira_core::adf::plain_text_to_adf(&body)),
+        status: "To Do".into(),
+        assignee: Some("Dev".into()),
+        reporter: Some("Reporter".into()),
+        priority: Some("High".into()),
+        issue_type: "Task".into(),
+        project_key: "PROJ".into(),
+        created: "2024-01-01T00:00:00.000+0000".into(),
+        updated: "2024-01-02T00:00:00.000+0000".into(),
+        attachments: vec![],
+        links: vec![],
+        fields: json!({ "customfield_10010": "noise" }),
+    }
+}
+
+#[test]
+fn slim_issue_drops_adf_and_caps_excerpt() {
+    let slim = super::shared::slim_issue(&issue_with_description(5_000));
+
+    assert_eq!(slim["key"], json!("PROJ-1"));
+    assert_eq!(slim["status"], json!("To Do"));
+    // Heavy ADF description and the raw fields map must be gone.
+    assert!(slim.get("description").is_none());
+    assert!(slim.get("fields").is_none());
+
+    let excerpt = slim["description_excerpt"].as_str().expect("excerpt");
+    assert!(excerpt.ends_with("…[truncated]"));
+    // 500 kept chars + the truncation marker.
+    assert!(excerpt.chars().count() <= 500 + "…[truncated]".chars().count());
+}
+
+#[test]
+fn slimmed_issue_list_stays_under_stdio_cap() {
+    let issues: Vec<Value> = (0..25)
+        .map(|_| super::shared::slim_issue(&issue_with_description(20_000)))
+        .collect();
+    let payload = json!({ "issues": issues });
+    let len = serde_json::to_string(&payload).expect("serialize").len();
+
+    // Full issues with 20 KB ADF bodies x25 would be ~500 KB; slimmed must be
+    // comfortably under a 64 KB stdio line cap.
+    assert!(len < 48 * 1024, "slimmed list was {len} bytes");
+}
+
+#[test]
+fn truncate_chars_appends_marker_when_over_limit() {
+    assert_eq!(super::shared::truncate_chars("short", 10), "short");
+    let out = super::shared::truncate_chars(&"a".repeat(50), 10);
+    assert_eq!(out, format!("{}…[truncated]", "a".repeat(10)));
+}

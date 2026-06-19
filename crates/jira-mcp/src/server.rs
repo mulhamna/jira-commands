@@ -46,8 +46,54 @@ impl JiraMcpServer {
 
     fn respond(&self, result: AppResult<Value>) -> Result<Json<ToolResponse>, ErrorData> {
         result
-            .map(|value| Json(ToolResponse { result: value }))
+            .map(|value| {
+                Json(ToolResponse {
+                    result: bound_response(value),
+                })
+            })
             .map_err(|err| err.to_mcp())
+    }
+}
+
+/// Keep a tool response comfortably under typical MCP stdio line-length caps.
+///
+/// MCP stdio frames are newline-delimited JSON on a single line; several clients
+/// limit how long a line may be (e.g. Python `asyncio.StreamReader` defaults to
+/// 64 KB) and report overflow as a truncated `Unexpected EOF` parse error. This
+/// is a defensive net for any tool — even ones that return full payloads such as
+/// `jira_issue_view` or raw `jira_api_request` passthrough.
+const MAX_RESPONSE_BYTES: usize = 48 * 1024;
+/// Cap individual string fields when a response is over budget.
+const MAX_STRING_CHARS: usize = 2000;
+
+fn bound_response(mut value: Value) -> Value {
+    if serialized_len(&value) <= MAX_RESPONSE_BYTES {
+        return value;
+    }
+    truncate_long_strings(&mut value, MAX_STRING_CHARS);
+    if let Value::Object(map) = &mut value {
+        map.insert("_truncated".to_string(), Value::Bool(true));
+    }
+    value
+}
+
+fn serialized_len(value: &Value) -> usize {
+    serde_json::to_string(value).map(|s| s.len()).unwrap_or(0)
+}
+
+fn truncate_long_strings(value: &mut Value, max_chars: usize) {
+    match value {
+        Value::String(text) if text.chars().count() > max_chars => {
+            let kept: String = text.chars().take(max_chars).collect();
+            *text = format!("{kept}…[truncated]");
+        }
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(|item| truncate_long_strings(item, max_chars)),
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|item| truncate_long_strings(item, max_chars)),
+        _ => {}
     }
 }
 
@@ -721,6 +767,29 @@ mod tests {
     struct TestClient;
 
     impl ClientHandler for TestClient {}
+
+    #[test]
+    fn bound_response_passes_small_values_through() {
+        let value = serde_json::json!({ "key": "PROJ-1", "status": "To Do" });
+        assert_eq!(bound_response(value.clone()), value);
+    }
+
+    #[test]
+    fn bound_response_truncates_oversized_payloads() {
+        let value = serde_json::json!({ "blob": "x".repeat(60 * 1024) });
+        let bounded = bound_response(value);
+
+        assert_eq!(bounded["_truncated"], serde_json::json!(true));
+        assert!(bounded["blob"]
+            .as_str()
+            .expect("blob")
+            .ends_with("…[truncated]"));
+        let len = serde_json::to_string(&bounded).expect("serialize").len();
+        assert!(
+            len <= MAX_RESPONSE_BYTES,
+            "bounded response was {len} bytes"
+        );
+    }
 
     fn set_config_home_vars(temp_dir: &TempDir) {
         std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());

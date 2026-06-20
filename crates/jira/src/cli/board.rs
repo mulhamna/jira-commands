@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
-use indicatif::{ProgressBar, ProgressStyle};
 use jira_core::{model::Issue, JiraClient};
+
+use crate::cli::progress::spinner_new;
 
 #[derive(Debug, Subcommand)]
 pub enum BoardCommand {
@@ -169,16 +170,4 @@ async fn board_issues(
         println!("{:<14} {:<14} {}", i.key, i.status, i.summary);
     }
     Ok(())
-}
-
-fn spinner_new(msg: impl Into<String>) -> ProgressBar {
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::with_template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
-    );
-    spinner.set_message(msg.into());
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
-    spinner
 }

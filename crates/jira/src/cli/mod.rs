@@ -4,3 +4,4 @@ pub mod board;
 pub mod issue;
 pub mod mcp;
 pub mod plan;
+pub mod progress;

@@ -63,7 +63,9 @@ jirac auth use work-cloud
 
 The MCP server includes tools for:
 - auth status and credential updates
-- issue list, view, create, update, delete, clone, batch flows, standups, sprint summaries, and notifications
+- diagnostics: `jira_whoami` (current account id, timezone, base URL) and `jira_server_info` (server info + premium/Plans detection)
+- issue list, view, create, update, delete, clone, move (native cross-project move, `confirm: true` required), batch flows, standups, sprint summaries, and notifications
+- notifications: mark scanned notifications as read by id (`jira_notifications_mark_read`)
 - field and transition discovery
 - comments (single + bulk)
 - attachments: upload, list, download (writes to disk with `$HOME` guard and `force_path` opt-out), and delete (`confirm: true` required)

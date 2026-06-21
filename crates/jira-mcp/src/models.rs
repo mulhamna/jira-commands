@@ -12,14 +12,6 @@ fn any_json_object(_: &mut SchemaGenerator) -> Schema {
     .expect("static schema literal must deserialize")
 }
 
-fn any_json_object_map(_: &mut SchemaGenerator) -> Schema {
-    serde_json::from_value(json!({
-        "type": "object",
-        "additionalProperties": {}
-    }))
-    .expect("static schema literal must deserialize")
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ToolResponse {
     #[schemars(schema_with = "any_json_object")]
@@ -70,6 +62,12 @@ pub struct IssueNotificationsArgs {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueKeyArgs {
     pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NotificationsMarkReadArgs {
+    /// Notification ids (the `id` field from jira_issue_notifications entries).
+    pub ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -234,7 +232,7 @@ pub struct IssueCreateArgs {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -253,7 +251,7 @@ pub struct IssueUpdateArgs {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -277,6 +275,18 @@ pub struct IssueCloneArgs {
 pub struct IssueTransitionArgs {
     pub key: String,
     pub transition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueMoveArgs {
+    pub key: String,
+    /// Target project key to move the issue into.
+    pub project_key: String,
+    /// Target issue type id (not name). Fetch ids via jira_issue_types_list.
+    pub issue_type_id: String,
+    /// Optional target parent key (for sub-tasks).
+    pub parent: Option<String>,
+    pub confirm: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -391,7 +401,7 @@ pub struct BatchCreateOp {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -410,7 +420,7 @@ pub struct BatchUpdateOp {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -445,7 +455,7 @@ pub struct ApiRequestArgs {
     pub method: String,
     pub path: String,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub query: Option<BTreeMap<String, Value>>,
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]

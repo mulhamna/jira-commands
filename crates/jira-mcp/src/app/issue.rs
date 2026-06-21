@@ -11,9 +11,9 @@ use crate::{
     models::{
         ArchiveArgs, AttachmentInput, BatchArgs, BatchOperation, BulkCommentArgs,
         BulkTransitionArgs, BulkUpdateArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
-        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueNotificationsArgs,
-        IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs,
-        SprintSummaryArgs,
+        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueMoveArgs,
+        IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
+        IssueUpdateArgs, SprintSummaryArgs,
     },
 };
 
@@ -542,6 +542,20 @@ impl JiraApp {
             "deleted_original": deleted_original,
             "issue": cloned
         }))
+    }
+
+    pub async fn issue_move(&self, args: IssueMoveArgs) -> AppResult<Value> {
+        require_confirm(args.confirm)?;
+        let client = self.build_client()?;
+        let issue = client
+            .move_issue(
+                &args.key,
+                &args.project_key,
+                &args.issue_type_id,
+                args.parent.as_deref(),
+            )
+            .await?;
+        Ok(slim_issue(&issue))
     }
 
     pub async fn issue_transition(&self, args: IssueTransitionArgs) -> AppResult<Value> {

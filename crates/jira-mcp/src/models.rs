@@ -12,14 +12,6 @@ fn any_json_object(_: &mut SchemaGenerator) -> Schema {
     .expect("static schema literal must deserialize")
 }
 
-fn any_json_object_map(_: &mut SchemaGenerator) -> Schema {
-    serde_json::from_value(json!({
-        "type": "object",
-        "additionalProperties": {}
-    }))
-    .expect("static schema literal must deserialize")
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ToolResponse {
     #[schemars(schema_with = "any_json_object")]
@@ -234,7 +226,7 @@ pub struct IssueCreateArgs {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -253,7 +245,7 @@ pub struct IssueUpdateArgs {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -391,7 +383,7 @@ pub struct BatchCreateOp {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -410,7 +402,7 @@ pub struct BatchUpdateOp {
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
 }
 
@@ -445,7 +437,7 @@ pub struct ApiRequestArgs {
     pub method: String,
     pub path: String,
     #[serde(default)]
-    #[schemars(schema_with = "any_json_object_map")]
+    #[schemars(schema_with = "any_json_object")]
     pub query: Option<BTreeMap<String, Value>>,
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]

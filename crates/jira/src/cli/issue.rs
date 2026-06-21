@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::cli::progress::{progress_bar, spinner_new};
 use crate::{
     datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
     notifications::scan_mention_notifications,
@@ -8,7 +9,6 @@ use crate::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use clap::Subcommand;
-use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Confirm, MultiSelect, Select, Text};
 use jira_core::{
     model::{
@@ -3301,37 +3301,6 @@ fn normalize_render_output(value: &str) -> Result<&str> {
         "text" | "txt" => Ok("text"),
         other => anyhow::bail!("Unsupported output format '{other}'. Use one of: adf, text"),
     }
-}
-
-fn spinner_new(msg: impl Into<String>) -> ProgressBar {
-    use std::io::IsTerminal;
-    if !std::io::stdout().is_terminal() {
-        return ProgressBar::hidden();
-    }
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .expect("spinner template is a compile-time constant"),
-    );
-    pb.set_message(msg.into());
-    pb.enable_steady_tick(std::time::Duration::from_millis(100));
-    pb
-}
-
-fn progress_bar(len: u64) -> ProgressBar {
-    use std::io::IsTerminal;
-    if !std::io::stdout().is_terminal() {
-        return ProgressBar::hidden();
-    }
-    let pb = ProgressBar::new(len);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.cyan} [{bar:40}] {pos}/{len} {msg}")
-            .expect("progress bar template is a compile-time constant")
-            .progress_chars("=> "),
-    );
-    pb
 }
 
 fn truncate(s: &str, max_len: usize) -> String {

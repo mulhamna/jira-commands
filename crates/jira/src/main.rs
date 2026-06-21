@@ -112,53 +112,41 @@ async fn main() -> Result<()> {
     match command {
         Commands::Auth { command } => {
             cli::auth::handle(command).await?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
         Commands::Issue { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
             cli::issue::handle(*command, client, config.project).await?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
         Commands::Tui { project } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
             let effective_project = project.or(config.project);
-            tui::run_tui(client, effective_project, update_notice)
+            // run_tui consumes update_notice and surfaces it itself; return so the
+            // post-match print below does not touch the moved value.
+            return tui::run_tui(client, effective_project, update_notice)
                 .await
-                .context("TUI error")?;
+                .context("TUI error");
         }
         Commands::Api { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             cli::api::handle(command, client).await?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
         Commands::Plan { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             cli::plan::handle(command, client).await?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
         Commands::Mcp { command } => {
             cli::mcp::handle(command)?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
         Commands::Board { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             cli::board::handle(command, client).await?;
-            if let Some(notice) = &update_notice {
-                eprintln!("{}", version_check::cli_message(notice));
-            }
         }
+    }
+
+    if let Some(notice) = &update_notice {
+        eprintln!("{}", version_check::cli_message(notice));
     }
 
     Ok(())

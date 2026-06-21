@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.3.1](https://github.com/mulhamna/jira-commands/compare/v2.3.0...v2.3.1) (2026-06-20)
+
+
+### Bug Fixes
+
+* **cli:** guard board spinner off-TTY and dedup helpers ([#381](https://github.com/mulhamna/jira-commands/issues/381)) ([7efae01](https://github.com/mulhamna/jira-commands/commit/7efae0193239c0f0d7860943c4a408f2110ec940))
+
 ## [2.3.0](https://github.com/mulhamna/jira-commands/compare/v2.2.0...v2.3.0) (2026-06-15)
 
 

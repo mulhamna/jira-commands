@@ -2,7 +2,7 @@ use std::{collections::HashSet, fs, path::PathBuf, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 
 use jira_core::{
     adf::{adf_to_text, mentioned_account_ids},
@@ -11,9 +11,30 @@ use jira_core::{
     JiraClient,
 };
 
-use crate::error::{AppError, AppResult};
+use crate::{
+    error::{AppError, AppResult},
+    models::NotificationsMarkReadArgs,
+};
 
-use super::jql::build_notifications_jql;
+use super::{jql::build_notifications_jql, JiraApp};
+
+impl JiraApp {
+    pub async fn notifications_mark_read(
+        &self,
+        args: NotificationsMarkReadArgs,
+    ) -> AppResult<Value> {
+        if args.ids.is_empty() {
+            return Err(AppError::validation(
+                "Provide at least one notification id to mark as read",
+            ));
+        }
+        let marked = mark_notifications_read(&args.ids)?;
+        Ok(json!({
+            "marked": marked,
+            "ids": args.ids,
+        }))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct ResolvedTransition {
@@ -59,6 +80,25 @@ pub(super) fn load_notification_read_state() -> NotificationReadState {
         .ok()
         .and_then(|raw| serde_json::from_str(&raw).ok())
         .unwrap_or_default()
+}
+
+pub(super) fn save_notification_read_state(state: &NotificationReadState) -> AppResult<()> {
+    let path = notifications_state_path();
+    let raw = serde_json::to_string(state)?;
+    fs::write(&path, raw)?;
+    Ok(())
+}
+
+/// Mark the given notification ids as read, persisting the read state.
+/// Returns the number of ids that were not already marked.
+pub(super) fn mark_notifications_read(ids: &[String]) -> AppResult<usize> {
+    let mut state = load_notification_read_state();
+    let newly = ids
+        .iter()
+        .filter(|id| state.read_ids.insert((*id).clone()))
+        .count();
+    save_notification_read_state(&state)?;
+    Ok(newly)
 }
 
 pub(super) fn notification_entry_id(issue_key: &str, source: &str, created: &str) -> String {

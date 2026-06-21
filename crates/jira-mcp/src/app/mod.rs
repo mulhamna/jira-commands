@@ -6,6 +6,7 @@ pub mod comment;
 pub mod issue;
 pub mod jql;
 pub mod link;
+pub mod meta;
 pub mod notify;
 pub mod plan;
 pub mod project;

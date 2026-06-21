@@ -21,12 +21,13 @@ use crate::{
         AttachmentListArgs, AuthSetCredentialsArgs, BatchArgs, BoardGetArgs, BoardIssuesArgs,
         BoardListArgs, BulkCommentArgs, BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs,
         IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs,
+        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs, IssueMoveArgs,
         IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, JqlBuildArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
-        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SprintAddIssueArgs,
-        SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs,
-        ToolResponse, WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        IssueUpdateArgs, JqlBuildArgs, NotificationsMarkReadArgs, ProjectKeyArgs,
+        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
+        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
+        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -189,6 +190,33 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueNotificationsArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_notifications(args).await)
+    }
+
+    #[tool(
+        name = "jira_notifications_mark_read",
+        description = "Mark scanned Jira notifications as read by their notification id"
+    )]
+    pub async fn jira_notifications_mark_read(
+        &self,
+        Parameters(args): Parameters<NotificationsMarkReadArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.notifications_mark_read(args).await)
+    }
+
+    #[tool(
+        name = "jira_whoami",
+        description = "Show the current authenticated Jira account id, timezone, and base URL"
+    )]
+    pub async fn jira_whoami(&self) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.whoami().await)
+    }
+
+    #[tool(
+        name = "jira_server_info",
+        description = "Show Jira server info and whether the instance has premium (Plans) features"
+    )]
+    pub async fn jira_server_info(&self) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.server_info().await)
     }
 
     #[tool(
@@ -496,6 +524,17 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         Parameters(args): Parameters<IssueCloneArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_clone(args).await)
+    }
+
+    #[tool(
+        name = "jira_issue_move",
+        description = "Move a Jira issue to another project and issue type using Jira's native bulk move; requires confirm=true"
+    )]
+    pub async fn jira_issue_move(
+        &self,
+        Parameters(args): Parameters<IssueMoveArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.issue_move(args).await)
     }
 
     #[tool(
@@ -860,6 +899,12 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool.name == "jira_issue_notifications"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool.name == "jira_notifications_mark_read"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_issue_move"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_whoami"));
+        assert!(tools.iter().any(|tool| tool.name == "jira_server_info"));
 
         client
             .call_tool(CallToolRequestParams::new("jira_auth_status"))

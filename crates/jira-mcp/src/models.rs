@@ -65,6 +65,12 @@ pub struct IssueKeyArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NotificationsMarkReadArgs {
+    /// Notification ids (the `id` field from jira_issue_notifications entries).
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct IssueTypesListArgs {
     pub project_key: String,
 }
@@ -269,6 +275,18 @@ pub struct IssueCloneArgs {
 pub struct IssueTransitionArgs {
     pub key: String,
     pub transition: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct IssueMoveArgs {
+    pub key: String,
+    /// Target project key to move the issue into.
+    pub project_key: String,
+    /// Target issue type id (not name). Fetch ids via jira_issue_types_list.
+    pub issue_type_id: String,
+    /// Optional target parent key (for sub-tasks).
+    pub parent: Option<String>,
+    pub confirm: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

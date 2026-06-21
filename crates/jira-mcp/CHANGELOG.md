@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.2.1...jira-mcp-v2.3.0) (2026-06-21)
+
+
+### Features
+
+* **jira-mcp:** add issue move, whoami, server-info, and notification mark-read tools ([#384](https://github.com/mulhamna/jira-commands/issues/384)) ([bc00e39](https://github.com/mulhamna/jira-commands/commit/bc00e3959b84e61bc9be56adc73dfb639d428dc0))
+
 ## [2.2.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.2.0...jira-mcp-v2.2.1) (2026-06-19)
 
 

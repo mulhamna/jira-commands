@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.3.2](https://github.com/mulhamna/jira-commands/compare/v2.3.1...v2.3.2) (2026-06-22)
+
+
+### Bug Fixes
+
+* jira-core runtime bugs, npm/mcp installers, brew-trust docs ([#394](https://github.com/mulhamna/jira-commands/issues/394)) ([0ee6881](https://github.com/mulhamna/jira-commands/commit/0ee68812b009efe63e1347fe5d2f7ce4c13a5f81))
+
 ## [2.3.1](https://github.com/mulhamna/jira-commands/compare/v2.3.0...v2.3.1) (2026-06-20)
 
 

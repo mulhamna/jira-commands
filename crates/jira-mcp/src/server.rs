@@ -485,7 +485,10 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         self.respond(self.app.issue_transitions_list(args).await)
     }
 
-    #[tool(name = "jira_issue_create", description = "Create a Jira issue")]
+    #[tool(
+        name = "jira_issue_create",
+        description = "Create a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF."
+    )]
     pub async fn jira_issue_create(
         &self,
         Parameters(args): Parameters<IssueCreateArgs>,
@@ -495,7 +498,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_update",
-        description = "Update fields on a Jira issue"
+        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF."
     )]
     pub async fn jira_issue_update(
         &self,
@@ -712,7 +715,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_batch",
-        description = "Run typed create, update, transition, and archive issue operations in sequence; requires confirm=true"
+        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (auto-converted to ADF)."
     )]
     pub async fn jira_issue_batch(
         &self,

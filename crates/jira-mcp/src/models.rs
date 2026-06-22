@@ -221,7 +221,12 @@ pub struct IssueCreateArgs {
     pub project_key: String,
     pub summary: String,
     pub issue_type: String,
+    /// Issue description as plain Markdown (headings, lists, tables, code,
+    /// links). Auto-converted to Atlassian Document Format. Use this for
+    /// normal text — do NOT hand-build ADF.
     pub description: Option<String>,
+    /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
+    /// for Markdown. If both are set, this one wins.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -231,6 +236,8 @@ pub struct IssueCreateArgs {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    /// Map of field id (e.g. customfield_10011) or name -> value. Fetch ids
+    /// via jira_issue_fields.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
@@ -240,7 +247,12 @@ pub struct IssueCreateArgs {
 pub struct IssueUpdateArgs {
     pub key: String,
     pub summary: Option<String>,
+    /// Issue description as plain Markdown (headings, lists, tables, code,
+    /// links). Auto-converted to Atlassian Document Format. Use this for
+    /// normal text — do NOT hand-build ADF.
     pub description: Option<String>,
+    /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
+    /// for Markdown. If both are set, this one wins.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -250,6 +262,8 @@ pub struct IssueUpdateArgs {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    /// Map of field id (e.g. customfield_10011) or name -> value. Fetch ids
+    /// via jira_issue_fields.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
@@ -390,7 +404,11 @@ pub struct BatchCreateOp {
     pub project_key: String,
     pub summary: String,
     pub issue_type: Option<String>,
+    /// Issue description as plain Markdown. Auto-converted to ADF — do NOT
+    /// hand-build ADF.
     pub description: Option<String>,
+    /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
+    /// for Markdown. If both are set, this one wins.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -400,6 +418,8 @@ pub struct BatchCreateOp {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    /// Map of field id (e.g. customfield_10011) or name -> value. Fetch ids
+    /// via jira_issue_fields.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,
@@ -409,7 +429,11 @@ pub struct BatchCreateOp {
 pub struct BatchUpdateOp {
     pub key: String,
     pub summary: Option<String>,
+    /// Issue description as plain Markdown. Auto-converted to ADF — do NOT
+    /// hand-build ADF.
     pub description: Option<String>,
+    /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
+    /// for Markdown. If both are set, this one wins.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -419,6 +443,8 @@ pub struct BatchUpdateOp {
     pub components: Option<Vec<String>>,
     pub parent: Option<String>,
     pub fix_versions: Option<Vec<String>>,
+    /// Map of field id (e.g. customfield_10011) or name -> value. Fetch ids
+    /// via jira_issue_fields.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub custom_fields: Option<BTreeMap<String, Value>>,

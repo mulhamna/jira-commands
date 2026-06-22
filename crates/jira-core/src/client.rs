@@ -464,57 +464,23 @@ impl JiraClient {
     }
 
     /// Get fields available for a project (runtime field resolution — no hardcoding).
+    ///
+    /// The `createmeta/{project}/issuetypes` LIST endpoint only returns issue
+    /// types (no per-type `fields`), so fields are resolved per issue type via
+    /// the `createmeta/{project}/issuetypes/{id}` endpoint and merged.
     pub async fn get_project_fields(&self, project_key: &str) -> Result<Vec<Field>> {
-        let headers = self.auth_headers()?;
-        let url = self.platform_url(&format!("/issue/createmeta/{project_key}/issuetypes"));
-
-        #[derive(serde::Deserialize)]
-        struct IssueTypeMeta {
-            #[serde(rename = "issueTypes")]
-            issue_types: Vec<IssueTypeDetail>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct IssueTypeDetail {
-            fields: Option<std::collections::HashMap<String, FieldMeta>>,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct FieldMeta {
-            name: String,
-            required: bool,
-            schema: Option<Value>,
-        }
-
-        let http = &self.http;
-        let meta: IssueTypeMeta = self
-            .request(|| http.get(&url).headers(headers.clone()))
-            .await?;
+        let issue_types = self.get_issue_types(project_key).await?;
 
         let mut fields: Vec<Field> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        for it in meta.issue_types {
-            if let Some(field_map) = it.fields {
-                for (id, meta) in field_map {
-                    if seen.insert(id.clone()) {
-                        let field_type = meta
-                            .schema
-                            .as_ref()
-                            .and_then(|s| s.get("type"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-
-                        fields.push(Field {
-                            id,
-                            name: meta.name,
-                            field_type,
-                            required: meta.required,
-                            schema: meta.schema,
-                            allowed_values: None,
-                        });
-                    }
+        for it in issue_types {
+            // ponytail: first-seen wins on the required flag — a field required
+            // in only some issue types reports the first type's flag, which is
+            // fine for a project-wide field list.
+            for field in self.get_fields_for_issue_type(project_key, &it.id).await? {
+                if seen.insert(field.id.clone()) {
+                    fields.push(field);
                 }
             }
         }
@@ -929,11 +895,19 @@ impl JiraClient {
                 .unwrap_or_default();
             let boards = Self::paged_values(&boards_resp);
 
-            board_ids.extend(
-                boards
-                    .iter()
-                    .filter_map(|b| b.get("id").and_then(|id| id.as_u64())),
-            );
+            // Only scrum boards have sprints. Kanban/simple boards reject the
+            // /sprint endpoint with an API error, which would otherwise abort
+            // the whole listing. Keep boards whose type is scrum or unspecified.
+            board_ids.extend(boards.iter().filter_map(|b| {
+                let is_scrum = b
+                    .get("type")
+                    .and_then(|t| t.as_str())
+                    .map(|t| t.eq_ignore_ascii_case("scrum"))
+                    .unwrap_or(true);
+                is_scrum
+                    .then(|| b.get("id").and_then(|id| id.as_u64()))
+                    .flatten()
+            }));
 
             if Self::page_is_last(&boards_resp, boards.len()) {
                 break;
@@ -2410,6 +2384,107 @@ mod tests {
         assert_eq!(sprints[1].state, "future");
         assert_eq!(sprints[2].id, 20);
         assert_eq!(sprints[2].state, "future");
+    }
+
+    #[tokio::test]
+    async fn list_sprints_for_project_skips_kanban_boards() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board"))
+            .and(header("authorization", expected_auth.as_str()))
+            .and(query_param("projectKeyOrId", "TEST"))
+            .and(query_param("maxResults", "100"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 1, "type": "scrum" },
+                    { "id": 2, "type": "kanban" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/1/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [
+                    { "id": 10, "name": "Active Sprint", "state": "active" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        // Kanban board must never be queried — a 500 here would surface as an
+        // error if the filter failed.
+        Mock::given(method("GET"))
+            .and(path("/rest/agile/1.0/board/2/sprint"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(500).set_body_string("kanban has no sprints"))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let sprints = client
+            .list_sprints_for_project("TEST")
+            .await
+            .expect("kanban board should be skipped, not error");
+
+        assert_eq!(sprints.len(), 1);
+        assert_eq!(sprints[0].id, 10);
+    }
+
+    #[tokio::test]
+    async fn get_project_fields_aggregates_across_issue_types() {
+        let server = MockServer::start().await;
+        let expected_auth = cloud_auth();
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/createmeta/TEST/issuetypes"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issueTypes": [
+                    { "id": "10001", "name": "Story" },
+                    { "id": "10002", "name": "Task" }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/createmeta/TEST/issuetypes/10001"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": {
+                    "summary": { "name": "Summary", "required": true, "schema": { "type": "string" } },
+                    "customfield_1": { "name": "Story Points", "required": false, "schema": { "type": "number" } }
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/createmeta/TEST/issuetypes/10002"))
+            .and(header("authorization", expected_auth.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "fields": {
+                    "summary": { "name": "Summary", "required": true, "schema": { "type": "string" } },
+                    "customfield_2": { "name": "Component", "required": false, "schema": { "type": "string" } }
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let fields = client
+            .get_project_fields("TEST")
+            .await
+            .expect("project fields should resolve per issue type");
+
+        let mut ids: Vec<&str> = fields.iter().map(|f| f.id.as_str()).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec!["customfield_1", "customfield_2", "summary"]);
     }
 
     #[tokio::test]

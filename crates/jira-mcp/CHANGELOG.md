@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.0...jira-mcp-v2.3.1) (2026-06-22)
+
+
+### Bug Fixes
+
+* **jira-mcp:** document markdown/ADF affordance on issue tools ([#391](https://github.com/mulhamna/jira-commands/issues/391)) ([cf74365](https://github.com/mulhamna/jira-commands/commit/cf74365bdbcae7586fb6f0d897c5fe6b5dfca9da))
+
 ## [2.3.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.2.1...jira-mcp-v2.3.0) (2026-06-21)
 
 

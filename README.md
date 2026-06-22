@@ -76,7 +76,6 @@ Jira on the command line.
 ```bash
 # Homebrew (macOS / Linux)
 brew tap mulhamna/tap
-brew trust mulhamna/tap   # newer Homebrew requires trusting third-party taps
 brew install jira-commands
 
 # Optional MCP server

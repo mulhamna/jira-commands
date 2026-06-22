@@ -9,7 +9,9 @@ const { spawnSync } = require('node:child_process');
 
 const REPO = 'mulhamna/jira-commands';
 const VERSION = require('../package.json').version;
-const TAG = `v${VERSION}`;
+// jirac-mcp release assets live on the separate jira-mcp release lane,
+// tagged `jira-mcp-vX.Y.Z` (not `vX.Y.Z`, which is the jirac lane).
+const TAG = `jira-mcp-v${VERSION}`;
 const BASE_URL = `https://github.com/${REPO}/releases/download/${TAG}`;
 const BIN_DIR = path.join(__dirname, 'bin');
 const TMP_DIR = path.join(os.tmpdir(), `jirac-mcp-npm-${process.pid}-${Date.now()}`);

@@ -18,10 +18,10 @@ function getPlatformAsset() {
   const platform = process.platform;
   const arch = process.arch;
 
-  if (platform === 'darwin' && arch === 'arm64') return { archive: 'jirac-macos-aarch64.tar.gz', binary: 'jirac', archivedBinary: 'jirac' };
-  if (platform === 'darwin' && arch === 'x64') return { archive: 'jirac-macos-x86_64.tar.gz', binary: 'jirac', archivedBinary: 'jirac' };
-  if (platform === 'linux' && arch === 'x64') return { archive: 'jirac-linux-x86_64.tar.gz', binary: 'jirac', archivedBinary: 'jirac' };
-  if (platform === 'linux' && arch === 'arm64') return { archive: 'jirac-linux-aarch64.tar.gz', binary: 'jirac', archivedBinary: 'jirac' };
+  if (platform === 'darwin' && arch === 'arm64') return { archive: 'jirac-macos-aarch64.tar.gz', binary: 'jirac', archivedBinary: 'jirac-macos-aarch64' };
+  if (platform === 'darwin' && arch === 'x64') return { archive: 'jirac-macos-x86_64.tar.gz', binary: 'jirac', archivedBinary: 'jirac-macos-x86_64' };
+  if (platform === 'linux' && arch === 'x64') return { archive: 'jirac-linux-x86_64.tar.gz', binary: 'jirac', archivedBinary: 'jirac-linux-x86_64' };
+  if (platform === 'linux' && arch === 'arm64') return { archive: 'jirac-linux-aarch64.tar.gz', binary: 'jirac', archivedBinary: 'jirac-linux-aarch64' };
   if (platform === 'win32' && arch === 'x64') return { archive: 'jirac-windows-x86_64.zip', binary: 'jirac.exe', archivedBinary: 'jirac-windows-x86_64.exe' };
   if (platform === 'win32' && arch === 'arm64') return { archive: 'jirac-windows-aarch64.zip', binary: 'jirac.exe', archivedBinary: 'jirac-windows-aarch64.exe' };
 

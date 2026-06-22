@@ -6,7 +6,7 @@ window.JIRAC = (function () {
   // ---- Install matrix: OS -> ordered methods, each a single copy-paste command ----
   const install = {
     macos: [
-      { id: "brew", label: "Homebrew", recommended: true, cmd: "brew tap mulhamna/tap && brew install jira-commands jira-mcp" },
+      { id: "brew", label: "Homebrew", recommended: true, cmd: "brew tap mulhamna/tap && brew trust mulhamna/tap && brew install jira-commands jira-mcp" },
       { id: "shell", label: "Shell script", cmd: "curl -sSL https://raw.githubusercontent.com/mulhamna/jira-commands/main/install.sh | bash" },
       { id: "cargo", label: "Cargo", cmd: "cargo install jira-commands jira-mcp" },
       { id: "npm", label: "npm", cmd: "npm install -g @mulham28/jirac @mulham28/jirac-mcp" },

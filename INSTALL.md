@@ -23,8 +23,12 @@ Install both packages:
 
 ```bash
 brew tap mulhamna/tap
+brew trust mulhamna/tap   # newer Homebrew requires trusting third-party taps
 brew install jira-commands jira-mcp
 ```
+
+> If you see `Refusing to load formula ... from untrusted tap`, run
+> `brew trust mulhamna/tap` (one-time) and re-run the install.
 
 Install just one:
 

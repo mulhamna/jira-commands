@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.1...jira-mcp-v2.3.2) (2026-06-23)
+
+
+### Bug Fixes
+
+* **jira-mcp:** document release lane to trigger mcp release ([#402](https://github.com/mulhamna/jira-commands/issues/402)) ([1f53933](https://github.com/mulhamna/jira-commands/commit/1f539338c2ad4622c4f94b79da7b8617ba02c3ad))
+
 ## [2.3.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.0...jira-mcp-v2.3.1) (2026-06-22)
 
 

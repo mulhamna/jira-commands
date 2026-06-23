@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.3.3](https://github.com/mulhamna/jira-commands/compare/v2.3.2...v2.3.3) (2026-06-23)
+
+
+### Bug Fixes
+
+* **deps:** bump quinn-proto to 0.11.15 for RUSTSEC-2026-0185 ([#399](https://github.com/mulhamna/jira-commands/issues/399)) ([630618c](https://github.com/mulhamna/jira-commands/commit/630618c2610b99daacda90301b18fe78554da823))
+
 ## [2.3.2](https://github.com/mulhamna/jira-commands/compare/v2.3.1...v2.3.2) (2026-06-22)
 
 

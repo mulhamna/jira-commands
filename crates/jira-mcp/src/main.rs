@@ -1,3 +1,8 @@
+// Release lane: this crate ships on the `jira-mcp-vX.Y.Z` tag lane (NOT the
+// `vX.Y.Z` jirac lane). Brew/npm/winget assets for jirac-mcp are published from
+// that tag. Keep version-bumping commits scoped to `crates/jira-mcp/**` so the
+// release-please mcp lane picks them up — commits touching only
+// `packaging/npm-mcp/**` are not attributed to this lane.
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use jira_mcp::{run_stdio, run_streamable_http};

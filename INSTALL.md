@@ -17,6 +17,24 @@ Detailed installation guide for `jirac` and `jirac-mcp`.
 | Scoop                | ❌    | ❌    | ✅      | Custom bucket `mulhamna/scoop-bucket` for `jirac` + `jirac-mcp` |
 | Winget               | ❌    | ❌    | ✅      | Windows package manager for `mulhamna.jirac` + `mulhamna.jirac-mcp` |
 
+## Choosing a channel (and avoiding conflicts)
+
+Every channel installs the same `jirac` / `jirac-mcp` binaries — pick whichever
+you prefer. They only clash if you install the **same binary from two channels
+at once**, because more than one of them writes to the same directory on `PATH`.
+
+- **Homebrew and npm both write to `/opt/homebrew/bin`** (Apple Silicon). Only
+  one can own the `jirac` symlink at a time. If `brew link` fails with
+  `already exists`, either let brew take over —
+  `brew link --overwrite jira-commands` — or remove the npm copy first:
+  `npm uninstall -g @mulham28/jirac`. To switch back to npm later,
+  `brew unlink jira-commands` then reinstall the npm package.
+- **Cargo installs to `~/.cargo/bin`**, which is usually earlier in `PATH`, so a
+  `cargo install`ed `jirac` shadows the brew/npm one. That's fine (same tool);
+  if you want brew/npm to win, `cargo uninstall jira-commands` or put
+  `/opt/homebrew/bin` ahead of `~/.cargo/bin` in your `PATH`.
+- Check which one wins with `which -a jirac jirac-mcp`.
+
 ## Homebrew (macOS / Linux)
 
 Install both packages:

@@ -38,7 +38,12 @@ async function fetchToFile(url, outPath) {
   });
 
   if (!response.ok || !response.body) {
-    throw new Error(`Download failed: ${url} (${response.status})`);
+    let hint = '';
+    if (response.status === 404) {
+      hint = `\nAsset not found. jirac-mcp ships on the '${TAG}' release lane — `
+        + `verify the release exists at https://github.com/${REPO}/releases/tag/${TAG}`;
+    }
+    throw new Error(`Download failed: ${url} (${response.status})${hint}`);
   }
 
   await fs.promises.mkdir(path.dirname(outPath), { recursive: true });

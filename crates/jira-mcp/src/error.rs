@@ -32,6 +32,73 @@ impl AppError {
         Self::new(ErrorCode::INTERNAL_ERROR, "jira_api_error", detail, data)
     }
 
+    /// Build a `jira_api_error`, lifting Jira's structured `errors` map and
+    /// `errorMessages` array out of the raw response body into the error `data`
+    /// when present. Falls back to the raw body as `detail` for non-JSON or
+    /// non-standard responses (best-effort — never panics on a weird body).
+    fn from_jira_api(status: u16, body: String) -> Self {
+        if let Ok(Value::Object(parsed)) = serde_json::from_str::<Value>(&body) {
+            let errors = parsed.get("errors").cloned();
+            let error_messages = parsed.get("errorMessages").cloned();
+            let has_errors = errors
+                .as_ref()
+                .and_then(Value::as_object)
+                .is_some_and(|m| !m.is_empty());
+            let has_messages = error_messages
+                .as_ref()
+                .and_then(Value::as_array)
+                .is_some_and(|a| !a.is_empty());
+            if has_errors || has_messages {
+                let mut data = Map::new();
+                data.insert("status".into(), json!(status));
+                if let Some(e) = errors {
+                    data.insert("errors".into(), e);
+                }
+                if let Some(m) = error_messages {
+                    data.insert("errorMessages".into(), m);
+                }
+                let field_count = data
+                    .get("errors")
+                    .and_then(Value::as_object)
+                    .map_or(0, Map::len);
+                let detail = if field_count > 0 {
+                    format!("Jira rejected the request: {field_count} field error(s)")
+                } else {
+                    "Jira rejected the request".to_string()
+                };
+                return Self::jira_api_error(detail, Some(Value::Object(data)));
+            }
+        }
+        Self::jira_api_error(body, Some(json!({ "status": status })))
+    }
+
+    /// True when this error carries a non-empty Jira field-validation `errors` map.
+    pub fn is_field_validation(&self) -> bool {
+        self.stable_code == "jira_api_error"
+            && self
+                .data
+                .as_ref()
+                .and_then(|d| d.get("errors"))
+                .and_then(Value::as_object)
+                .is_some_and(|m| !m.is_empty())
+    }
+
+    /// Attach a key/value into this error's structured `data` payload.
+    pub fn with_data_field(mut self, key: &str, value: Value) -> Self {
+        let mut map = match self.data.take() {
+            Some(Value::Object(m)) => m,
+            Some(other) => {
+                let mut m = Map::new();
+                m.insert("context".into(), other);
+                m
+            }
+            None => Map::new(),
+        };
+        map.insert(key.into(), value);
+        self.data = Some(Value::Object(map));
+        self
+    }
+
     pub fn not_found(detail: impl Into<String>, data: Option<Value>) -> Self {
         Self::new(ErrorCode::RESOURCE_NOT_FOUND, "not_found", detail, data)
     }
@@ -98,9 +165,7 @@ impl From<jira_core::JiraError> for AppError {
     fn from(value: jira_core::JiraError) -> Self {
         match value {
             jira_core::JiraError::Auth(message) => Self::auth_missing(message),
-            jira_core::JiraError::Api { status, message } => {
-                Self::jira_api_error(message, Some(json!({ "status": status })))
-            }
+            jira_core::JiraError::Api { status, message } => Self::from_jira_api(status, message),
             jira_core::JiraError::Config(message) => Self::config_error(message),
             jira_core::JiraError::NotFound(message) => Self::not_found(message, None),
             jira_core::JiraError::RateLimit { retry_after } => Self::rate_limited(retry_after),
@@ -126,5 +191,39 @@ impl From<std::io::Error> for AppError {
 impl From<base64::DecodeError> for AppError {
     fn from(value: base64::DecodeError) -> Self {
         Self::validation(format!("Invalid base64 attachment payload: {value}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_jira_field_validation_body() {
+        let body = r#"{"errorMessages":[],"errors":{"customfield_10011":"Epic Link is required"}}"#;
+        let err = AppError::from(jira_core::JiraError::Api {
+            status: 400,
+            message: body.to_string(),
+        });
+
+        assert!(err.is_field_validation());
+        let data = err.data.as_ref().expect("data present");
+        assert_eq!(
+            data["errors"]["customfield_10011"],
+            json!("Epic Link is required")
+        );
+        assert_eq!(data["status"], json!(400));
+        assert!(data.get("errorMessages").is_some());
+    }
+
+    #[test]
+    fn non_json_body_passes_through() {
+        let err = AppError::from(jira_core::JiraError::Api {
+            status: 500,
+            message: "<html>boom</html>".to_string(),
+        });
+
+        assert!(!err.is_field_validation());
+        assert_eq!(err.detail, "<html>boom</html>");
     }
 }

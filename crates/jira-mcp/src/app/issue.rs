@@ -13,7 +13,7 @@ use crate::{
         BulkTransitionArgs, BulkUpdateArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
         IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueMoveArgs,
         IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, SprintSummaryArgs,
+        IssueUpdateArgs, SearchUsersArgs, SprintSummaryArgs,
     },
 };
 
@@ -321,6 +321,12 @@ impl JiraApp {
             .collect();
 
         (!required.is_empty()).then(|| json!(required))
+    }
+
+    pub async fn search_users(&self, args: SearchUsersArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let users = client.search_users(&args.query).await?;
+        Ok(json!({ "users": users }))
     }
 
     pub async fn issue_update(&self, args: IssueUpdateArgs) -> AppResult<Value> {

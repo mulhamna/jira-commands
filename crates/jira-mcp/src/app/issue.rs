@@ -13,7 +13,7 @@ use crate::{
         BulkTransitionArgs, BulkUpdateArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
         IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueListArgs, IssueMoveArgs,
         IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, SprintSummaryArgs,
+        IssueUpdateArgs, SearchUsersArgs, SprintSummaryArgs,
     },
 };
 
@@ -261,11 +261,72 @@ impl JiraApp {
 
     pub async fn issue_create(&self, args: IssueCreateArgs) -> AppResult<Value> {
         let client = self.build_client()?;
-        let issue = client
-            .create_issue_v2(create_issue_request_from_issue(args))
-            .await?;
+        let project_key = args.project_key.clone();
+        let issue_type = args.issue_type.clone();
 
-        Ok(slim_issue(&issue))
+        match client
+            .create_issue_v2(create_issue_request_from_issue(args))
+            .await
+        {
+            Ok(issue) => Ok(slim_issue(&issue)),
+            Err(err) => {
+                let err = AppError::from(err);
+                // On a required-field rejection, attach the schema's required
+                // fields so the agent can retry in one shot instead of looping.
+                if err.is_field_validation() {
+                    if let Some(required) = self
+                        .required_fields_hint(&client, &project_key, &issue_type)
+                        .await
+                    {
+                        return Err(err.with_data_field("required_fields", required));
+                    }
+                }
+                Err(err)
+            }
+        }
+    }
+
+    /// Best-effort lookup of required fields for a project + issue type (matched
+    /// by id or name) to enrich a validation error. Returns `None` on any
+    /// failure — this runs only on the error path and must never mask the
+    /// original error.
+    async fn required_fields_hint(
+        &self,
+        client: &jira_core::JiraClient,
+        project_key: &str,
+        issue_type: &str,
+    ) -> Option<Value> {
+        let type_id = client
+            .get_issue_types(project_key)
+            .await
+            .ok()?
+            .into_iter()
+            .find(|t| t.id == issue_type || t.name.eq_ignore_ascii_case(issue_type))
+            .map(|t| t.id)?;
+
+        let required: Vec<Value> = client
+            .get_fields_for_issue_type(project_key, &type_id)
+            .await
+            .ok()?
+            .into_iter()
+            .filter(|f| f.required)
+            .map(|f| {
+                json!({
+                    "id": f.id,
+                    "name": f.name,
+                    "field_type": f.field_type,
+                    "allowed_values": f.allowed_values,
+                })
+            })
+            .collect();
+
+        (!required.is_empty()).then(|| json!(required))
+    }
+
+    pub async fn search_users(&self, args: SearchUsersArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        let users = client.search_users(&args.query).await?;
+        Ok(json!({ "users": users }))
     }
 
     pub async fn issue_update(&self, args: IssueUpdateArgs) -> AppResult<Value> {

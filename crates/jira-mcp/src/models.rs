@@ -88,6 +88,12 @@ pub struct IssueFieldsArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SearchUsersArgs {
+    /// Name, email, or partial string to match Jira users against.
+    pub query: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SprintListArgs {
     pub project_key: String,
     pub states: Option<Vec<String>>,

@@ -25,9 +25,9 @@ use crate::{
         IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
         IssueUpdateArgs, JqlBuildArgs, NotificationsMarkReadArgs, ProjectKeyArgs,
         ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs,
-        SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse, WatcherAddArgs,
-        WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        RemoteLinkDeleteArgs, SearchUsersArgs, SprintAddIssueArgs, SprintCreateArgs,
+        SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse,
+        WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
     },
 };
 
@@ -250,6 +250,17 @@ impl JiraMcpServer {
         Parameters(args): Parameters<IssueFieldsArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.issue_fields(args).await)
+    }
+
+    #[tool(
+        name = "jira_search_users",
+        description = "Search Jira users by name or email to resolve an accountId for assignee/reporter fields"
+    )]
+    pub async fn jira_search_users(
+        &self,
+        Parameters(args): Parameters<SearchUsersArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.search_users(args).await)
     }
 
     #[tool(

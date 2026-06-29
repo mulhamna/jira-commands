@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.3](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.2...jira-mcp-v2.3.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* **jira-mcp:** structured validation errors + jira_search_users ([#408](https://github.com/mulhamna/jira-commands/issues/408)) ([5d14ef2](https://github.com/mulhamna/jira-commands/commit/5d14ef2dcd9f8daa0688d07b1933f5607c6d1c8b))
+
 ## [2.3.2](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.1...jira-mcp-v2.3.2) (2026-06-23)
 
 

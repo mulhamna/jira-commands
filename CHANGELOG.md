@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.4.0](https://github.com/mulhamna/jira-commands/compare/v2.3.3...v2.4.0) (2026-07-02)
+
+
+### Features
+
+* **cli:** add --non-interactive guard for no-TTY environments ([#411](https://github.com/mulhamna/jira-commands/issues/411)) ([53b52b0](https://github.com/mulhamna/jira-commands/commit/53b52b0d4f7bc3f3f814911b0c1502b7dd4d86ee))
+
 ## [2.3.3](https://github.com/mulhamna/jira-commands/compare/v2.3.2...v2.3.3) (2026-06-23)
 
 

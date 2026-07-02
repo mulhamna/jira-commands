@@ -27,6 +27,10 @@ struct Cli {
     /// Enable verbose logging (sets RUST_LOG=debug)
     #[arg(short, long, global = true)]
     verbose: bool,
+
+    /// Never prompt; error if required input is missing (for scripts/agents/CI)
+    #[arg(long, global = true)]
+    non_interactive: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -85,6 +89,7 @@ async fn main() -> Result<()> {
     }
 
     let cli = Cli::parse();
+    cli::interactive::init(cli.non_interactive);
     let update_notice = version_check::check_for_update().await;
 
     let filter = if cli.verbose {
@@ -119,6 +124,9 @@ async fn main() -> Result<()> {
             cli::issue::handle(*command, client, config.project).await?;
         }
         Commands::Tui { project } => {
+            if cli::interactive::is_non_interactive() {
+                anyhow::bail!("`jirac tui` requires an interactive terminal");
+            }
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
             let effective_project = project.or(config.project);

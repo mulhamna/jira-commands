@@ -168,18 +168,22 @@ jobs:
 
       - name: Publish package
         if: steps.trigger.outputs.source_changed == 'true'
+        env:
+          PUBLISH_VERSION: ${{ steps.publish_meta.outputs.version }}
+          PUBLISH_CHANGELOG: ${{ steps.publish_meta.outputs.changelog }}
+          BUNDLE_DIR: ${{ steps.staged_bundle.outputs.bundle_dir }}
         run: |
           set -euo pipefail
 
           for attempt in 1 2 3; do
             echo "Publish attempt $attempt/3"
 
-            if npx --prefix .github/clawhub-cli clawhub package publish "${{ steps.staged_bundle.outputs.bundle_dir }}" \
+            if npx --prefix .github/clawhub-cli clawhub package publish "$BUNDLE_DIR" \
               --family bundle-plugin \
               --name "$PACKAGE_NAME" \
               --display-name "$PACKAGE_DISPLAY_NAME" \
-              --version "${{ steps.publish_meta.outputs.version }}" \
-              --changelog "${{ steps.publish_meta.outputs.changelog }}" \
+              --version "$PUBLISH_VERSION" \
+              --changelog "$PUBLISH_CHANGELOG" \
               --source-repo "https://github.com/${{ github.repository }}" \
               --source-commit "${{ github.sha }}" \
               --source-ref "${{ github.ref_name }}"; then

@@ -84,33 +84,27 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-x86_64
-            mcp_artifact: jirac-mcp-linux-x86_64
             archive_artifact: jirac-linux-x86_64.tar.gz
-            mcp_archive_artifact: jirac-mcp-linux-x86_64.tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: jirac-linux-aarch64
-            mcp_artifact: jirac-mcp-linux-aarch64
             archive_artifact: jirac-linux-aarch64.tar.gz
-            mcp_archive_artifact: jirac-mcp-linux-aarch64.tar.gz
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-x86_64
-            mcp_artifact: jirac-mcp-macos-x86_64
             archive_artifact: jirac-macos-x86_64.tar.gz
-            mcp_archive_artifact: jirac-mcp-macos-x86_64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: jirac-macos-aarch64
-            mcp_artifact: jirac-mcp-macos-aarch64
             archive_artifact: jirac-macos-aarch64.tar.gz
-            mcp_archive_artifact: jirac-mcp-macos-aarch64.tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact: jirac-windows-x86_64.exe
-            mcp_artifact: jirac-mcp-windows-x86_64.exe
             archive_artifact: jirac-windows-x86_64.zip
-            mcp_archive_artifact: jirac-mcp-windows-x86_64.zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+            artifact: jirac-windows-aarch64.exe
+            archive_artifact: jirac-windows-aarch64.zip
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -129,45 +123,37 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       - name: Build (zigbuild — Linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+        run: cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.17 -p jira-commands
       - name: Build (zigbuild — Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands -p jira-mcp
+        run: cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.17 -p jira-commands
       - name: Build (native)
         if: matrix.target != 'x86_64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-gnu'
-        run: cargo build --release --target ${{ matrix.target }} -p jira-commands -p jira-mcp
+        run: cargo build --release --target ${{ matrix.target }} -p jira-commands
       - name: Copy binaries (Unix)
-        if: matrix.os != 'windows-latest'
+        if: runner.os != 'Windows'
         run: |
           cp target/${{ matrix.target }}/release/jirac ${{ matrix.artifact }}
-          cp target/${{ matrix.target }}/release/jirac-mcp ${{ matrix.mcp_artifact }}
       - name: Copy binaries (Windows)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Copy-Item target/${{ matrix.target }}/release/jirac.exe ${{ matrix.artifact }}
-          Copy-Item target/${{ matrix.target }}/release/jirac-mcp.exe ${{ matrix.mcp_artifact }}
       - name: Package archives (Unix)
-        if: matrix.os != 'windows-latest'
+        if: runner.os != 'Windows'
         run: |
-          mkdir -p dist/jirac dist/jirac-mcp
+          mkdir -p dist/jirac
           cp ${{ matrix.artifact }} dist/jirac/
-          cp ${{ matrix.mcp_artifact }} dist/jirac-mcp/
           cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac/
-          cp README.md LICENSE-MIT LICENSE-APACHE dist/jirac-mcp/
           tar -czf ${{ matrix.archive_artifact }} -C dist/jirac .
-          tar -czf ${{ matrix.mcp_archive_artifact }} -C dist/jirac-mcp .
       - name: Package archives (Windows)
-        if: matrix.os == 'windows-latest'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/jirac, dist/jirac-mcp | Out-Null
+          New-Item -ItemType Directory -Force -Path dist/jirac | Out-Null
           Copy-Item ${{ matrix.artifact }} dist/jirac/
-          Copy-Item ${{ matrix.mcp_artifact }} dist/jirac-mcp/
           Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac/
-          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac-mcp/
           Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
-          Compress-Archive -Path dist/jirac-mcp/* -DestinationPath ${{ matrix.mcp_archive_artifact }}
       - name: Upload artifact (jirac)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -175,14 +161,6 @@ jobs:
           path: |
             ${{ matrix.artifact }}
             ${{ matrix.archive_artifact }}
-          if-no-files-found: error
-      - name: Upload artifact (jirac-mcp)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ matrix.mcp_artifact }}
-          path: |
-            ${{ matrix.mcp_artifact }}
-            ${{ matrix.mcp_archive_artifact }}
           if-no-files-found: error
 
   publish-crates:
@@ -250,11 +228,7 @@ jobs:
             -name 'jirac-*' -o \
             -name 'jirac-*.exe' -o \
             -name 'jirac-*.tar.gz' -o \
-            -name 'jirac-*.zip' -o \
-            -name 'jirac-mcp-*' -o \
-            -name 'jirac-mcp-*.exe' -o \
-            -name 'jirac-mcp-*.tar.gz' -o \
-            -name 'jirac-mcp-*.zip' \
+            -name 'jirac-*.zip' \
           \) -print0 | sort -z | while IFS= read -r -d '' file; do
             sha256sum "$file" >> checksums.txt
           done
@@ -342,6 +316,7 @@ jobs:
       sha_linux_arm: ${{ steps.vars.outputs.sha_linux_arm }}
       sha_linux_x86: ${{ steps.vars.outputs.sha_linux_x86 }}
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
+      sha_windows_arm: ${{ steps.vars.outputs.sha_windows_arm }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -364,12 +339,14 @@ jobs:
           SHA_LINUX_ARM=$(grep -E '(^|/)jirac-linux-aarch64\.tar\.gz$'  checksums.txt | awk '{print $1}')
           SHA_LINUX_X86=$(grep -E '(^|/)jirac-linux-x86_64\.tar\.gz$'   checksums.txt | awk '{print $1}')
           SHA_WINDOWS_X86=$(grep -E '(^|/)jirac-windows-x86_64\.zip$' checksums.txt | awk '{print $1}')
+          SHA_WINDOWS_ARM=$(grep -E '(^|/)jirac-windows-aarch64\.zip$' checksums.txt | awk '{print $1}')
 
           test -n "$SHA_MACOS_ARM"
           test -n "$SHA_MACOS_X86"
           test -n "$SHA_LINUX_ARM"
           test -n "$SHA_LINUX_X86"
           test -n "$SHA_WINDOWS_X86"
+          test -n "$SHA_WINDOWS_ARM"
 
           {
             echo "version=$VERSION"
@@ -378,6 +355,7 @@ jobs:
             echo "sha_linux_arm=$SHA_LINUX_ARM"
             echo "sha_linux_x86=$SHA_LINUX_X86"
             echo "sha_windows_x86=$SHA_WINDOWS_X86"
+            echo "sha_windows_arm=$SHA_WINDOWS_ARM"
             echo "release_date=$RELEASE_DATE"
           } >> "$GITHUB_OUTPUT"
 
@@ -397,24 +375,48 @@ jobs:
 
           version = os.environ['VERSION']
           release_date = os.environ['RELEASE_DATE']
-          sha_windows = os.environ['SHA_WINDOWS_X86']
+          sha_windows_x86 = os.environ['SHA_WINDOWS_X86']
+          sha_windows_arm = os.environ['SHA_WINDOWS_ARM']
 
-          files = {
+          installer_path = Path('packaging/winget/jirac.installer.yaml')
+
+          def patch_installer(content, arch, asset, sha):
+              # Within the block starting at `- Architecture: <arch>` up to the
+              # next `- Architecture:` (or EOF), rewrite InstallerUrl + Sha256.
+              block_re = re.compile(
+                  rf'(- Architecture: {arch}\b.*?)(?=^  - Architecture:|\Z)',
+                  re.MULTILINE | re.DOTALL,
+              )
+              m = block_re.search(content)
+              if not m:
+                  raise SystemExit(f'No installer block for Architecture: {arch} in {installer_path}')
+              block = m.group(0)
+              new_block, n_url = re.subn(
+                  r'(?m)^(\s+InstallerUrl: ).*$',
+                  rf'\g<1>https://github.com/mulhamna/jira-commands/releases/download/v{version}/{asset}',
+                  block,
+                  count=1,
+              )
+              new_block, n_sha = re.subn(
+                  r'(?m)^(\s+InstallerSha256: ).*$',
+                  rf'\g<1>{sha}',
+                  new_block,
+                  count=1,
+              )
+              if n_url != 1 or n_sha != 1:
+                  raise SystemExit(f'Expected one Url and one Sha replacement for {arch}, got {n_url}/{n_sha}')
+              return content.replace(block, new_block, 1)
+
+          simple_files = {
               Path('packaging/winget/jirac.yaml'): [
                   (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
               ],
               Path('packaging/winget/jirac.locale.en-US.yaml'): [
                   (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
               ],
-              Path('packaging/winget/jirac.installer.yaml'): [
-                  (r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}'),
-                  (r'(?m)^ReleaseDate: .*$', f'ReleaseDate: {release_date}'),
-                  (r'(?m)^    InstallerUrl: .*$', f'    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v{version}/jirac-windows-x86_64.zip'),
-                  (r'(?m)^    InstallerSha256: .*$', f'    InstallerSha256: {sha_windows}'),
-              ],
           }
 
-          for path, replacements in files.items():
+          for path, replacements in simple_files.items():
               content = path.read_text()
               for pattern, repl in replacements:
                   content, count = re.subn(pattern, repl, content, count=1)
@@ -422,11 +424,24 @@ jobs:
                       raise SystemExit(f'Expected exactly one match for {pattern!r} in {path}')
               path.write_text(content)
               print(f'updated {path}')
+
+          content = installer_path.read_text()
+          content, count = re.subn(r'(?m)^PackageVersion: .*$', f'PackageVersion: {version}', content, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected PackageVersion replacement in {installer_path}')
+          content, count = re.subn(r'(?m)^ReleaseDate: .*$', f'ReleaseDate: {release_date}', content, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected ReleaseDate replacement in {installer_path}')
+          content = patch_installer(content, 'x64', f'jirac-windows-x86_64.zip', sha_windows_x86)
+          content = patch_installer(content, 'arm64', f'jirac-windows-aarch64.zip', sha_windows_arm)
+          installer_path.write_text(content)
+          print(f'updated {installer_path}')
           EOF
         env:
           VERSION: ${{ steps.vars.outputs.version }}
           RELEASE_DATE: ${{ steps.vars.outputs.release_date }}
           SHA_WINDOWS_X86: ${{ steps.vars.outputs.sha_windows_x86 }}
+          SHA_WINDOWS_ARM: ${{ steps.vars.outputs.sha_windows_arm }}
 
       - name: Create manifest refresh pull request
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
@@ -466,6 +481,7 @@ jobs:
     env:
       VERSION: ${{ needs.refresh-package-manifests.outputs.version }}
       SHA_WINDOWS_X86: ${{ needs.refresh-package-manifests.outputs.sha_windows_x86 }}
+      SHA_WINDOWS_ARM: ${{ needs.refresh-package-manifests.outputs.sha_windows_arm }}
       REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout scoop bucket
@@ -488,17 +504,32 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
-          sha = os.environ["SHA_WINDOWS_X86"]
+          sha_x86 = os.environ["SHA_WINDOWS_X86"]
+          sha_arm = os.environ["SHA_WINDOWS_ARM"]
           repo = os.environ.get("REPOSITORY", "mulhamna/jira-commands")
           manifest_path = Path(os.environ["SCOOP_MANIFEST_PATH"])
 
           manifest = json.loads(manifest_path.read_text())
           manifest["version"] = version
-          manifest["url"] = f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-x86_64.zip"
-          manifest["hash"] = sha
+          manifest.pop("url", None)
+          manifest.pop("hash", None)
+          manifest["architecture"] = {
+              "64bit": {
+                  "url": f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-x86_64.zip",
+                  "hash": sha_x86,
+              },
+              "arm64": {
+                  "url": f"https://github.com/{repo}/releases/download/v{version}/jirac-windows-aarch64.zip",
+                  "hash": sha_arm,
+              },
+          }
           manifest.setdefault("checkver", {})
-          manifest.setdefault("autoupdate", {})
-          manifest["autoupdate"]["url"] = f"https://github.com/{repo}/releases/download/v$version/jirac-windows-x86_64.zip"
+          autoupdate = manifest.setdefault("autoupdate", {})
+          autoupdate.pop("url", None)
+          autoupdate["architecture"] = {
+              "64bit": {"url": f"https://github.com/{repo}/releases/download/v$version/jirac-windows-x86_64.zip"},
+              "arm64": {"url": f"https://github.com/{repo}/releases/download/v$version/jirac-windows-aarch64.zip"},
+          }
           manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
           print(f"updated {manifest_path} -> v{version}")
           PY

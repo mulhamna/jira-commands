@@ -188,11 +188,14 @@ async fn login(args: LoginArgs) -> Result<()> {
 
     let base_url = match args.url {
         Some(url) => url.trim().to_string(),
-        None => Text::new("Jira base URL (e.g. https://yourorg.atlassian.net):")
-            .prompt()
-            .context("Failed to read URL")?
-            .trim()
-            .to_string(),
+        None => {
+            crate::cli::interactive::require_interactive("Jira base URL", "--url")?;
+            Text::new("Jira base URL (e.g. https://yourorg.atlassian.net):")
+                .prompt()
+                .context("Failed to read URL")?
+                .trim()
+                .to_string()
+        }
     };
 
     let deployment = args
@@ -203,6 +206,7 @@ async fn login(args: LoginArgs) -> Result<()> {
     let deployment = if args.deployment.is_some() {
         deployment
     } else {
+        crate::cli::interactive::require_interactive("deployment type", "--deployment")?;
         prompt_deployment(deployment.clone())?
     };
 
@@ -214,6 +218,7 @@ async fn login(args: LoginArgs) -> Result<()> {
     let auth_type = if args.auth_type.is_some() {
         auth_type
     } else {
+        crate::cli::interactive::require_interactive("auth type", "--auth-type")?;
         prompt_auth_type(&deployment, auth_type.clone())?
     };
 
@@ -232,21 +237,27 @@ async fn login(args: LoginArgs) -> Result<()> {
     if config.requires_user_identity() {
         config.email = match args.email {
             Some(email) => email.trim().to_string(),
-            None => Text::new(config.user_label())
-                .prompt()
-                .context("Failed to read user identity")?
-                .trim()
-                .to_string(),
+            None => {
+                crate::cli::interactive::require_interactive("user identity", "--email")?;
+                Text::new(config.user_label())
+                    .prompt()
+                    .context("Failed to read user identity")?
+                    .trim()
+                    .to_string()
+            }
         };
     }
 
     let secret_prompt = format!("{}:", config.credential_label());
     let secret = match args.token {
         Some(token) => token,
-        None => Password::new(&secret_prompt)
-            .with_display_mode(PasswordDisplayMode::Masked)
-            .prompt()
-            .context("Failed to read secret")?,
+        None => {
+            crate::cli::interactive::require_interactive("API token/secret", "--token")?;
+            Password::new(&secret_prompt)
+                .with_display_mode(PasswordDisplayMode::Masked)
+                .prompt()
+                .context("Failed to read secret")?
+        }
     };
     config.token = Some(secret);
 

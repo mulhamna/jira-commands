@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::cli::interactive::require_interactive;
 use crate::cli::progress::{progress_bar, spinner_new};
 use crate::{
     datetime::{build_worklog_range_dates, build_worklog_started, build_worklog_started_for_date},
@@ -2297,6 +2298,7 @@ async fn sprint_delete(
         .context("Project key is required. Pass --project or configure a default project.")?;
     let sprint_meta = resolve_sprint_for_project(&client, &project_key, &sprint).await?;
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirmed = Confirm::new(&format!(
             "Delete sprint '{}' (id:{}) in project {}? This cannot be undone.",
             sprint_meta.name, sprint_meta.id, project_key
@@ -2574,9 +2576,12 @@ async fn create_issue(
     // 1. Project key
     let project_key = match project {
         Some(p) => p,
-        None => Text::new("Project key:")
-            .prompt()
-            .context("Failed to read project key")?,
+        None => {
+            require_interactive("project key", "--project")?;
+            Text::new("Project key:")
+                .prompt()
+                .context("Failed to read project key")?
+        }
     };
 
     // 2. Issue type — interactive picker if not supplied
@@ -2586,9 +2591,12 @@ async fn create_issue(
     // 3. Summary
     let summary = match summary {
         Some(s) => s,
-        None => Text::new("Summary:")
-            .prompt()
-            .context("Failed to read summary")?,
+        None => {
+            require_interactive("summary", "--summary")?;
+            Text::new("Summary:")
+                .prompt()
+                .context("Failed to read summary")?
+        }
     };
 
     // 4. Description from file
@@ -2687,6 +2695,7 @@ async fn resolve_issue_type(
             }
 
             // Interactive picker
+            require_interactive("issue type", "--type")?;
             let options: Vec<String> = types.iter().map(|t| t.name.clone()).collect();
             let selected = Select::new("Issue type:", options)
                 .prompt()
@@ -2704,10 +2713,13 @@ async fn resolve_issue_type(
             // API call failed or returned empty — fall back gracefully
             let name = match issue_type {
                 Some(n) => n,
-                None => Text::new("Issue type (e.g. Task, Bug, Story):")
-                    .with_default("Task")
-                    .prompt()
-                    .context("Failed to read issue type")?,
+                None => {
+                    require_interactive("issue type", "--type")?;
+                    Text::new("Issue type (e.g. Task, Bug, Story):")
+                        .with_default("Task")
+                        .prompt()
+                        .context("Failed to read issue type")?
+                }
             };
             Ok((name, String::new()))
         }
@@ -2760,6 +2772,8 @@ async fn collect_custom_fields(
     if custom.is_empty() {
         return Ok(HashMap::new());
     }
+
+    require_interactive("required custom fields", "--field / --no-custom-fields")?;
 
     println!("\nRequired custom fields:");
     println!("{}", "─".repeat(40));
@@ -2940,6 +2954,7 @@ async fn update_issue(
 
 async fn delete_issue(client: JiraClient, key: String, force: bool) -> Result<()> {
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!("Delete {key}? This cannot be undone."))
             .with_default(false)
             .prompt()
@@ -2988,6 +3003,7 @@ async fn transition_issue(
             .map(|t| t.id.clone())
             .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", name_or_id))?
     } else {
+        require_interactive("target transition", "the transition name/id argument")?;
         let options: Vec<String> = transitions
             .iter()
             .map(|t| format!("{} [{}]", t.name, t.id))
@@ -3135,6 +3151,7 @@ async fn attachment_download(
 
 async fn attachment_delete(client: JiraClient, id: String, force: bool) -> Result<()> {
     if !force {
+        require_interactive("confirmation", "--force")?;
         let ok = Confirm::new(&format!("Delete attachment {id}?"))
             .with_default(false)
             .prompt()
@@ -3165,9 +3182,12 @@ async fn list_fields(
 ) -> Result<()> {
     let project_key = match project {
         Some(p) => p,
-        None => Text::new("Project key:")
-            .prompt()
-            .context("Failed to read project key")?,
+        None => {
+            require_interactive("project key", "--project")?;
+            Text::new("Project key:")
+                .prompt()
+                .context("Failed to read project key")?
+        }
     };
 
     // Get issue types to resolve the ID
@@ -3186,6 +3206,7 @@ async fn list_fields(
                 anyhow::anyhow!("Issue type '{}' not found in {}", filter, project_key)
             })?
     } else {
+        require_interactive("issue type", "--type")?;
         let options: Vec<String> = types.iter().map(|t| t.name.clone()).collect();
         let selected = Select::new("Issue type:", options)
             .prompt()
@@ -3273,7 +3294,15 @@ fn read_render_input(path: Option<&std::path::Path>) -> Result<String> {
         Some(path) => std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read input file: {}", path.display())),
         None => {
-            use std::io::Read;
+            use std::io::{IsTerminal, Read};
+
+            // A TTY with nothing piped would block on stdin forever — refuse instead.
+            // Piped input is NOT a terminal, so it still reads normally below.
+            if std::io::stdin().is_terminal() {
+                anyhow::bail!(
+                    "no input file and nothing piped on stdin. Pass a file path or pipe content."
+                );
+            }
 
             let mut input = String::new();
             std::io::stdin()
@@ -3498,6 +3527,7 @@ async fn watch_list(client: JiraClient, key: String) -> Result<()> {
 
 async fn watch_rm(client: JiraClient, key: String, account_id: String, force: bool) -> Result<()> {
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!("Remove watcher {account_id} from {key}?"))
             .with_default(false)
             .prompt()
@@ -3645,6 +3675,7 @@ async fn bulk_comment(
     println!("Found {} issue(s).", target_keys.len());
 
     if !force {
+        require_interactive("confirmation", "--force")?;
         let target_label = if jql.is_some() {
             "matched issues"
         } else {
@@ -3909,6 +3940,7 @@ async fn worklog_add_range(
 
 async fn worklog_delete(client: JiraClient, key: String, id: String, force: bool) -> Result<()> {
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!("Delete worklog {id} on {key}?"))
             .with_default(false)
             .prompt()
@@ -3953,6 +3985,7 @@ async fn bulk_transition(
     println!("Found {} issues.", issues.len());
 
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!(
             "Transition all {} issues to '{to}'?",
             issues.len()
@@ -4046,6 +4079,7 @@ async fn bulk_update(
     println!("Found {} issues.", issues.len());
 
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!("Update {} issues?", issues.len()))
             .with_default(false)
             .prompt()
@@ -4119,6 +4153,7 @@ async fn archive(client: JiraClient, jql: String, force: bool) -> Result<()> {
     println!("Found {} issues.", issues.len());
 
     if !force {
+        require_interactive("confirmation", "--force")?;
         let confirm = inquire::Confirm::new(&format!(
             "Archive {} issues? This cannot be undone.",
             issues.len()
@@ -4172,6 +4207,8 @@ fn load_jql_params(spec: &str) -> Result<jira_core::jql::JqlParams> {
 
 fn prompt_jql_params() -> Result<jira_core::jql::JqlParams> {
     use jira_core::jql::{AssigneeFilter, JqlParams, OrderDir};
+
+    require_interactive("JQL parameters", "--params <json|@file>")?;
 
     println!("JQL Builder — press Enter to skip any field\n");
 
@@ -4732,6 +4769,10 @@ async fn clone_issue(
 
     if move_issue {
         // Confirm before deleting original
+        require_interactive(
+            "deletion of the original after clone",
+            "`jirac issue move` (native move) or run interactively",
+        )?;
         let confirm = inquire::Confirm::new(&format!(
             "Delete original {key} after cloning to {}?",
             clone.key
@@ -4942,6 +4983,7 @@ async fn handle_link_command(client: JiraClient, cmd: LinkCommand) -> Result<()>
         }
         LinkCommand::Delete { id, force } => {
             if !force {
+                require_interactive("confirmation", "--force")?;
                 let confirmed = inquire::Confirm::new(&format!("Delete issue link {id}?"))
                     .with_default(false)
                     .prompt()?;

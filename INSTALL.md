@@ -213,6 +213,8 @@ jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
 jirac mcp install --client codex
+jirac mcp install --client vscode
+jirac mcp install --client copilot-cli
 jirac mcp install --client opencode
 jirac mcp install --client generic-json
 jirac mcp install --client antigravity
@@ -225,6 +227,8 @@ Supported targets now:
 - `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
 - `gemini-cli` (delegates to `gemini mcp add -s user ...`)
 - `codex` (delegates to `codex mcp add ...`)
+- `vscode` (delegates to `code --add-mcp ...` — GitHub Copilot in VS Code)
+- `copilot-cli` (`~/.copilot/mcp-config.json`, direct JSON write for GitHub Copilot CLI)
 - `opencode` (`~/.config/opencode/opencode.jsonc`, direct JSONC write)
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
 - `antigravity` (`~/.gemini/antigravity/mcp_config.json`, user-level JSON with `mcpServers`)

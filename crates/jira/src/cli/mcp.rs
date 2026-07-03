@@ -44,6 +44,10 @@ pub enum McpClient {
     Cursor,
     GeminiCli,
     Codex,
+    #[value(name = "vscode")]
+    Vscode,
+    #[value(name = "copilot-cli")]
+    CopilotCli,
     #[value(name = "opencode")]
     OpenCode,
     GenericJson,
@@ -64,6 +68,12 @@ impl std::fmt::Display for McpClient {
                 "codex              (delegates to `codex mcp add` for codex cli & codex desktop)"
             }
             McpClient::GeminiCli => "gemini-cli         (delegates to `gemini mcp add`)",
+            McpClient::Vscode => {
+                "vscode             (delegates to `code --add-mcp`; GitHub Copilot in VS Code)"
+            }
+            McpClient::CopilotCli => {
+                "copilot-cli        (writes ~/.copilot/mcp-config.json; GitHub Copilot CLI)"
+            }
             McpClient::OpenCode => "opencode           (writes opencode.jsonc)",
             McpClient::Antigravity => {
                 "antigravity        (writes ~/.gemini/antigravity/mcp_config.json)"
@@ -163,6 +173,8 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::Cursor,
             McpClient::Codex,
             McpClient::GeminiCli,
+            McpClient::Vscode,
+            McpClient::CopilotCli,
             McpClient::OpenCode,
             McpClient::Antigravity,
             McpClient::AntigravityCli,
@@ -289,6 +301,8 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::Cursor,
             McpClient::GeminiCli,
             McpClient::Codex,
+            McpClient::Vscode,
+            McpClient::CopilotCli,
             McpClient::OpenCode,
             McpClient::GenericJson,
             McpClient::Antigravity,
@@ -444,6 +458,22 @@ fn server_spec(client: &McpClient, name: &str, command: &str, transport: &str) -
                 json_snippet,
             }
         }
+        McpClient::CopilotCli => {
+            let file_entry = json!({
+                "type": "stdio",
+                "command": command,
+                "args": ["serve", "--transport", transport],
+            });
+            let json_snippet = json!({
+                "mcpServers": {
+                    name: file_entry.clone()
+                }
+            });
+            ServerSpec {
+                file_entry,
+                json_snippet,
+            }
+        }
         _ => {
             let file_entry = json!({
                 "command": command,
@@ -485,7 +515,17 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
             "mcpServers",
         ),
         McpClient::OpenCode => ("opencode", opencode_settings_path(&home), "mcp"),
-        McpClient::GeminiCli | McpClient::Codex | McpClient::GenericJson => unreachable!(),
+        McpClient::CopilotCli => (
+            "copilot-cli",
+            config_path_from_env_or_default(
+                "COPILOT_CLI_CONFIG",
+                home.join(".copilot/mcp-config.json"),
+            ),
+            "mcpServers",
+        ),
+        McpClient::GeminiCli | McpClient::Codex | McpClient::Vscode | McpClient::GenericJson => {
+            unreachable!()
+        }
         McpClient::Antigravity => (
             "antigravity",
             config_path_from_env_or_default(
@@ -555,6 +595,19 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
             program: "codex",
             note: "Delegates to `codex mcp add ...`.",
         },
+        McpClient::Vscode => ClientDescriptor::Delegated {
+            label: "vscode",
+            program: "code",
+            note: "Delegates to `code --add-mcp ...` (GitHub Copilot in VS Code).",
+        },
+        McpClient::CopilotCli => ClientDescriptor::FileTarget {
+            label: "copilot-cli",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.copilot/mcp-config.json")),
+            note: "Writes GitHub Copilot CLI config at ~/.copilot/mcp-config.json (mcpServers).",
+            top_level_key: "mcpServers",
+        },
         McpClient::GenericJson => ClientDescriptor::SnippetOnly {
             label: "generic-json",
             note: "Prints a portable JSON snippet instead of writing a file.",
@@ -589,6 +642,11 @@ fn client_adapter(client: &McpClient) -> Option<ClientAdapter> {
             label: "codex",
             program: "codex",
             build_steps: codex_steps,
+        }),
+        McpClient::Vscode => Some(ClientAdapter {
+            label: "vscode",
+            program: "code",
+            build_steps: vscode_steps,
         }),
         _ => None,
     }
@@ -658,6 +716,19 @@ fn codex_steps(name: &str, command: &str, transport: &str, force: bool) -> Vec<V
         transport.into(),
     ]);
     steps
+}
+
+fn vscode_steps(name: &str, command: &str, transport: &str, _force: bool) -> Vec<Vec<String>> {
+    // ponytail: type hardcoded "stdio" (matches default transport);
+    // add an http/sse branch if a non-stdio transport is ever wired.
+    // `code --add-mcp` overwrites an entry with the same name, so force is a no-op.
+    let payload = json!({
+        "name": name,
+        "type": "stdio",
+        "command": command,
+        "args": ["serve", "--transport", transport],
+    });
+    vec![vec!["--add-mcp".into(), payload.to_string()]]
 }
 
 fn config_path_from_env_or_default(env_key: &str, default: PathBuf) -> PathBuf {
@@ -1022,6 +1093,22 @@ mod tests {
         let adapter = client_adapter(&McpClient::Codex).unwrap();
         let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
         assert!(preview.contains("codex mcp add jira -- jirac-mcp serve --transport stdio"));
+    }
+
+    #[test]
+    fn vscode_preview_includes_transport() {
+        let adapter = client_adapter(&McpClient::Vscode).unwrap();
+        let preview = adapter.preview_command("jira", "jirac-mcp", "stdio", false);
+        assert!(preview.contains("code --add-mcp"));
+        assert!(preview.contains("--transport") && preview.contains("stdio"));
+    }
+
+    #[test]
+    fn copilot_cli_spec_is_stdio_mcp_servers() {
+        let spec = server_spec(&McpClient::CopilotCli, "jira", "jirac-mcp", "stdio");
+        assert_eq!(spec.file_entry["type"], "stdio");
+        assert_eq!(spec.file_entry["command"], "jirac-mcp");
+        assert!(spec.json_snippet.get("mcpServers").is_some());
     }
 
     #[test]

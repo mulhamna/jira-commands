@@ -113,6 +113,9 @@ jobs:
 
       - name: Publish skill
         if: steps.trigger.outputs.source_changed == 'true'
+        env:
+          PUBLISH_VERSION: ${{ steps.publish_meta.outputs.version }}
+          PUBLISH_CHANGELOG: ${{ steps.publish_meta.outputs.changelog }}
         run: |
           set -euo pipefail
 
@@ -122,8 +125,8 @@ jobs:
             if npx --prefix .github/clawhub-cli clawhub skill publish "$SKILL_PATH" \
               --slug "$SKILL_SLUG" \
               --name "$SKILL_NAME" \
-              --version "${{ steps.publish_meta.outputs.version }}" \
-              --changelog "${{ steps.publish_meta.outputs.changelog }}"; then
+              --version "$PUBLISH_VERSION" \
+              --changelog "$PUBLISH_CHANGELOG"; then
               echo "Publish succeeded on attempt $attempt"
               exit 0
             fi

@@ -3,7 +3,12 @@ name: ClusterFuzzLite PR fuzzing
 on:
   pull_request:
     paths:
-      - '**'
+      - 'crates/**'
+      - 'fuzz/**'
+      - '.clusterfuzzlite/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/cflite_pr.yml'
 
 permissions:
   contents: read
@@ -11,6 +16,7 @@ permissions:
 jobs:
   pr-fuzzing:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true

@@ -100,7 +100,13 @@ pub fn handle(command: McpCommand) -> Result<()> {
         } => {
             let resolved_client = match client {
                 Some(c) => c,
-                None => run_interactive_prereqs_and_pick(&command)?,
+                None => {
+                    crate::cli::interactive::require_interactive(
+                        "MCP client",
+                        "--client <target>",
+                    )?;
+                    run_interactive_prereqs_and_pick(&command)?
+                }
             };
             install_client(
                 resolved_client,

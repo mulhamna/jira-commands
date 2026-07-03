@@ -16,8 +16,8 @@ jobs:
       github.event.pull_request.draft == false &&
       contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+    # Merging uses the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN.
+    permissions: {}
     steps:
       - name: Enable auto-merge (squash) for labeled PRs only
         env:

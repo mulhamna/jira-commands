@@ -6,6 +6,18 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.5.0](https://github.com/mulhamna/jira-commands/compare/v2.4.0...v2.5.0) (2026-07-03)
+
+
+### Features
+
+* **mcp-install:** add VS Code + GitHub Copilot CLI install targets ([#416](https://github.com/mulhamna/jira-commands/issues/416)) ([6a6ee29](https://github.com/mulhamna/jira-commands/commit/6a6ee298e565bffe190d1dab64e1afec5bfc4b6b))
+
+
+### Bug Fixes
+
+* **ci:** harden workflows from audit findings ([#414](https://github.com/mulhamna/jira-commands/issues/414)) ([1d76758](https://github.com/mulhamna/jira-commands/commit/1d76758c5fc36b50326bc929473d20f05d310783))
+
 ## [2.4.0](https://github.com/mulhamna/jira-commands/compare/v2.3.3...v2.4.0) (2026-07-02)
 
 

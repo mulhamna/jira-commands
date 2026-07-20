@@ -33,13 +33,13 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v3
+        uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v3
         with:
           languages: ${{ matrix.language }}
           build-mode: none
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v3
+        uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v3
 
   # ── 1. CVE scan (rustsec advisory database) ───────────────────────────────
   # Uses plain shell commands instead of rustsec/audit-check action to avoid
@@ -74,7 +74,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           command: check all
 
@@ -111,6 +111,6 @@ jobs:
           path: scorecard-results.sarif
           retention-days: 5
 
-      - uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v3
+      - uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v3
         with:
           sarif_file: scorecard-results.sarif

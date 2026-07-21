@@ -5,5 +5,8 @@
   "license": "UNLICENSED",
   "dependencies": {
     "clawhub": "0.12.2"
+  },
+  "overrides": {
+    "undici": "7.28.0"
   }
 }

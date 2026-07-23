@@ -32,11 +32,34 @@ impl AppError {
         Self::new(ErrorCode::INTERNAL_ERROR, "jira_api_error", detail, data)
     }
 
+    /// Like `jira_api_error`, but with an explicit RPC code so a caller-side
+    /// rejection (4xx) is reported as `INVALID_PARAMS` rather than masquerading
+    /// as an internal server error.
+    fn jira_api_error_with_code(
+        rpc_code: ErrorCode,
+        detail: impl Into<String>,
+        data: Option<Value>,
+    ) -> Self {
+        Self::new(rpc_code, "jira_api_error", detail, data)
+    }
+
+    /// Map an HTTP status to the JSON-RPC error code: 5xx is genuinely
+    /// server-side (`INTERNAL_ERROR`), everything else is the caller's input
+    /// to fix (`INVALID_PARAMS`).
+    fn rpc_code_for_status(status: u16) -> ErrorCode {
+        if status >= 500 {
+            ErrorCode::INTERNAL_ERROR
+        } else {
+            ErrorCode::INVALID_PARAMS
+        }
+    }
+
     /// Build a `jira_api_error`, lifting Jira's structured `errors` map and
     /// `errorMessages` array out of the raw response body into the error `data`
     /// when present. Falls back to the raw body as `detail` for non-JSON or
     /// non-standard responses (best-effort — never panics on a weird body).
     fn from_jira_api(status: u16, body: String) -> Self {
+        let rpc_code = Self::rpc_code_for_status(status);
         if let Ok(Value::Object(parsed)) = serde_json::from_str::<Value>(&body) {
             let errors = parsed.get("errors").cloned();
             let error_messages = parsed.get("errorMessages").cloned();
@@ -66,10 +89,10 @@ impl AppError {
                 } else {
                     "Jira rejected the request".to_string()
                 };
-                return Self::jira_api_error(detail, Some(Value::Object(data)));
+                return Self::jira_api_error_with_code(rpc_code, detail, Some(Value::Object(data)));
             }
         }
-        Self::jira_api_error(body, Some(json!({ "status": status })))
+        Self::jira_api_error_with_code(rpc_code, body, Some(json!({ "status": status })))
     }
 
     /// True when this error carries a non-empty Jira field-validation `errors` map.
@@ -225,5 +248,31 @@ mod tests {
 
         assert!(!err.is_field_validation());
         assert_eq!(err.detail, "<html>boom</html>");
+    }
+
+    #[test]
+    fn client_errors_map_to_invalid_params() {
+        let body = r#"{"errorMessages":[],"errors":{"summary":"required"}}"#;
+        let err = AppError::from(jira_core::JiraError::Api {
+            status: 400,
+            message: body.to_string(),
+        });
+        assert_eq!(err.rpc_code, ErrorCode::INVALID_PARAMS);
+
+        // Raw (non-standard) 4xx body still uses INVALID_PARAMS.
+        let raw = AppError::from(jira_core::JiraError::Api {
+            status: 409,
+            message: "conflict".to_string(),
+        });
+        assert_eq!(raw.rpc_code, ErrorCode::INVALID_PARAMS);
+    }
+
+    #[test]
+    fn server_errors_stay_internal() {
+        let err = AppError::from(jira_core::JiraError::Api {
+            status: 503,
+            message: "<html>unavailable</html>".to_string(),
+        });
+        assert_eq!(err.rpc_code, ErrorCode::INTERNAL_ERROR);
     }
 }

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.5.1](https://github.com/mulhamna/jira-commands/compare/v2.5.0...v2.5.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* honest jira_issue_create errors (-32602 on 4xx, keep issue) ([#430](https://github.com/mulhamna/jira-commands/issues/430)) ([c574b53](https://github.com/mulhamna/jira-commands/commit/c574b538ebac45f5abf56f72e197390483865d70))
+
 ## [2.5.0](https://github.com/mulhamna/jira-commands/compare/v2.4.0...v2.5.0) (2026-07-03)
 
 

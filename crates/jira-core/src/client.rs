@@ -1241,6 +1241,12 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
 
+        // Kept for a best-effort fallback if the post-create re-fetch fails:
+        // the issue already exists, so we must never report the create as failed.
+        let fallback_project_key = req.project_key.clone();
+        let fallback_summary = req.summary.clone();
+        let fallback_issue_type = req.issue_type.clone();
+
         let description_adf = req
             .description_adf
             .or_else(|| req.description.as_deref().map(markdown_to_adf));
@@ -1289,6 +1295,8 @@ impl JiraClient {
 
         #[derive(serde::Deserialize)]
         struct CreateResponse {
+            #[serde(default)]
+            id: String,
             key: String,
         }
 
@@ -1297,7 +1305,31 @@ impl JiraClient {
             .request(|| http.post(&url).headers(headers.clone()).json(&body))
             .await?;
 
-        self.get_issue(&resp.key).await
+        // The issue is now created. Re-fetching the full record is a
+        // convenience, not part of creation — if it fails (rate limit,
+        // transient 5xx, or read-after-write lag), return a minimal issue
+        // built from the create response so the caller still gets the key
+        // instead of a false failure (which would tempt a duplicate retry).
+        match self.get_issue(&resp.key).await {
+            Ok(issue) => Ok(issue),
+            Err(_) => Ok(Issue {
+                id: resp.id,
+                key: resp.key,
+                summary: fallback_summary,
+                description: None,
+                status: String::new(),
+                assignee: None,
+                reporter: None,
+                priority: None,
+                issue_type: fallback_issue_type,
+                project_key: fallback_project_key,
+                created: String::new(),
+                updated: String::new(),
+                attachments: Vec::new(),
+                links: Vec::new(),
+                fields: serde_json::Value::Null,
+            }),
+        }
     }
 
     // ── Comments ─────────────────────────────────────────────────────────────
@@ -2062,6 +2094,44 @@ mod tests {
 
         let info = client.get_server_info().await.expect("server info");
         assert_eq!(info["deploymentType"], Value::String("Data Center".into()));
+    }
+
+    #[tokio::test]
+    async fn create_issue_returns_key_when_refetch_fails() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "10042",
+                "key": "PROJ-42"
+            })))
+            .mount(&server)
+            .await;
+
+        // The convenience re-fetch fails; creation itself succeeded.
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/PROJ-42"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+
+        let client = cloud_client(&server);
+        let issue = client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "PROJ".into(),
+                summary: "hello".into(),
+                issue_type: "Task".into(),
+                ..Default::default()
+            })
+            .await
+            .expect("create must not fail when only the re-fetch fails");
+
+        assert_eq!(issue.key, "PROJ-42");
+        assert_eq!(issue.id, "10042");
+        assert_eq!(issue.summary, "hello");
+        assert_eq!(issue.project_key, "PROJ");
+        assert_eq!(issue.issue_type, "Task");
     }
 
     #[tokio::test]

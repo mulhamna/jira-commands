@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.4](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.3...jira-mcp-v2.3.4) (2026-07-23)
+
+
+### Bug Fixes
+
+* honest jira_issue_create errors (-32602 on 4xx, keep issue) ([#430](https://github.com/mulhamna/jira-commands/issues/430)) ([c574b53](https://github.com/mulhamna/jira-commands/commit/c574b538ebac45f5abf56f72e197390483865d70))
+
 ## [2.3.3](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.2...jira-mcp-v2.3.3) (2026-06-29)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@mulham28/jirac-mcp",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "MCP server for Jira powered by jira-core — installed from npm via GitHub Releases",
   "license": "MIT OR Apache-2.0",
   "repository": {

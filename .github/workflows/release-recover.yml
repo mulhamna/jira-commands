@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
 
@@ -106,7 +106,7 @@ jobs:
             artifact: jirac-windows-aarch64.exe
             archive_artifact: jirac-windows-aarch64.zip
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
       - name: Install Rust stable
@@ -172,7 +172,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # stable
@@ -213,7 +213,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
       - name: Download all artifacts
@@ -252,7 +252,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
 
@@ -318,7 +318,7 @@ jobs:
       sha_windows_x86: ${{ steps.vars.outputs.sha_windows_x86 }}
       sha_windows_arm: ${{ steps.vars.outputs.sha_windows_arm }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           ref: main
@@ -485,7 +485,7 @@ jobs:
       REPOSITORY: ${{ github.repository }}
     steps:
       - name: Checkout scoop bucket
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: mulhamna/scoop-bucket
           token: ${{ secrets.SCOOP_BUCKET_PAT }}
@@ -560,7 +560,7 @@ jobs:
       SHA_WINDOWS_X86: ${{ needs.refresh-package-manifests.outputs.sha_windows_x86 }}
     steps:
       - name: Checkout homebrew-tap
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: mulhamna/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}

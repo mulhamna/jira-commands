@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.6.0](https://github.com/mulhamna/jira-commands/compare/v2.5.1...v2.6.0) (2026-07-30)
+
+
+### Features
+
+* **auth:** show Jira account ID in status ([88d40b6](https://github.com/mulhamna/jira-commands/commit/88d40b6efe8ccd71bea323158d7c47f8a57a9f42))
+
 ## [2.5.1](https://github.com/mulhamna/jira-commands/compare/v2.5.0...v2.5.1) (2026-07-23)
 
 

@@ -2,9 +2,12 @@ use crate::help_text;
 use anyhow::{Context, Result};
 use clap::{Subcommand, ValueEnum};
 use inquire::{Password, PasswordDisplayMode, Select, Text};
-use jira_core::config::{
-    config_file_path, default_profile_name, JiraAuthType, JiraConfig, JiraDeployment,
-    JiraProfilesFile,
+use jira_core::{
+    config::{
+        config_file_path, default_profile_name, JiraAuthType, JiraConfig, JiraDeployment,
+        JiraProfilesFile,
+    },
+    JiraClient,
 };
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -418,6 +421,10 @@ async fn status(profile: Option<String>) -> Result<()> {
             "  Secret:         ✓ stored in {}",
             config_file_path().display()
         );
+        match JiraClient::new(config.clone()).get_myself().await {
+            Ok(account_id) => println!("  Jira ID:        {account_id}"),
+            Err(err) => println!("  Jira ID:        unavailable ({err})"),
+        }
     } else {
         println!("  Secret:         ✗ not found — run `jirac auth login`");
     }

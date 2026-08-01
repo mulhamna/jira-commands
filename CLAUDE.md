@@ -14,6 +14,21 @@ Claude may:
 
 ---
 
+## Common commands
+
+```bash
+cargo build --all                                  # build workspace
+cargo test --all                                   # run all tests
+cargo test -p jira-core auth::                     # run tests matching a path in one crate
+cargo test --all test_name                         # run a single test by name across workspace
+cargo run -p jira -- issue view KEY-123             # run the CLI binary
+cargo run -p jira-mcp                               # run the MCP server binary
+cargo fmt --all                                     # format
+cargo clippy --all-targets --all-features -- -D warnings  # lint
+```
+
+---
+
 ## Project overview
 
 Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynamic introspection, attachment upload, Jira REST API v3, interactive TUI (ratatui), single binary.
@@ -63,7 +78,7 @@ plugin/
 ### Crate responsibilities
 
 - **`jira-core`** — public API: `JiraClient`, model types (split under `model/`), ADF parser, auth (Cloud + Data Center multi-profile), `FieldCache` for custom-field resolution, error types. Library dependency.
-- **`jira/`** — clap commands (`cli/{api,auth,issue,mcp,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`. `mcp` subcommand: `jirac mcp doctor` + `jirac mcp install --client <target>` to register `jirac-mcp` into supported clients (claude-code, claude-desktop, cursor, gemini-cli, codex, vscode, copilot-cli, opencode, generic-json, antigravity, antigravity-cli).
+- **`jira/`** — clap commands (`cli/{api,auth,issue,mcp,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`. `mcp` subcommand: `jirac mcp doctor` + `jirac mcp install --client <target>` to register `jirac-mcp` into supported clients (claude-code, claude-desktop, cursor, gemini-cli, codex, vscode, copilot-cli, opencode, generic-json, antigravity, antigravity-cli, kilocode).
 - **`jira-mcp/`** — MCP server via `rmcp`, split into `app.rs` (wiring) + `server.rs` (impl) + `models.rs` (I/O types). Exposes `jira-core` as MCP tools for LLM clients. Binary: `jirac-mcp`.
 
 ---

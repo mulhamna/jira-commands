@@ -337,7 +337,7 @@ export JIRA_TOKEN=your_api_token
 
 Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then writes the right config file for the client you pick. Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites without writing anything.
 
-Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, generic JSON snippets, Antigravity, and antigravity-cli.
+Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, generic JSON snippets, Antigravity, antigravity-cli, and Kilo Code CLI.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.7.0](https://github.com/mulhamna/jira-commands/compare/v2.6.0...v2.7.0) (2026-08-01)
+
+
+### Features
+
+* **mcp:** add jirac mcp install support for Kilo Code CLI ([3784381](https://github.com/mulhamna/jira-commands/commit/378438100eeb7517b4e82cf0aa21f911f3046bf8))
+
 ## [2.6.0](https://github.com/mulhamna/jira-commands/compare/v2.5.1...v2.6.0) (2026-07-30)
 
 

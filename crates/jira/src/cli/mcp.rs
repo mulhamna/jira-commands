@@ -54,6 +54,8 @@ pub enum McpClient {
     Antigravity,
     #[value(name = "antigravity-cli")]
     AntigravityCli,
+    #[value(name = "kilocode")]
+    KiloCode,
 }
 
 impl std::fmt::Display for McpClient {
@@ -81,6 +83,7 @@ impl std::fmt::Display for McpClient {
             McpClient::AntigravityCli => {
                 "antigravity-cli    (writes ~/.gemini/config/mcp_config.json)"
             }
+            McpClient::KiloCode => "kilocode           (writes ~/.config/kilo/kilo.json)",
             McpClient::GenericJson => "generic-json       (print snippet only, no file changes)",
         };
         f.write_str(label)
@@ -178,6 +181,7 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::OpenCode,
             McpClient::Antigravity,
             McpClient::AntigravityCli,
+            McpClient::KiloCode,
             McpClient::GenericJson,
         ],
     )
@@ -307,6 +311,7 @@ fn doctor(client: Option<McpClient>, command: &str) -> Result<()> {
             McpClient::GenericJson,
             McpClient::Antigravity,
             McpClient::AntigravityCli,
+            McpClient::KiloCode,
         ],
     };
 
@@ -442,7 +447,7 @@ enum ClientDescriptor {
 
 fn server_spec(client: &McpClient, name: &str, command: &str, transport: &str) -> ServerSpec {
     match client {
-        McpClient::OpenCode => {
+        McpClient::OpenCode | McpClient::KiloCode => {
             let file_entry = json!({
                 "type": "local",
                 "command": [command, "serve", "--transport", transport],
@@ -542,6 +547,11 @@ fn install_target(client: &McpClient) -> Result<InstallTarget> {
             ),
             "mcpServers",
         ),
+        McpClient::KiloCode => (
+            "kilocode",
+            config_path_from_env_or_default("KILOCODE_CONFIG", kilocode_settings_path(&home)),
+            "mcp",
+        ),
     };
 
     Ok(InstallTarget {
@@ -627,6 +637,14 @@ fn describe_client(client: &McpClient) -> ClientDescriptor {
                 .unwrap_or_else(|_| PathBuf::from("~/.gemini/config/mcp_config.json")),
             note: "Writes user-level config at ~/.gemini/config/mcp_config.json (mcpServers).",
             top_level_key: "mcpServers",
+        },
+        McpClient::KiloCode => ClientDescriptor::FileTarget {
+            label: "kilocode",
+            path: install_target(client)
+                .map(|t| t.path)
+                .unwrap_or_else(|_| PathBuf::from("~/.config/kilo/kilo.json")),
+            note: "Writes Kilo Code CLI global config at ~/.config/kilo/kilo.json (mcp).",
+            top_level_key: "mcp",
         },
     }
 }
@@ -816,6 +834,13 @@ fn opencode_settings_path(home: &Path) -> PathBuf {
             .unwrap_or_else(|| home.join(".config"))
             .join("opencode/opencode.jsonc")
     }
+}
+
+fn kilocode_settings_path(home: &Path) -> PathBuf {
+    env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".config"))
+        .join("kilo/kilo.json")
 }
 
 fn resolve_command_for_client(client: &McpClient, command: &str, dry_run: bool) -> Result<String> {
@@ -1216,6 +1241,24 @@ mod tests {
         assert!(rendered.contains("\"mcpServers\""));
         assert!(rendered.contains("\"jira\""));
         assert!(rendered.contains("\"jirac-mcp\""));
+    }
+
+    #[test]
+    fn kilocode_install_target_uses_mcp_key() {
+        let target = install_target(&McpClient::KiloCode).unwrap();
+        assert_eq!(target.label, "kilocode");
+        assert_eq!(target.top_level_key, "mcp");
+        assert!(target.path.ends_with(".config/kilo/kilo.json"));
+    }
+
+    #[test]
+    fn kilocode_snippet_uses_local_command_array() {
+        let snippet =
+            server_spec(&McpClient::KiloCode, "jira", "/tmp/jirac-mcp", "stdio").json_snippet;
+        let rendered = serde_json::to_string_pretty(&snippet).unwrap();
+        assert!(rendered.contains("\"mcp\""));
+        assert!(rendered.contains("\"type\": \"local\""));
+        assert!(rendered.contains("/tmp/jirac-mcp"));
     }
 
     #[test]

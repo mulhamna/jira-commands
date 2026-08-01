@@ -219,6 +219,7 @@ jirac mcp install --client opencode
 jirac mcp install --client generic-json
 jirac mcp install --client antigravity
 jirac mcp install --client antigravity-cli
+jirac mcp install --client kilocode
 ```
 
 Supported targets now:
@@ -233,6 +234,7 @@ Supported targets now:
 - `generic-json` (prints a portable JSON snippet instead of writing a file)
 - `antigravity` (`~/.gemini/antigravity/mcp_config.json`, user-level JSON with `mcpServers`)
 - `antigravity-cli` (`~/.gemini/config/mcp_config.json`, user-level JSON with `mcpServers`)
+- `kilocode` (`~/.config/kilo/kilo.json`, Kilo Code CLI global config with `mcp`)
 
 Helpful flags:
 - `--print` prints the JSON snippet or delegated client command first
@@ -256,4 +258,5 @@ Local verification notes:
 - Codex stores MCP entries under `~/.codex/config.toml`; this helper delegates to the Codex CLI directly
 - Antigravity user scope writes `~/.gemini/antigravity/mcp_config.json` (top-level `mcpServers`); override with `ANTIGRAVITY_CONFIG`
 - Antigravity CLI user scope writes `~/.gemini/config/mcp_config.json` (`mcpServers`); override with `ANTIGRAVITY_CLI_CONFIG`
+- Kilo Code CLI user scope writes `~/.config/kilo/kilo.json` (top-level `mcp`, `{"type": "local", "command": [...], "enabled": true}` entries); override with `KILOCODE_CONFIG`. See [Kilo Code CLI MCP docs](https://kilo.ai/docs/automate/mcp/using-in-cli).
 - For local-binary clients, `jirac mcp install` requires `jirac-mcp` on PATH. Install it with `cargo install jira-mcp`, download a release binary, or pass `--command /path/to/jirac-mcp`.

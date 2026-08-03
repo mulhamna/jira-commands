@@ -115,3 +115,9 @@ Notes:
 ## More docs
 
 See the root README and `INSTALL.md` for client-specific install notes, helper target details, and workspace-level context.
+
+
+## Release notes
+
+This package is released from the `crates/jira-mcp` lane. User-facing fixes in MCP docs, request handling, or package metadata should use a releasable Conventional Commit type such as `fix(jira-mcp): ...` when they need a patch release.
+

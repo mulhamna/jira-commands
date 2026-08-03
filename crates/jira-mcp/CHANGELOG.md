@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.5](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.4...jira-mcp-v2.3.5) (2026-08-03)
+
+
+### Bug Fixes
+
+* **jira-mcp:** trigger patch release for custom field guidance ([280910b](https://github.com/mulhamna/jira-commands/commit/280910be03819815df63f012803f13d6186552a7))
+
 ## [2.3.4](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.3...jira-mcp-v2.3.4) (2026-07-23)
 
 

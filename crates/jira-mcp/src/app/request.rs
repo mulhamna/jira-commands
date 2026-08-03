@@ -10,6 +10,15 @@ use crate::{
     models::{BatchCreateOp, BatchUpdateOp, IssueCreateArgs, IssueUpdateArgs},
 };
 
+/// Map custom field inputs to FieldValue for serialization.
+///
+/// Wraps each value as `FieldValue::Raw` to preserve the original JSON type,
+/// which allows array fields (e.g., Labels, MultiSelect) to work correctly.
+/// The JSON shape must match Jira's expectations for the field type:
+/// - Array field (e.g., Labels): `["value1", "value2"]`
+/// - Select field: `{ "value": "option" }`
+/// - User field: `{ "emailAddress": "user@example.com" }`
+/// - Text/Number: scalar value
 pub(super) fn map_custom_fields(
     custom_fields: Option<std::collections::BTreeMap<String, Value>>,
 ) -> HashMap<String, FieldValue> {

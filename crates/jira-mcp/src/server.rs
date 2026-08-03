@@ -498,7 +498,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_create",
-        description = "Create a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF."
+        description = "Create a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
     )]
     pub async fn jira_issue_create(
         &self,

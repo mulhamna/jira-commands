@@ -34,6 +34,22 @@ impl JiraApp {
 
         Ok(JiraClient::new(config))
     }
+
+    /// Resolve the effective limit for a list-like call.
+    ///
+    /// Priority: explicit tool arg > `default_issue_limit` from config >
+    /// `fallback`. The value is clamped to the Jira API upper bound (5000)
+    /// and a minimum of 1.
+    pub(crate) fn resolve_limit(&self, arg: Option<u32>, fallback: u32) -> AppResult<u32> {
+        const MAX: u32 = 5_000;
+        let value = arg
+            .or_else(|| self.load_config().ok().and_then(|c| c.default_issue_limit))
+            .unwrap_or(fallback);
+        if value == 0 {
+            return Err(AppError::validation("limit must be at least 1"));
+        }
+        Ok(value.clamp(1, MAX))
+    }
 }
 
 pub(super) fn require_confirm(confirm: Option<bool>) -> AppResult<()> {

@@ -32,10 +32,7 @@ use super::{
 impl JiraApp {
     pub async fn issue_list(&self, args: IssueListArgs) -> AppResult<Value> {
         let client = self.build_client()?;
-        let limit = args.limit.unwrap_or(25);
-        if !(1..=100).contains(&limit) {
-            return Err(AppError::validation("limit must be between 1 and 100"));
-        }
+        let limit = self.resolve_limit(args.limit, 25)?;
 
         let jql = if let Some(jql) = args.jql {
             jql
@@ -56,10 +53,7 @@ impl JiraApp {
     }
 
     pub async fn issue_standup(&self, args: IssueStandupArgs) -> AppResult<Value> {
-        let limit = args.limit.unwrap_or(50);
-        if !(1..=100).contains(&limit) {
-            return Err(AppError::validation("limit must be between 1 and 100"));
-        }
+        let limit = self.resolve_limit(args.limit, 50)?;
 
         let since = args.since.unwrap_or_else(|| "2d".to_string());
         let cutoff = Utc::now() - parse_relative_window(&since)?;
@@ -117,10 +111,7 @@ impl JiraApp {
 
     pub async fn issue_sprint_summary(&self, args: SprintSummaryArgs) -> AppResult<Value> {
         let client = self.build_client()?;
-        let limit = args.limit.unwrap_or(100);
-        if !(1..=100).contains(&limit) {
-            return Err(AppError::validation("limit must be between 1 and 100"));
-        }
+        let limit = self.resolve_limit(args.limit, 100)?;
 
         let sprint_label = args
             .sprint
@@ -192,10 +183,7 @@ impl JiraApp {
     }
 
     pub async fn issue_notifications(&self, args: IssueNotificationsArgs) -> AppResult<Value> {
-        let limit = args.limit.unwrap_or(50);
-        if !(1..=100).contains(&limit) {
-            return Err(AppError::validation("limit must be between 1 and 100"));
-        }
+        let limit = self.resolve_limit(args.limit, 50)?;
 
         let since = args.since.unwrap_or_else(|| "7d".to_string());
         let client = self.build_client()?;

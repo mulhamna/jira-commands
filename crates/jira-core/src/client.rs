@@ -2059,6 +2059,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         })
     }
 
@@ -2090,6 +2091,7 @@ mod tests {
             deployment: JiraDeployment::DataCenter,
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
+            default_issue_limit: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2159,6 +2161,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2195,6 +2198,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         });
 
         let fields = client
@@ -2246,6 +2250,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         });
 
         let fields = client
@@ -3329,6 +3334,7 @@ mod tests {
             deployment: JiraDeployment::DataCenter,
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
+            default_issue_limit: None,
         });
 
         let issue = client
@@ -3380,6 +3386,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         });
 
         // Test list
@@ -3448,6 +3455,7 @@ mod tests {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
+            default_issue_limit: None,
         });
 
         let issue = client.get_issue("TEST-1").await.expect("get issue");

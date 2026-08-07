@@ -235,6 +235,7 @@ async fn login(args: LoginArgs) -> Result<()> {
         deployment,
         auth_type,
         api_version: 0,
+        default_issue_limit: None,
     };
 
     if config.requires_user_identity() {

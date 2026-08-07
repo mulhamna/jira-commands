@@ -12,6 +12,7 @@ fn cloud_config_requires_user_identity_but_data_center_pat_does_not() {
         deployment: JiraDeployment::Cloud,
         auth_type: JiraAuthType::CloudApiToken,
         api_version: 3,
+        default_issue_limit: None,
     };
     let data_center = JiraConfig {
         profile_name: Some("dc".into()),
@@ -23,6 +24,7 @@ fn cloud_config_requires_user_identity_but_data_center_pat_does_not() {
         deployment: JiraDeployment::DataCenter,
         auth_type: JiraAuthType::DataCenterPat,
         api_version: 2,
+        default_issue_limit: None,
     };
 
     assert!(cloud.requires_user_identity());

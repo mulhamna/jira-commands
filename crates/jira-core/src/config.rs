@@ -59,6 +59,10 @@ pub struct JiraConfig {
     pub auth_type: JiraAuthType,
     #[serde(default = "default_api_version")]
     pub api_version: u8,
+    /// Optional cap on the default number of issues returned by list-like
+    /// commands when no explicit `--limit` is given. `None` means "fetch all".
+    #[serde(default)]
+    pub default_issue_limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +79,10 @@ pub struct JiraProfileConfig {
     pub auth_type: JiraAuthType,
     #[serde(default = "default_api_version")]
     pub api_version: u8,
+    /// Optional cap on the default number of issues returned by list-like
+    /// commands when no explicit `--limit` is given. `None` means "fetch all".
+    #[serde(default)]
+    pub default_issue_limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -109,6 +117,7 @@ impl Default for JiraConfig {
             deployment: JiraDeployment::Cloud,
             auth_type: JiraAuthType::CloudApiToken,
             api_version: default_api_version(),
+            default_issue_limit: None,
         }
     }
 }
@@ -132,6 +141,7 @@ impl From<JiraProfileConfig> for JiraConfig {
             deployment: value.deployment,
             auth_type: value.auth_type,
             api_version,
+            default_issue_limit: value.default_issue_limit,
         }
     }
 }
@@ -177,6 +187,7 @@ impl JiraConfig {
             deployment: self.deployment,
             auth_type: self.auth_type,
             api_version,
+            default_issue_limit: self.default_issue_limit,
         }
     }
 
@@ -277,6 +288,11 @@ impl JiraConfig {
                 self.api_version = value;
             }
         }
+        // Reset-to-default semantics: `JIRA_ISSUE_LIMIT` overrides the file
+        // value. `JIRA_ISSUE_LIMIT=0` is treated as "unset" (fetch all).
+        if let Ok(issue_limit) = env::var("JIRA_ISSUE_LIMIT") {
+            self.default_issue_limit = issue_limit.trim().parse::<u32>().ok().filter(|n| *n > 0);
+        }
     }
 }
 
@@ -327,6 +343,7 @@ impl JiraProfilesFile {
                 deployment: JiraDeployment::Cloud,
                 auth_type: JiraAuthType::CloudApiToken,
                 api_version: default_api_version(),
+                default_issue_limit: None,
             },
         );
 
@@ -544,6 +561,7 @@ timeout_secs = 55
                         deployment: JiraDeployment::Cloud,
                         auth_type: JiraAuthType::CloudApiToken,
                         api_version: 3,
+                        default_issue_limit: None,
                     },
                 ),
                 (
@@ -557,6 +575,7 @@ timeout_secs = 55
                         deployment: JiraDeployment::DataCenter,
                         auth_type: JiraAuthType::DataCenterPat,
                         api_version: 2,
+                        default_issue_limit: None,
                     },
                 ),
             ]),

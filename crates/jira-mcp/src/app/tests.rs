@@ -149,15 +149,15 @@ async fn standup_rejects_invalid_since_window() {
 
 #[tokio::test]
 #[serial]
-async fn notifications_reject_invalid_limit_before_auth() {
+async fn notifications_reject_zero_limit_before_auth() {
     let err = JiraApp
         .issue_notifications(IssueNotificationsArgs {
             project_key: None,
             since: None,
-            limit: Some(101),
+            limit: Some(0),
         })
         .await
-        .expect_err("invalid limit should fail");
+        .expect_err("zero limit should fail");
 
     assert_eq!(err.to_mcp().message, "validation_error");
 }

@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.0](https://github.com/mulhamna/jira-commands/compare/v2.7.0...v2.8.0) (2026-08-07)
+
+
+### Features
+
+* **cli:** configurable issue limit, --all, and issue export ([a7572fd](https://github.com/mulhamna/jira-commands/commit/a7572fda2fdef15726892963b245067fac62d38e))
+* **core:** add configurable default_issue_limit ([62c19d1](https://github.com/mulhamna/jira-commands/commit/62c19d1fbfb35cb1c7502d31d9c1ed5cc325ead2))
+
 ## [2.7.0](https://github.com/mulhamna/jira-commands/compare/v2.6.0...v2.7.0) (2026-08-01)
 
 

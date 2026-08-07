@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.5...jira-mcp-v2.4.0) (2026-08-07)
+
+
+### Features
+
+* **mcp:** resolve list limits from config and drop the 100 cap ([b2abc5b](https://github.com/mulhamna/jira-commands/commit/b2abc5b5394e47184e514d1414c928dcf930eeb8))
+
 ## [2.3.5](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.4...jira-mcp-v2.3.5) (2026-08-03)
 
 

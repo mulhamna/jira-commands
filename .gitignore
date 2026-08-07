@@ -40,3 +40,6 @@ TASK.md
 /tmp/
 tmp/
 .forgeguard/
+.codex/
+.cursor/
+.agents/

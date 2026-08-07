@@ -70,6 +70,11 @@ enum Commands {
         #[command(subcommand)]
         command: cli::board::BoardCommand,
     },
+    /// View or change local configuration (e.g. default_issue_limit)
+    Config {
+        #[command(subcommand)]
+        command: cli::config::ConfigCommand,
+    },
 }
 
 #[tokio::main]
@@ -121,7 +126,8 @@ async fn main() -> Result<()> {
         Commands::Issue { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
-            cli::issue::handle(*command, client, config.project).await?;
+            cli::issue::handle(*command, client, config.project, config.default_issue_limit)
+                .await?;
         }
         Commands::Tui { project } => {
             if cli::interactive::is_non_interactive() {
@@ -150,6 +156,9 @@ async fn main() -> Result<()> {
         Commands::Board { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;
             cli::board::handle(command, client).await?;
+        }
+        Commands::Config { command } => {
+            cli::config::handle(command).await?;
         }
     }
 

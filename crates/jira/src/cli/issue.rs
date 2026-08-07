@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::cli::interactive::require_interactive;
 use crate::cli::progress::{progress_bar, spinner_new};
@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use inquire::{Confirm, MultiSelect, Select, Text};
 use jira_core::{
     model::{
@@ -22,6 +22,35 @@ use jira_core::{
 use serde_json;
 use serde_json::Value;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ExportFormat {
+    Json,
+    Csv,
+}
+
+/// Resolved request bounds for a list-like operation.
+#[derive(Debug, Clone, Copy, Default)]
+struct LimitOptions {
+    /// Explicit `--limit` (overrides configured default).
+    limit: Option<u32>,
+    /// `--all` forces fetching every matching issue.
+    all: bool,
+    /// Configured `default_issue_limit`, used when no explicit limit is given.
+    configured: Option<u32>,
+}
+
+impl LimitOptions {
+    /// Effective cap: `--all` → `None` (fetch everything), otherwise the
+    /// explicit `--limit`, the configured default, or `None` (fetch all).
+    fn effective(self) -> Option<u32> {
+        if self.all {
+            None
+        } else {
+            self.limit.or(self.configured)
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 pub enum IssueCommand {
     /// List issues — by project, JQL, or your assigned issues
@@ -29,10 +58,15 @@ pub enum IssueCommand {
     /// Without flags, shows issues assigned to you (assignee = currentUser()).
     /// Use --project for a project overview, or --jql for full control.
     ///
+    /// By default the result count follows, in priority order: the explicit
+    /// `--limit`, then the configured `default_issue_limit`, then "all".
+    /// "All" fetches every matching issue via pagination unless capped.
+    ///
     /// Examples:
     ///   jirac issue list                              # your assigned issues
     ///   jirac issue list -p PROJ                      # all issues in project
     ///   jirac issue list -p PROJ -l 50                # up to 50 results
+    ///   jirac issue list --all -p PROJ                # every issue (paged)
     ///   jirac issue list --jql 'status = "In Progress" AND project = PROJ'
     ///   jirac issue list --jql 'sprint = openSprints() AND assignee = me'
     List {
@@ -42,12 +76,47 @@ pub enum IssueCommand {
         /// Raw JQL query — overrides --project when both are provided
         #[arg(long, value_name = "JQL")]
         jql: Option<String>,
-        /// Maximum number of issues to return (default: 25, max: 100)
-        #[arg(short, long, default_value = "25", value_name = "N")]
-        limit: u32,
+        /// Maximum number of issues to return. Overrides the configured
+        /// default_issue_limit when both are present.
+        #[arg(short, long, value_name = "N")]
+        limit: Option<u32>,
+        /// Fetch every matching issue, ignoring --limit and configured limits.
+        #[arg(long)]
+        all: bool,
         /// Output results as JSON array
         #[arg(long)]
         json: bool,
+    },
+
+    /// Export matching issues to a file in JSON or CSV format
+    ///
+    /// Intended for large, machine-readable result sets (scripts, reporting,
+    /// pipelines). By default fetches every matching issue via pagination;
+    /// use --limit to cap the result.
+    ///
+    /// Examples:
+    ///   jirac issue export -p PROJ --format json                 # all issues, JSON
+    ///   jirac issue export -p PROJ --format csv -o issues.csv    # all issues, CSV
+    ///   jirac issue export -p PROJ --limit 500 --format json -o out.json
+    Export {
+        /// Project key (e.g. PROJ). Overrides default project from config.
+        #[arg(short, long, value_name = "PROJECT")]
+        project: Option<String>,
+        /// Raw JQL query — overrides --project when both are provided
+        #[arg(long, value_name = "JQL")]
+        jql: Option<String>,
+        /// Fetch every matching issue (ignores --limit and configured limits)
+        #[arg(long)]
+        all: bool,
+        /// Maximum number of issues to export. Omitting it exports everything.
+        #[arg(short = 'l', long, value_name = "N")]
+        limit: Option<u32>,
+        /// Output format
+        #[arg(long, value_enum, default_value = "json")]
+        format: ExportFormat,
+        /// Output file path. Defaults to stdout when omitted.
+        #[arg(short = 'o', long, value_name = "PATH")]
+        output: Option<PathBuf>,
     },
 
     /// Generate a daily standup summary from your assigned issues
@@ -1192,14 +1261,51 @@ pub async fn handle(
     cmd: IssueCommand,
     client: JiraClient,
     default_project: Option<String>,
+    default_issue_limit: Option<u32>,
 ) -> Result<()> {
     match cmd {
         IssueCommand::List {
             project,
             jql,
             limit,
+            all,
             json,
-        } => list_issues(client, project.or(default_project), jql, limit, json).await,
+        } => {
+            list_issues(
+                client,
+                project.or(default_project),
+                jql,
+                LimitOptions {
+                    limit,
+                    all,
+                    configured: default_issue_limit,
+                },
+                json,
+            )
+            .await
+        }
+        IssueCommand::Export {
+            project,
+            jql,
+            all,
+            limit,
+            format,
+            output,
+        } => {
+            export_issues(
+                client,
+                project.or(default_project),
+                jql,
+                LimitOptions {
+                    limit,
+                    all,
+                    configured: default_issue_limit,
+                },
+                format,
+                output,
+            )
+            .await
+        }
         IssueCommand::Standup {
             project,
             jql,
@@ -1510,7 +1616,7 @@ async fn list_issues(
     client: JiraClient,
     project: Option<String>,
     jql: Option<String>,
-    limit: u32,
+    bounds: LimitOptions,
     json: bool,
 ) -> Result<()> {
     let jql_query = if let Some(jql) = jql {
@@ -1521,19 +1627,29 @@ async fn list_issues(
         "assignee = currentUser() ORDER BY updated DESC".to_string()
     };
 
+    // Resolve the effective request limit (priority: --all > --limit >
+    // config.default_issue_limit > "all"). `None` means unfetched/unbounded.
+    let effective_limit = bounds.effective();
+
+    if effective_limit.is_none() && !bounds.all {
+        // No explicit cap anywhere: we are about to fetch every issue. Give a
+        // gentle, stderr-only hint (keeps --json output clean) on how to cap.
+        eprintln!("ℹ️  No default issue limit set — fetching all issues (this may be slow).");
+        eprintln!(
+            "   Tip: set a cap with `jirac config set default_issue_limit <N>` or pass --limit."
+        );
+    }
+
     let spinner = spinner_new("Fetching issues...");
-    let result = client
-        .search_issues(&jql_query, None, Some(limit))
-        .await
-        .context("Failed to search issues")?;
+    let result = fetch_issues(&client, &jql_query, effective_limit).await?;
     spinner.finish_and_clear();
 
     if json {
-        println!("{}", serde_json::to_string_pretty(&result.issues)?);
+        println!("{}", serde_json::to_string_pretty(&result)?);
         return Ok(());
     }
 
-    if result.issues.is_empty() {
+    if result.is_empty() {
         println!("No issues found.");
         return Ok(());
     }
@@ -1544,7 +1660,7 @@ async fn list_issues(
     );
     println!("{}", "─".repeat(82));
 
-    for issue in &result.issues {
+    for issue in &result {
         let summary = if issue.summary.len() > 38 {
             format!("{}…", &issue.summary[..37])
         } else {
@@ -1559,11 +1675,119 @@ async fn list_issues(
         );
     }
 
-    if let Some(total) = result.total {
-        println!("\nShowing {} of {} issues", result.issues.len(), total);
+    println!("\nShowing {} issues", result.len());
+
+    Ok(())
+}
+
+/// Jira Cloud's per-request `maxResults` upper bound.
+const JIRA_MAX_RESULTS: u32 = 5_000;
+
+/// Fetch issues honoring an optional cap. `None` fetches every matching issue
+/// via cursor-based pagination; `Some(n)` issues a single bounded request
+/// (clamped to [`JIRA_MAX_RESULTS`] to avoid a raw Jira API 400).
+async fn fetch_issues(client: &JiraClient, jql: &str, limit: Option<u32>) -> Result<Vec<Issue>> {
+    match limit {
+        Some(n) => {
+            let raw = n;
+            let n = raw.min(JIRA_MAX_RESULTS);
+            if raw > JIRA_MAX_RESULTS {
+                eprintln!(
+                    "ℹ️  Requested limit {raw} exceeds Jira's {JIRA_MAX_RESULTS} per-request cap; using {JIRA_MAX_RESULTS}."
+                );
+            }
+
+            let result = client
+                .search_issues(jql, None, Some(n))
+                .await
+                .context("Failed to search issues")?;
+            Ok(result.issues)
+        }
+        None => client
+            .get_all_issues(jql)
+            .await
+            .context("Failed to fetch all issues"),
+    }
+}
+
+async fn export_issues(
+    client: JiraClient,
+    project: Option<String>,
+    jql: Option<String>,
+    bounds: LimitOptions,
+    format: ExportFormat,
+    output: Option<std::path::PathBuf>,
+) -> Result<()> {
+    let jql_query = if let Some(jql) = jql {
+        jql
+    } else if let Some(proj) = &project {
+        format!("project = {proj} ORDER BY updated DESC")
+    } else {
+        "assignee = currentUser() ORDER BY updated DESC".to_string()
+    };
+
+    // Priority: --all > --limit > config.default_issue_limit > (fetch all).
+    let effective_limit = bounds.effective();
+
+    let spinner = spinner_new("Exporting issues...");
+    let issues = fetch_issues(&client, &jql_query, effective_limit).await?;
+    spinner.finish_and_clear();
+
+    let rendered: String = match format {
+        ExportFormat::Json => serde_json::to_string_pretty(&issues)?,
+        ExportFormat::Csv => render_issues_csv(&issues),
+    };
+
+    match output {
+        Some(path) => {
+            std::fs::write(&path, rendered)
+                .with_context(|| format!("Failed to write export to {}", path.display()))?;
+            println!(
+                "✓ Exported {} issues ({format:?}) to {}",
+                issues.len(),
+                path.display()
+            );
+        }
+        None => println!("{rendered}"),
     }
 
     Ok(())
+}
+
+/// Render issues as a simple CSV (header + one row per issue). Values are
+/// escaped for commas, quotes, and newlines.
+fn render_issues_csv(issues: &[Issue]) -> String {
+    let mut out = String::new();
+    out.push_str("id,key,project,type,status,summary,assignee,reporter,priority,created,updated\n");
+
+    for issue in issues {
+        let row = [
+            &issue.id,
+            &issue.key,
+            &issue.project_key,
+            &issue.issue_type,
+            &issue.status,
+            &issue.summary,
+            issue.assignee.as_deref().unwrap_or(""),
+            issue.reporter.as_deref().unwrap_or(""),
+            issue.priority.as_deref().unwrap_or(""),
+            &issue.created,
+            &issue.updated,
+        ];
+        let escaped: Vec<String> = row.iter().map(|cell| csv_escape(cell)).collect();
+        out.push_str(&escaped.join(","));
+        out.push('\n');
+    }
+
+    out
+}
+
+fn csv_escape(cell: &str) -> String {
+    if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
+        format!("\"{}\"", cell.replace('"', "\"\""))
+    } else {
+        cell.to_string()
+    }
 }
 
 async fn notifications(

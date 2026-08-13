@@ -305,7 +305,7 @@ jobs:
 
       - name: Cache cargo
         if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.workflows == 'true'
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
 
       - name: cargo publish --dry-run (jira-core)
         if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.release == 'true' || needs.changes.outputs.workflows == 'true'
@@ -332,7 +332,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -358,7 +358,7 @@ jobs:
           toolchain: stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
 
       - name: Run jira-core tests
         run: cargo test -p jira-core
@@ -378,7 +378,7 @@ jobs:
           toolchain: stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
 
       - name: Run jira-commands tests
         run: cargo test -p jira-commands
@@ -398,7 +398,7 @@ jobs:
           toolchain: stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
 
       - name: Run jira-mcp tests
         run: cargo test -p jira-mcp

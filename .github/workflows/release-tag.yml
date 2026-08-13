@@ -351,7 +351,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Update npm for Trusted Publishing support
-        run: npm install -g npm@latest
+        run: npm install -g npm@12.0.2
 
       - name: Sync npm package version from VERSION
         run: |

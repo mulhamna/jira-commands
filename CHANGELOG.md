@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.3](https://github.com/mulhamna/jira-commands/compare/v2.8.2...v2.8.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** pin npm to 11.19.0 for OIDC trusted publishing support ([9bf0a71](https://github.com/mulhamna/jira-commands/commit/9bf0a71d747134f9663b8734514cacfc96081787))
+
 ## [2.8.2](https://github.com/mulhamna/jira-commands/compare/v2.8.1...v2.8.2) (2026-08-13)
 
 

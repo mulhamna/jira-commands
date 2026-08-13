@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.1](https://github.com/mulhamna/jira-commands/compare/v2.8.0...v2.8.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** pin npm version in release workflows ([3d05783](https://github.com/mulhamna/jira-commands/commit/3d05783a0d6b70b385c8399db8324aa3bb7c4a4b))
+
 ## [2.8.0](https://github.com/mulhamna/jira-commands/compare/v2.7.0...v2.8.0) (2026-08-07)
 
 

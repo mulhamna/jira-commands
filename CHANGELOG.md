@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.2](https://github.com/mulhamna/jira-commands/compare/v2.8.1...v2.8.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** use npm 10.9.9 compatible with node 20 runners ([6035e64](https://github.com/mulhamna/jira-commands/commit/6035e64406040d6b3da0e4290604df5dcd6b9d74))
+
 ## [2.8.1](https://github.com/mulhamna/jira-commands/compare/v2.8.0...v2.8.1) (2026-08-13)
 
 

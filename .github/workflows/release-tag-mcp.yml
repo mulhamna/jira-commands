@@ -311,7 +311,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Update npm for Trusted Publishing support
-        run: npm install -g npm@12.0.2
+        run: npm install -g npm@10.9.9
 
       - name: Sync npm-mcp package version from crates/jira-mcp/VERSION
         run: |

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.4](https://github.com/mulhamna/jira-commands/compare/v2.8.3...v2.8.4) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** bump h2 to 0.4.18 to clear RUSTSEC-2026-0258 ([132552f](https://github.com/mulhamna/jira-commands/commit/132552f242016e8ef058fb9824c9e3a4ae06c23f))
+
 ## [2.8.3](https://github.com/mulhamna/jira-commands/compare/v2.8.2...v2.8.3) (2026-08-13)
 
 

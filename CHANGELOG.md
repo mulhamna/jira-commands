@@ -6,6 +6,34 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.4](https://github.com/mulhamna/jira-commands/compare/v2.8.3...v2.8.4) (2026-08-24)
+
+
+### Bug Fixes
+
+* **deps:** bump h2 to 0.4.18 to clear RUSTSEC-2026-0258 ([132552f](https://github.com/mulhamna/jira-commands/commit/132552f242016e8ef058fb9824c9e3a4ae06c23f))
+
+## [2.8.3](https://github.com/mulhamna/jira-commands/compare/v2.8.2...v2.8.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** pin npm to 11.19.0 for OIDC trusted publishing support ([9bf0a71](https://github.com/mulhamna/jira-commands/commit/9bf0a71d747134f9663b8734514cacfc96081787))
+
+## [2.8.2](https://github.com/mulhamna/jira-commands/compare/v2.8.1...v2.8.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** use npm 10.9.9 compatible with node 20 runners ([6035e64](https://github.com/mulhamna/jira-commands/commit/6035e64406040d6b3da0e4290604df5dcd6b9d74))
+
+## [2.8.1](https://github.com/mulhamna/jira-commands/compare/v2.8.0...v2.8.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **ci:** pin npm version in release workflows ([3d05783](https://github.com/mulhamna/jira-commands/commit/3d05783a0d6b70b385c8399db8324aa3bb7c4a4b))
+
 ## [2.8.0](https://github.com/mulhamna/jira-commands/compare/v2.7.0...v2.8.0) (2026-08-07)
 
 

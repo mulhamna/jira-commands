@@ -171,6 +171,7 @@ jobs:
     environment: production
     permissions:
       contents: read
+      id-token: write # for crates.io Trusted Publishing
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -178,13 +179,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # stable
         with:
           toolchain: stable
+      - name: Authenticate to crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
       - name: Publish jira-core (skip if already published)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
           VERSION=$(grep '^version' crates/jira-core/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if curl -sf "https://index.crates.io/ji/ra/jira-core" | grep -q "\"vers\":\"${VERSION}\""; then
             echo "✓ jira-core v${VERSION} already on crates.io — skipping publish"
           else
-            cargo publish -p jira-core --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+            cargo publish -p jira-core
           fi
       - name: Wait for jira-core in crates.io sparse index
         run: |
@@ -197,12 +203,14 @@ jobs:
           done
           exit 1
       - name: Publish jira-commands (skip if already published)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: |
           VERSION=$(grep '^version' crates/jira/Cargo.toml | head -1 | sed 's/^version = "\([^"]*\)".*/\1/')
           if curl -sf "https://index.crates.io/ji/ra/jira-commands" | grep -q "\"vers\":\"${VERSION}\""; then
             echo "✓ jira-commands v${VERSION} already on crates.io — skipping publish"
           else
-            cargo publish -p jira-commands --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+            cargo publish -p jira-commands
           fi
 
   create-release:
@@ -251,6 +259,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      id-token: write # for npm Trusted Publishing
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -261,6 +270,9 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm for Trusted Publishing support
+        run: npm install -g npm@11.19.0
 
       - name: Sync npm package version from VERSION
         run: |
@@ -290,14 +302,12 @@ jobs:
           test "$NPM_VERSION" = "$VERSION"
 
       - name: Publish @mulham28/jirac (skip if already published)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION=$(node -p "require('./packaging/npm/package.json').version")
           if npm view @mulham28/jirac@"$VERSION" version >/dev/null 2>&1; then
             echo "✓ @mulham28/jirac npm v$VERSION already published, skipping"
           else
-            npm publish ./packaging/npm --access public
+            npm publish ./packaging/npm --access public --provenance
           fi
 
 

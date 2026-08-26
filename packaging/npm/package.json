@@ -1,6 +1,6 @@
 {
   "name": "@mulham28/jirac",
-  "version": "2.8.2",
+  "version": "2.8.4",
   "description": "Fast Jira CLI with TUI, worklogs, bulk ops, and MCP-friendly workflows — installed from npm via GitHub Releases",
   "license": "MIT OR Apache-2.0",
   "repository": {

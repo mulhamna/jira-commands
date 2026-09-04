@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.8.5](https://github.com/mulhamna/jira-commands/compare/v2.8.4...v2.8.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* **auth:** skip confirmation prompt on login token entry ([6815f65](https://github.com/mulhamna/jira-commands/commit/6815f65e5e710d79a3b2d2f342c5ad639016e910))
+
 ## [2.8.4](https://github.com/mulhamna/jira-commands/compare/v2.8.3...v2.8.4) (2026-08-24)
 
 

@@ -258,6 +258,7 @@ async fn login(args: LoginArgs) -> Result<()> {
         None => {
             crate::cli::interactive::require_interactive("API token/secret", "--token")?;
             Password::new(&secret_prompt)
+                .without_confirmation()
                 .with_display_mode(PasswordDisplayMode::Masked)
                 .prompt()
                 .context("Failed to read secret")?

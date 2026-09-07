@@ -6,6 +6,20 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.9.0](https://github.com/mulhamna/jira-commands/compare/v2.8.5...v2.9.0) (2026-09-07)
+
+
+### Features
+
+* **auth:** expose ca_bundle in the auth login/update/status flow ([2e42a4d](https://github.com/mulhamna/jira-commands/commit/2e42a4d74adacf4fb95472d868dfeb3d4aae65cb))
+* **core:** trust an internal CA bundle via ca_bundle config ([3f41eeb](https://github.com/mulhamna/jira-commands/commit/3f41eeb48371f79c7705474681ea4f615f86a35a))
+
+
+### Bug Fixes
+
+* **auth:** keep CA bundle echo off the tokened config value ([90e8d0e](https://github.com/mulhamna/jira-commands/commit/90e8d0e827421d482e2fb7d33c399148a4c76ba8))
+* **auth:** stop echoing the CA bundle path from login output ([fbb6a27](https://github.com/mulhamna/jira-commands/commit/fbb6a27054cf7cea23ce9cfbbd1bda6a890d7860))
+
 ## [2.8.5](https://github.com/mulhamna/jira-commands/compare/v2.8.4...v2.8.5) (2026-09-04)
 
 

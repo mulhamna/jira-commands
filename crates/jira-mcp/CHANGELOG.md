@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.4.0...jira-mcp-v2.5.0) (2026-09-07)
+
+
+### Features
+
+* **core:** trust an internal CA bundle via ca_bundle config ([3f41eeb](https://github.com/mulhamna/jira-commands/commit/3f41eeb48371f79c7705474681ea4f615f86a35a))
+
 ## [2.4.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.5...jira-mcp-v2.4.0) (2026-08-07)
 
 

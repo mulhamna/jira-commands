@@ -214,5 +214,5 @@ fn build_client() -> Result<JiraClient> {
         );
     }
 
-    Ok(JiraClient::new(config))
+    Ok(JiraClient::try_new(config)?)
 }

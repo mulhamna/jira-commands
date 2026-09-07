@@ -50,12 +50,34 @@ pub struct JiraClient {
 
 impl JiraClient {
     pub fn new(config: JiraConfig) -> Self {
-        let http = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_secs))
-            .build()
-            .expect("Failed to build HTTP client");
+        Self::try_new(config).expect("Failed to build HTTP client")
+    }
 
-        Self { http, config }
+    /// Build a client, failing instead of panicking when the configured
+    /// `ca_bundle` cannot be read or parsed.
+    pub fn try_new(config: JiraConfig) -> Result<Self> {
+        let mut builder = Client::builder().timeout(Duration::from_secs(config.timeout_secs));
+
+        if let Some(path) = config
+            .ca_bundle
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+        {
+            let pem = std::fs::read(path)
+                .map_err(|e| JiraError::Config(format!("failed to read CA bundle {path}: {e}")))?;
+            let certs = reqwest::Certificate::from_pem_bundle(&pem)
+                .map_err(|e| JiraError::Config(format!("invalid CA bundle {path}: {e}")))?;
+            for cert in certs {
+                builder = builder.add_root_certificate(cert);
+            }
+        }
+
+        let http = builder
+            .build()
+            .map_err(|e| JiraError::Config(format!("failed to build HTTP client: {e}")))?;
+
+        Ok(Self { http, config })
     }
 
     pub fn base_url(&self) -> &str {
@@ -2060,11 +2082,79 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         })
     }
 
     fn cloud_auth() -> String {
         format!("Basic {}", base64_encode("dev@example.com:cloud-token"))
+    }
+
+    const TEST_CA_PEM: &str = "-----BEGIN CERTIFICATE-----\n\
+MIICrDCCAZQCCQDtfJ8RzzHprDANBgkqhkiG9w0BAQsFADAYMRYwFAYDVQQDDA1q\n\
+aXJhYy10ZXN0LWNhMB4XDTI2MDkwNzAzMTU0NFoXDTM2MDkwNDAzMTU0NFowGDEW\n\
+MBQGA1UEAwwNamlyYWMtdGVzdC1jYTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC\n\
+AQoCggEBAMHZlL6Nsf9/gpb1aWl+nKkPxKZX9GQ3rBAPeRG9nhR8p+L4/+tXMJNj\n\
++HkLnz131t3CHMIjvazf4D3yBK6ELma7K+B3FRPvScM/IfAQiMk8lFJqUho9wZ5S\n\
+cWNLo3q4qmjApd2RwP9xyAVleOBNMm2DVuY5DKBIaWhlQ0f22S+9mndQRspKk61S\n\
+B1yBdOK0YbDmBmFPJ7IA01C8vWgrmyHklBiDQQaRlFqzf4ifyRQGFqK7ZpKDi9ri\n\
+Ck00M9c7ODDZM9ntRvXZGea8FSwc5T2i7nGmKYbJXnnmYgiZMgZLHLmJFGx/a7hE\n\
+mqWc7MAoD40ND94A2Rv/AL1NSqcuVUMCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEA\n\
+IX84vljbBzQkV/72p/a9GY34O6vjho9PfFg7v9kx0SUHjBKv7F6TGYxLOsMB7gDY\n\
+q4uONXLYnBYrRaslzfR9eFUwzwbNHE68xpE/8yatxANNqy2knChL64MwDzhL3gwv\n\
+yJSx5shgkCSQXhJpQGrfM/0dUgN8eJWyD183a1s7A77RyumEhFFF6C0JiyNsLEeQ\n\
+X4PL+4NsA69XN9MjJtyigJQ5JOFseNpLXlAkJ5DuNWudk8OhkQghl29+bO8otQ8t\n\
+g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
+/PFUwVFH7iRhosZhgYwcOw==\n\
+-----END CERTIFICATE-----\n";
+
+    fn ca_config(ca_bundle: Option<String>) -> JiraConfig {
+        JiraConfig {
+            ca_bundle,
+            ..JiraConfig::default()
+        }
+    }
+
+    #[test]
+    fn try_new_trusts_a_valid_ca_bundle() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pem_path = dir.path().join("ca.pem");
+        std::fs::write(&pem_path, TEST_CA_PEM).expect("write pem");
+
+        JiraClient::try_new(ca_config(Some(pem_path.to_string_lossy().into_owned())))
+            .expect("client builds with a valid CA bundle");
+    }
+
+    #[test]
+    fn try_new_errors_on_missing_ca_bundle_file() {
+        let Err(err) = JiraClient::try_new(ca_config(Some("/no/such/ca.pem".into()))) else {
+            panic!("missing CA bundle must fail");
+        };
+        assert!(err.to_string().contains("failed to read CA bundle"));
+    }
+
+    #[test]
+    fn try_new_errors_on_invalid_ca_bundle() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pem_path = dir.path().join("bad.pem");
+        std::fs::write(
+            &pem_path,
+            b"-----BEGIN CERTIFICATE-----\nnot-valid-base64!!!\n-----END CERTIFICATE-----\n",
+        )
+        .expect("write");
+
+        let Err(err) =
+            JiraClient::try_new(ca_config(Some(pem_path.to_string_lossy().into_owned())))
+        else {
+            panic!("invalid CA bundle must fail");
+        };
+        assert!(err.to_string().contains("invalid CA bundle"));
+    }
+
+    #[test]
+    fn try_new_ignores_blank_ca_bundle() {
+        JiraClient::try_new(ca_config(Some("   ".into()))).expect("blank CA bundle is a no-op");
+        JiraClient::try_new(ca_config(None)).expect("no CA bundle is fine");
     }
 
     #[tokio::test]
@@ -2092,6 +2182,7 @@ mod tests {
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2162,6 +2253,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2199,6 +2291,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let fields = client
@@ -2251,6 +2344,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let fields = client
@@ -3335,6 +3429,7 @@ mod tests {
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let issue = client
@@ -3387,6 +3482,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         // Test list
@@ -3456,6 +3552,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let issue = client.get_issue("TEST-1").await.expect("get issue");

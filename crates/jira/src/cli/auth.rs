@@ -251,10 +251,6 @@ async fn login(args: LoginArgs) -> Result<()> {
         }
         None => None,
     };
-    // Report the path from this local, not from `config` later: `config` also
-    // carries the token, and CodeQL's field-insensitive taint would otherwise
-    // flag the echo as cleartext logging of a secret.
-    let ca_bundle_shown = ca_bundle.clone();
 
     let mut config = JiraConfig {
         profile_name: None,
@@ -311,9 +307,9 @@ async fn login(args: LoginArgs) -> Result<()> {
     );
     println!("  Deployment: {}", deployment_label(&config.deployment));
     println!("  Auth:       {}", auth_type_label(&config.auth_type));
-    if let Some(ca) = &ca_bundle_shown {
-        println!("  CA bundle:  {ca}");
-    }
+    // The CA bundle path is intentionally not echoed here; `jirac auth status`
+    // reports it. Echoing a value read from the interactive prompt trips
+    // CodeQL's cleartext-logging heuristic for little user benefit.
 
     Ok(())
 }

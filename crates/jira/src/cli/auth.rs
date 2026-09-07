@@ -52,6 +52,10 @@ pub enum AuthCommand {
         /// Authentication mode
         #[arg(long = "auth-type", value_enum)]
         auth_type: Option<AuthTypeArg>,
+        /// Path to a PEM file with extra CA certificate(s) to trust (self-hosted
+        /// Jira with an internal CA)
+        #[arg(long = "cacert", value_name = "PATH")]
+        cacert: Option<String>,
     },
 
     /// Remove stored token(s) without deleting profile metadata
@@ -107,6 +111,9 @@ pub enum AuthCommand {
         /// New auth mode
         #[arg(long = "auth-type", value_enum)]
         auth_type: Option<AuthTypeArg>,
+        /// New CA bundle path (use empty string to clear)
+        #[arg(long = "cacert", value_name = "PATH")]
+        cacert: Option<String>,
     },
 }
 
@@ -121,6 +128,7 @@ pub async fn handle(cmd: AuthCommand) -> Result<()> {
             timeout_secs,
             deployment,
             auth_type,
+            cacert,
         } => {
             login(LoginArgs {
                 profile,
@@ -131,6 +139,7 @@ pub async fn handle(cmd: AuthCommand) -> Result<()> {
                 timeout_secs,
                 deployment,
                 auth_type,
+                cacert,
             })
             .await
         }
@@ -147,6 +156,7 @@ pub async fn handle(cmd: AuthCommand) -> Result<()> {
             timeout_secs,
             deployment,
             auth_type,
+            cacert,
         } => {
             update(UpdateArgs {
                 profile,
@@ -157,6 +167,7 @@ pub async fn handle(cmd: AuthCommand) -> Result<()> {
                 timeout_secs,
                 deployment,
                 auth_type,
+                cacert,
             })
             .await
         }
@@ -172,6 +183,7 @@ struct LoginArgs {
     timeout_secs: Option<u64>,
     deployment: Option<DeploymentArg>,
     auth_type: Option<AuthTypeArg>,
+    cacert: Option<String>,
 }
 
 struct UpdateArgs {
@@ -183,6 +195,7 @@ struct UpdateArgs {
     timeout_secs: Option<u64>,
     deployment: Option<DeploymentArg>,
     auth_type: Option<AuthTypeArg>,
+    cacert: Option<String>,
 }
 
 async fn login(args: LoginArgs) -> Result<()> {
@@ -225,6 +238,20 @@ async fn login(args: LoginArgs) -> Result<()> {
         prompt_auth_type(&deployment, auth_type.clone())?
     };
 
+    let ca_bundle = match args.cacert {
+        Some(path) => normalize_optional(path),
+        None if matches!(deployment, JiraDeployment::DataCenter)
+            && !crate::cli::interactive::is_non_interactive() =>
+        {
+            normalize_optional(
+                Text::new("CA certificate path (optional, blank to skip):")
+                    .prompt()
+                    .context("Failed to read CA certificate path")?,
+            )
+        }
+        None => None,
+    };
+
     let mut config = JiraConfig {
         profile_name: None,
         base_url,
@@ -236,6 +263,7 @@ async fn login(args: LoginArgs) -> Result<()> {
         auth_type,
         api_version: 0,
         default_issue_limit: None,
+        ca_bundle,
     };
 
     if config.requires_user_identity() {
@@ -279,6 +307,9 @@ async fn login(args: LoginArgs) -> Result<()> {
     );
     println!("  Deployment: {}", deployment_label(&config.deployment));
     println!("  Auth:       {}", auth_type_label(&config.auth_type));
+    if let Some(ca) = &config.ca_bundle {
+        println!("  CA bundle:  {ca}");
+    }
 
     Ok(())
 }
@@ -323,9 +354,10 @@ async fn update(args: UpdateArgs) -> Result<()> {
         && args.timeout_secs.is_none()
         && args.deployment.is_none()
         && args.auth_type.is_none()
+        && args.cacert.is_none()
     {
         anyhow::bail!(
-            "Nothing to update. Use --url, --email, --token, --project, --timeout-secs, --deployment, or --auth-type."
+            "Nothing to update. Use --url, --email, --token, --project, --timeout-secs, --deployment, --auth-type, or --cacert."
         );
     }
 
@@ -354,6 +386,9 @@ async fn update(args: UpdateArgs) -> Result<()> {
     }
     if let Some(project) = args.project {
         config.project = normalize_optional(project);
+    }
+    if let Some(cacert) = args.cacert {
+        config.ca_bundle = normalize_optional(cacert);
     }
     if let Some(timeout_secs) = args.timeout_secs {
         config.timeout_secs = timeout_secs;
@@ -418,13 +453,19 @@ async fn status(profile: Option<String>) -> Result<()> {
     if config.requires_user_identity() {
         println!("  User:           {}", config.email);
     }
+    if let Some(ca) = &config.ca_bundle {
+        println!("  CA bundle:      {ca}");
+    }
     if config.token_present() {
         println!(
             "  Secret:         ✓ stored in {}",
             config_file_path().display()
         );
-        match JiraClient::new(config.clone()).get_myself().await {
-            Ok(account_id) => println!("  Jira ID:        {account_id}"),
+        match JiraClient::try_new(config.clone()) {
+            Ok(client) => match client.get_myself().await {
+                Ok(account_id) => println!("  Jira ID:        {account_id}"),
+                Err(err) => println!("  Jira ID:        unavailable ({err})"),
+            },
             Err(err) => println!("  Jira ID:        unavailable ({err})"),
         }
     } else {

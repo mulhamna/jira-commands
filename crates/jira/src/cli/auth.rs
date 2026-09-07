@@ -251,6 +251,10 @@ async fn login(args: LoginArgs) -> Result<()> {
         }
         None => None,
     };
+    // Report the path from this local, not from `config` later: `config` also
+    // carries the token, and CodeQL's field-insensitive taint would otherwise
+    // flag the echo as cleartext logging of a secret.
+    let ca_bundle_shown = ca_bundle.clone();
 
     let mut config = JiraConfig {
         profile_name: None,
@@ -307,7 +311,7 @@ async fn login(args: LoginArgs) -> Result<()> {
     );
     println!("  Deployment: {}", deployment_label(&config.deployment));
     println!("  Auth:       {}", auth_type_label(&config.auth_type));
-    if let Some(ca) = &config.ca_bundle {
+    if let Some(ca) = &ca_bundle_shown {
         println!("  CA bundle:  {ca}");
     }
 
@@ -421,6 +425,12 @@ async fn update(args: UpdateArgs) -> Result<()> {
     Ok(())
 }
 
+/// Resolve the caller's Jira account id, folding the client-build and lookup
+/// failures into one `Result` so the status output has a single match arm.
+async fn lookup_jira_id(config: JiraConfig) -> Result<String> {
+    Ok(JiraClient::try_new(config)?.get_myself().await?)
+}
+
 async fn status(profile: Option<String>) -> Result<()> {
     let store = JiraProfilesFile::load().unwrap_or_default();
     let config = if let Some(profile_name) = profile.as_ref() {
@@ -461,11 +471,8 @@ async fn status(profile: Option<String>) -> Result<()> {
             "  Secret:         ✓ stored in {}",
             config_file_path().display()
         );
-        match JiraClient::try_new(config.clone()) {
-            Ok(client) => match client.get_myself().await {
-                Ok(account_id) => println!("  Jira ID:        {account_id}"),
-                Err(err) => println!("  Jira ID:        unavailable ({err})"),
-            },
+        match lookup_jira_id(config.clone()).await {
+            Ok(account_id) => println!("  Jira ID:        {account_id}"),
             Err(err) => println!("  Jira ID:        unavailable ({err})"),
         }
     } else {

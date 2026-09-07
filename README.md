@@ -318,7 +318,13 @@ timeout_secs = 30
 deployment = "data_center"
 auth_type = "datacenter_pat"
 api_version = 2
+ca_bundle = "/path/to/internal-ca.pem"
 ```
+
+`ca_bundle` is optional — point it at a PEM file with your CA certificate(s) when
+a self-hosted Jira presents a cert from an internal CA. You can also set it with
+`jirac auth login --cacert /path/to/ca.pem` (the interactive flow offers it for
+Data Center) or the `JIRA_CA_BUNDLE` env var.
 
 Environment variables override the active profile:
 
@@ -327,6 +333,7 @@ export JIRA_PROFILE=work-cloud
 export JIRA_URL=https://yourcompany.atlassian.net
 export JIRA_EMAIL=you@example.com
 export JIRA_TOKEN=your_api_token
+export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
 ```
 
 ## MCP server

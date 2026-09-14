@@ -9,4 +9,5 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 jira-core = { path = "crates/jira-core", version = "2.10.0" } # x-release-please-version
 tokio = { version = "1", features = ["full"] }
+kurir = "=0.1.0"
 serde = { version = "1", features = ["derive"] }

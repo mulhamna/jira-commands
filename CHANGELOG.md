@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.10.0](https://github.com/mulhamna/jira-commands/compare/v2.9.0...v2.10.0) (2026-09-14)
+
+
+### Features
+
+* trust CA certificates from the OS trust store ([82affd7](https://github.com/mulhamna/jira-commands/commit/82affd71d546897976fb7777b3dc6c1860f2cb24))
+
 ## [2.9.0](https://github.com/mulhamna/jira-commands/compare/v2.8.5...v2.9.0) (2026-09-07)
 
 

@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.10.1](https://github.com/mulhamna/jira-commands/compare/v2.10.0...v2.10.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **security:** resolve rustls advisory and update yanked chacha20 ([a5ccc61](https://github.com/mulhamna/jira-commands/commit/a5ccc612cdbbd939b8e166786479588d020784ef))
+
 ## [2.10.0](https://github.com/mulhamna/jira-commands/compare/v2.9.0...v2.10.0) (2026-09-14)
 
 

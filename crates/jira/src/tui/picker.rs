@@ -121,7 +121,8 @@ pub(super) async fn prompt_assignee_selection(
             .unwrap_or("Unknown user")
             .trim();
         let email = user.email_address.as_deref().unwrap_or("").trim();
-        let account_id = user.account_id.trim();
+        let account_id = user.identifier().unwrap_or_default();
+        let account_id = account_id.trim();
 
         if account_id.is_empty() {
             continue;

@@ -40,6 +40,11 @@ struct MyselfResponse {
     account_id: Option<String>,
     #[serde(rename = "timeZone")]
     time_zone: Option<String>,
+    /// Data Center / Server identify the current user by login name (and `key`), not accountId.
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    key: Option<String>,
 }
 
 #[derive(Clone)]
@@ -140,13 +145,22 @@ impl JiraClient {
             .await
     }
 
-    /// Get the current authenticated user's accountId.
+    /// Get the current authenticated user's identifier: `accountId` on Cloud, login name
+    /// (`name`, falling back to `key`) on Data Center / Server, where /myself has no accountId.
     pub async fn get_myself(&self) -> Result<String> {
         let me = self.get_myself_info().await?;
-        me.account_id.ok_or_else(|| JiraError::Api {
-            status: 0,
-            message: "Could not get accountId from /myself".into(),
-        })
+        let preferred = if self.config.api_version < 3 {
+            me.name.clone().or_else(|| me.key.clone())
+        } else {
+            me.account_id.clone()
+        };
+        preferred
+            .or_else(|| me.account_id.clone())
+            .or_else(|| me.name.clone())
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Could not determine the current user from /myself".into(),
+            })
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.
@@ -154,19 +168,19 @@ impl JiraClient {
         Ok(self.get_myself_info().await?.time_zone)
     }
 
-    /// Resolve an assignee string to a Jira accountId.
+    /// Resolve an assignee string to the identifier used by the configured API version.
     ///
-    /// - `"me"` → current user's accountId via /myself
-    /// - contains `@` → search by email, return first match's accountId
-    /// - anything else → treated as a raw accountId and returned as-is
-    async fn resolve_assignee_account_id(&self, s: &str) -> Result<String> {
+    /// - `"me"` → the current user
+    /// - contains `@` → search by email, take the first match
+    /// - anything else → passed through as-is (accountId on Cloud, login name on DC)
+    async fn resolve_assignee_id(&self, s: &str) -> Result<String> {
         if s == "me" {
             return self.get_myself().await;
         }
         if !s.contains('@') {
             return Ok(s.to_string());
         }
-        // Resolve email → accountId via user search
+        // Resolve email → user via user search
         let users = self.search_users(s).await?;
         users
             .iter()
@@ -177,11 +191,22 @@ impl JiraClient {
                     .unwrap_or(false)
             })
             .or_else(|| users.first())
-            .map(|u| u.account_id.clone())
+            .and_then(|u| u.identifier())
             .ok_or_else(|| JiraError::Api {
                 status: 0,
                 message: format!("User not found: {s}"),
             })
+    }
+
+    /// Build the `assignee` field in the shape the configured API version expects:
+    /// `{"accountId": …}` on Cloud, `{"name": …}` on Data Center / Server.
+    async fn resolve_assignee_field(&self, s: &str) -> Result<Value> {
+        let id = self.resolve_assignee_id(s).await?;
+        if self.config.api_version < 3 {
+            Ok(json!({ "name": id }))
+        } else {
+            Ok(json!({ "accountId": id }))
+        }
     }
 
     /// Send a request, retrying on HTTP 429 according to the `Retry-After` header.
@@ -293,15 +318,36 @@ impl JiraClient {
         fields: &[&str],
     ) -> Result<SearchResult> {
         let headers = self.auth_headers()?;
-        let url = self.platform_url("/search/jql");
+        let max = max_results.unwrap_or(50);
+
+        // Jira Cloud (API v3) has the cursor-based /search/jql endpoint; Data Center / Server
+        // (API v2) only has /search with offset pagination. Cursor tokens are not portable
+        // between the two, so on v2 the "token" is the next startAt offset.
+        let legacy = self.config.api_version < 3;
+        let start_at = if legacy {
+            next_page_token
+                .and_then(|t| t.strip_prefix("offset:"))
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        let url = if legacy {
+            self.platform_url("/search")
+        } else {
+            self.platform_url("/search/jql")
+        };
 
         let mut body = json!({
             "jql": jql,
-            "maxResults": max_results.unwrap_or(50),
+            "maxResults": max,
             "fields": fields,
         });
 
-        if let Some(token) = next_page_token {
+        if legacy {
+            body["startAt"] = json!(start_at);
+        } else if let Some(token) = next_page_token {
             body["nextPageToken"] = json!(token);
         }
 
@@ -312,9 +358,25 @@ impl JiraClient {
             .request(|| http.post(&url).headers(headers.clone()).json(&body))
             .await?;
 
+        let page_len = raw.issues.len() as u32;
+        let next_page_token = if legacy {
+            let next_offset = start_at + page_len;
+            let has_more = match raw.total {
+                Some(total) => page_len > 0 && u64::from(next_offset) < total,
+                None => page_len >= max,
+            };
+            if has_more {
+                Some(format!("offset:{next_offset}"))
+            } else {
+                None
+            }
+        } else {
+            raw.next_page_token
+        };
+
         Ok(SearchResult {
             issues: raw.issues.into_iter().map(|r| r.into_issue()).collect(),
-            next_page_token: raw.next_page_token,
+            next_page_token,
             total: raw.total,
         })
     }
@@ -395,13 +457,17 @@ impl JiraClient {
             "issuetype": { "name": req.issue_type }
         });
 
-        if let Some(adf) = description_adf {
+        if self.config.api_version < 3 {
+            // v2 stores the description as plain text, not as an ADF document.
+            if let Some(description) = req.description.clone() {
+                fields["description"] = json!(description);
+            }
+        } else if let Some(adf) = description_adf {
             fields["description"] = adf;
         }
 
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
 
         if let Some(priority) = &req.priority {
@@ -435,13 +501,20 @@ impl JiraClient {
             fields["summary"] = json!(summary);
         }
         if let Some(adf) = &req.description_adf {
-            fields["description"] = adf.clone();
+            fields["description"] = if self.config.api_version < 3 {
+                json!(crate::adf::adf_to_text(adf))
+            } else {
+                adf.clone()
+            };
         } else if let Some(description) = &req.description {
-            fields["description"] = markdown_to_adf(description);
+            fields["description"] = if self.config.api_version < 3 {
+                json!(description)
+            } else {
+                markdown_to_adf(description)
+            };
         }
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
@@ -569,11 +642,18 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{key}/watchers"));
 
+        // Cloud removes by accountId, Data Center / Server by login name.
+        let param = if self.config.api_version < 3 {
+            "username"
+        } else {
+            "accountId"
+        };
+
         let http = &self.http;
         self.request_no_body(|| {
             http.delete(&url)
                 .headers(headers.clone())
-                .query(&[("accountId", account_id)])
+                .query(&[(param, account_id)])
         })
         .await
     }
@@ -742,11 +822,19 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/user/search");
 
+        // Cloud matches on `query`; Data Center / Server only understand `username`
+        // (`query=` there is a 400).
+        let param = if self.config.api_version < 3 {
+            "username"
+        } else {
+            "query"
+        };
+
         let http = &self.http;
         self.request(|| {
             http.get(&url)
                 .headers(headers.clone())
-                .query(&[("query", query), ("maxResults", "20")])
+                .query(&[(param, query), ("maxResults", "20")])
         })
         .await
     }
@@ -1184,7 +1272,12 @@ impl JiraClient {
     pub async fn add_comment_adf(&self, issue_key: &str, adf: Value) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
-        let payload = json!({ "body": adf });
+        // v2 cannot store ADF, so the document is flattened back to text.
+        let payload = if self.config.api_version < 3 {
+            json!({ "body": crate::adf::adf_to_text(&adf) })
+        } else {
+            json!({ "body": adf })
+        };
         let http = &self.http;
         let raw: Value = self
             .request(|| http.post(&url).headers(headers.clone()).json(&payload))
@@ -1269,6 +1362,14 @@ impl JiraClient {
         let fallback_summary = req.summary.clone();
         let fallback_issue_type = req.issue_type.clone();
 
+        // v2 stores the description as plain text, not as an ADF document, so the text form
+        // is taken before description_adf consumes the request fields.
+        let description_text = req
+            .description_adf
+            .as_ref()
+            .map(crate::adf::adf_to_text)
+            .or_else(|| req.description.clone());
+
         let description_adf = req
             .description_adf
             .or_else(|| req.description.as_deref().map(markdown_to_adf));
@@ -1279,12 +1380,15 @@ impl JiraClient {
             "issuetype": { "name": req.issue_type }
         });
 
-        if let Some(adf) = description_adf {
+        if self.config.api_version < 3 {
+            if let Some(description) = description_text {
+                fields["description"] = json!(description);
+            }
+        } else if let Some(adf) = description_adf {
             fields["description"] = adf;
         }
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
@@ -1383,9 +1487,13 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
 
-        let payload = json!({
-            "body": markdown_to_adf(body)
-        });
+        // API v2 (Data Center / Server) expects the comment body as a plain string,
+        // v3 (Cloud) expects an Atlassian Document Format object.
+        let payload = if self.config.api_version < 3 {
+            json!({ "body": body })
+        } else {
+            json!({ "body": markdown_to_adf(body) })
+        };
 
         let http = &self.http;
         let raw: Value = self
@@ -1446,7 +1554,12 @@ impl JiraClient {
         });
 
         if let Some(c) = comment {
-            body["comment"] = markdown_to_adf(c);
+            // v2 (Data Center / Server) takes a plain string, v3 (Cloud) an ADF object.
+            body["comment"] = if self.config.api_version < 3 {
+                json!(c)
+            } else {
+                markdown_to_adf(c)
+            };
         }
 
         let http = &self.http;
@@ -1513,7 +1626,26 @@ impl JiraClient {
         attachment_id: &str,
     ) -> Result<(String, Vec<u8>, String)> {
         let headers = self.auth_headers_no_content_type()?;
-        let url = self.platform_url(&format!("/attachment/content/{attachment_id}"));
+        // Cloud serves attachments from /attachment/content/{id}; on Data Center / Server that
+        // path is not routed (404 "null for uri") — the download URL comes from the attachment
+        // metadata instead (`/secure/attachment/{id}/{filename}`).
+        let url = if self.config.api_version < 3 {
+            let meta_headers = self.auth_headers()?;
+            let meta_url = self.platform_url(&format!("/attachment/{attachment_id}"));
+            let http = &self.http;
+            let meta: Value = self
+                .request(|| http.get(&meta_url).headers(meta_headers.clone()))
+                .await?;
+            meta.get("content")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .ok_or_else(|| JiraError::Api {
+                    status: 0,
+                    message: format!("Attachment {attachment_id} has no content URL"),
+                })?
+        } else {
+            self.platform_url(&format!("/attachment/content/{attachment_id}"))
+        };
 
         let http = &self.http;
         let response = self
@@ -1690,6 +1822,17 @@ impl JiraClient {
             }
         });
 
+        // Cloud-only endpoint: on Jira Server / Data Center /bulk/issues/move is not routed,
+        // so explain that instead of failing with a bare 404.
+        if self.config.api_version < 3 {
+            return Err(JiraError::Api {
+                status: 0,
+                message: "Bulk issue move is not available on Jira Server / Data Center \
+                          (/bulk/issues/move exists only in Cloud) — move issues one by one"
+                    .into(),
+            });
+        }
+
         let bulk_move_path = self.platform_path("/bulk/issues/move");
         let submitted = self
             .raw_request("POST", &bulk_move_path, Some(body))
@@ -1805,6 +1948,10 @@ impl JiraClient {
 
     /// Check if this Jira instance is Premium tier.
     pub async fn is_premium(&self) -> bool {
+        // Data Center / Server has no Plans API at all, so there is nothing to probe.
+        if self.config.api_version < 3 {
+            return false;
+        }
         match self.get_server_info().await {
             Ok(info) => {
                 let license = info
@@ -1831,6 +1978,16 @@ impl JiraClient {
 
     /// List Jira Plans (requires Jira Premium / Advanced Roadmaps).
     pub async fn get_plans(&self) -> Result<Vec<Value>> {
+        // Plans API (Advanced Roadmaps) exists only on Jira Cloud Premium; on Data Center /
+        // Server the path is not routed, so fail with an explanation instead of a bare 404.
+        if self.config.api_version < 3 {
+            return Err(JiraError::Api {
+                status: 0,
+                message:
+                    "Plans API is not available on Jira Server / Data Center (Cloud Premium only)"
+                        .into(),
+            });
+        }
         let headers = self.auth_headers()?;
         let url = self.platform_url("/plans/plan");
 
@@ -2408,7 +2565,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .expect("search should parse");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].account_id.as_deref(), Some("acct-1"));
         assert_eq!(users[0].display_name.as_deref(), Some("Alice Example"));
         assert!(users[0].email_address.is_none());
     }
@@ -3260,7 +3417,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .expect("request should retry and succeed");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].account_id.as_deref(), Some("acct-1"));
     }
 
     #[tokio::test]
@@ -3383,40 +3540,8 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
     }
 
     #[tokio::test]
-    async fn move_issue_uses_configured_api_version_for_data_center() {
+    async fn move_issue_reports_unavailable_bulk_move_on_data_center() {
         let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/rest/api/2/bulk/issues/move"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-dc" })))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("GET"))
-            .and(path("/rest/api/2/bulk/queue/task-dc"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("GET"))
-            .and(path("/rest/api/2/issue/DC-1"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "id": "20001",
-                "key": "DC-1",
-                "fields": {
-                    "summary": "Moved issue",
-                    "status": { "name": "Done" },
-                    "issuetype": { "name": "Task" },
-                    "project": { "key": "OPS" },
-                    "created": "2023-01-01T00:00:00.000+0000",
-                    "updated": "2023-01-01T00:00:00.000+0000"
-                }
-            })))
-            .mount(&server)
-            .await;
 
         let client = JiraClient::new(JiraConfig {
             profile_name: Some("dc-main".into()),
@@ -3432,13 +3557,23 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             ca_bundle: None,
         });
 
-        let issue = client
+        // Jira Server / Data Center does not route /bulk/issues/move at all, so the client must
+        // explain that instead of firing a request and surfacing a bare 404.
+        let error = client
             .move_issue("DC-1", "OPS", "10002", None)
             .await
-            .expect("data center move should use api v2");
-
-        assert_eq!(issue.key, "DC-1");
-        assert_eq!(issue.project_key, "OPS");
+            .expect_err("bulk move is Cloud-only");
+        assert!(
+            error
+                .to_string()
+                .contains("not available on Jira Server / Data Center"),
+            "unexpected message: {error}"
+        );
+        let requests = server.received_requests().await.unwrap_or_default();
+        assert!(
+            requests.is_empty(),
+            "no HTTP request should be sent on Data Center, got {requests:?}"
+        );
     }
 
     #[tokio::test]

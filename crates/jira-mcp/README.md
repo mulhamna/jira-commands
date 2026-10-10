@@ -67,12 +67,12 @@ The MCP server includes tools for:
 - issue list, view, create, update, delete, clone, move (native cross-project move, `confirm: true` required), batch flows, standups, sprint summaries, and notifications
 - notifications: mark scanned notifications as read by id (`jira_notifications_mark_read`)
 - field and transition discovery
-- comments (single + bulk)
+- comments: list, add, edit, and delete
 - attachments: upload, list, download (writes to disk with `$HOME` guard and `force_path` opt-out), and delete (`confirm: true` required)
 - watchers: list, add (defaults to the current authenticated user via `/myself`), and remove (`confirm: true` required)
-- worklog operations
+- worklogs: list, add, edit, and delete
+- Agile boards: list (project + type filter), get, list issues (JQL + max), backlog, sprint lifecycle, issue backlog moves, and relative ranking
 - structured JQL builder: `jira_jql_build` composes safe JQL from a `JqlParams` object, with optional `dry_run` preview of matching issue keys
-- Agile boards: list (project + type filter), get, list issues (JQL + max), and list backlog
 - bulk transition, bulk update, and archive flows
 - plans
 - raw Jira REST API requests

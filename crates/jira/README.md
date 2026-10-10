@@ -34,8 +34,9 @@ Or use one of the workspace-level install options from the root README:
 ## What this crate provides
 
 - `jirac` primary CLI binary
-- issue listing, viewing, create, update, transition, delete, clone
-- worklog, attachment, bulk-update, bulk-transition, archive, batch, and bulk-create flows
+- issue listing, viewing, create, update, transition, delete, clone, and bulk operations
+- comments (list, add, edit, delete), worklogs (list, add, edit, delete), and attachments
+- Agile sprints, backlog moves, relative issue ranking, project version management
 - interactive TUI flows, including split master-detail, saved JQL picker, theme picker, searchable assignee picker, project-scoped component picker, server summary, config summary, and saved column settings — fully usable with mouse (click rows, tabs, picker options; scroll wheel; click outside popup to dismiss)
 - raw Jira REST API passthrough
 - shared config with multi-profile auth support

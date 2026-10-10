@@ -1180,6 +1180,32 @@ impl JiraClient {
         Ok(())
     }
 
+    /// Move an issue from a sprint back to its board backlog.
+    pub async fn move_issue_to_backlog(&self, issue_key: &str) -> Result<()> {
+        let body = json!({ "issues": [issue_key] });
+        self.raw_request("POST", "/rest/agile/1.0/backlog/issue", Some(body))
+            .await?;
+        Ok(())
+    }
+
+    /// Rank an issue immediately before or after another issue on its board.
+    pub async fn rank_issue(
+        &self,
+        issue_key: &str,
+        relative_issue_key: &str,
+        before: bool,
+    ) -> Result<()> {
+        let mut body = json!({ "issues": [issue_key] });
+        body[if before {
+            "rankBeforeIssue"
+        } else {
+            "rankAfterIssue"
+        }] = json!(relative_issue_key);
+        self.raw_request("PUT", "/rest/agile/1.0/issue/rank", Some(body))
+            .await?;
+        Ok(())
+    }
+
     /// Add a comment using pre-built ADF JSON (skips Markdown conversion).
     pub async fn add_comment_adf(&self, issue_key: &str, adf: Value) -> Result<Comment> {
         let headers = self.auth_headers()?;
@@ -1398,6 +1424,27 @@ impl JiraClient {
         })
     }
 
+    /// Update a comment on an issue using Markdown content.
+    pub async fn update_comment(
+        &self,
+        issue_key: &str,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<Comment> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
+        let payload = json!({ "body": markdown_to_adf(body) });
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.put(&url).headers(headers.clone()).json(&payload))
+            .await?;
+
+        Comment::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse updated comment".into(),
+        })
+    }
+
     // ── Worklog ──────────────────────────────────────────────────────────────
 
     /// List all worklogs for an issue.
@@ -1457,6 +1504,69 @@ impl JiraClient {
         Worklog::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
             status: 0,
             message: "Failed to parse worklog".into(),
+        })
+    }
+
+    /// Update a worklog entry. Omitted fields retain their existing Jira values.
+    pub async fn update_worklog(
+        &self,
+        issue_key: &str,
+        worklog_id: &str,
+        time_spent: Option<&str>,
+        comment: Option<&str>,
+        started: Option<&str>,
+    ) -> Result<Worklog> {
+        if time_spent.is_none() && comment.is_none() && started.is_none() {
+            return Err(JiraError::Api {
+                status: 0,
+                message: "At least one worklog field must be provided".into(),
+            });
+        }
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/worklog/{worklog_id}"));
+        let http = &self.http;
+        let existing: Value = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+        let time_spent = time_spent
+            .map(str::to_owned)
+            .or_else(|| {
+                existing
+                    .get("timeSpent")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Existing worklog response is missing timeSpent".into(),
+            })?;
+        let started = started
+            .map(str::to_owned)
+            .or_else(|| {
+                existing
+                    .get("started")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Existing worklog response is missing started".into(),
+            })?;
+        let mut body = json!({
+            "timeSpent": time_spent,
+            "started": started,
+        });
+        if let Some(comment) = comment {
+            body["comment"] = markdown_to_adf(comment);
+        } else if let Some(existing_comment) = existing.get("comment") {
+            body["comment"] = existing_comment.clone();
+        }
+        let raw: Value = self
+            .request(|| http.put(&url).headers(headers.clone()).json(&body))
+            .await?;
+        Worklog::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse updated worklog".into(),
         })
     }
 

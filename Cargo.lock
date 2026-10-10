@@ -1513,7 +1513,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jira-commands"
-version = "2.10.0"
+version = "2.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1537,7 +1537,7 @@ dependencies = [
 
 [[package]]
 name = "jira-core"
-version = "2.10.0"
+version = "2.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1659,9 +1659,9 @@ dependencies = [
 
 [[package]]
 name = "kurir"
-version = "0.1.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "713e3508cff81bd999b381b429700a48a2f0bfcc4553b125547d3d8fdb0ed74b"
+checksum = "691dfe70200cba331f76adc7c078bcd2de208a74e19013a12cf5ffd50e0043c3"
 dependencies = [
  "clap",
  "reqwest 0.12.28",

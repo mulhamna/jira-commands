@@ -131,6 +131,18 @@ pub struct SprintAddIssueArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintBacklogIssueArgs {
+    pub issue_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SprintRankIssueArgs {
+    pub issue_key: String,
+    pub relative_issue_key: String,
+    pub before: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WatcherAddArgs {
     pub issue_key: String,
     /// Defaults to the current authenticated user.
@@ -335,6 +347,20 @@ pub struct CommentAddArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CommentUpdateArgs {
+    pub key: String,
+    pub comment_id: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CommentDeleteArgs {
+    pub key: String,
+    pub comment_id: String,
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BulkCommentArgs {
     pub jql: Option<String>,
     pub keys: Option<Vec<String>>,
@@ -382,6 +408,15 @@ pub struct WorklogAddArgs {
 pub struct WorklogDeleteArgs {
     pub key: String,
     pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct WorklogUpdateArgs {
+    pub key: String,
+    pub id: String,
+    pub time_spent: Option<String>,
+    pub comment: Option<String>,
+    pub started: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

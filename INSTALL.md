@@ -223,6 +223,7 @@ jirac mcp install --client openclaw
 jirac mcp install --client hermes
 jirac mcp install --client generic-json
 jirac mcp install --client antigravity-cli
+jirac mcp install --client arsy-code
 jirac mcp install --client antigravity-desktop
 ```
 
@@ -234,7 +235,7 @@ Supported targets now:
 - `claude-code`, `claude-code-cli`, and `claude-desktop`
 - `cursor`, `gemini-cli`, `codex`, `vscode`, and `copilot-cli`
 - `opencode`, `windsurf`, `zed`, `openclaw`, and `hermes`
-- `generic-json`, `antigravity-cli`, and `antigravity-desktop`
+- `arsy-code`, `generic-json`, `antigravity-cli`, and `antigravity-desktop`
 
 `antigravity` remains an alias for `antigravity-cli`.
 

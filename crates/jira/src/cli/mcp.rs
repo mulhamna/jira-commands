@@ -65,11 +65,13 @@ pub enum McpClient {
     AntigravityDesktop,
     #[value(name = "generic-json", alias = "omp")]
     GenericJson,
+    #[value(name = "arsy-code")]
+    ArsyCode,
 }
 
 impl McpClient {
     fn harness(self) -> Harness {
-        const HARNESSES: [Harness; 16] = [
+        const HARNESSES: [Harness; 17] = [
             Harness::ClaudeCode,
             Harness::ClaudeCodeCli,
             Harness::ClaudeDesktop,
@@ -86,6 +88,7 @@ impl McpClient {
             Harness::AntigravityCli,
             Harness::AntigravityDesktop,
             Harness::Omp,
+            Harness::ArsyCode,
         ];
         HARNESSES[self as usize]
     }
@@ -93,7 +96,7 @@ impl McpClient {
 
 impl std::fmt::Display for McpClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        const LABELS: [&str; 16] = [
+        const LABELS: [&str; 17] = [
             "claude-code        (Kurir: ~/.claude.json)",
             "claude-code-cli   (Kurir: delegates to `claude mcp add`)",
             "claude-desktop     (Kurir: Claude Desktop config)",
@@ -110,6 +113,7 @@ impl std::fmt::Display for McpClient {
             "antigravity-cli    (Kurir: Antigravity CLI config)",
             "antigravity-desktop (Kurir: Antigravity Desktop config)",
             "generic-json       (Kurir: print snippet only)",
+            "arsy-code          (Kurir: delegates to `arsy mcp add`)",
         ];
         f.write_str(LABELS[*self as usize])
     }
@@ -419,6 +423,7 @@ mod tests {
             Harness::AntigravityDesktop
         );
         assert_eq!(McpClient::GenericJson.harness(), Harness::Omp);
+        assert_eq!(McpClient::ArsyCode.harness(), Harness::ArsyCode);
     }
 
     #[test]

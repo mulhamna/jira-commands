@@ -165,6 +165,12 @@ jirac issue attach PROJ-123 ./screenshot.png
 jirac issue attachment list PROJ-123                # list attachments on an issue
 jirac issue attachment download 10100 --out ./tmp   # download by attachment ID
 jirac issue attachment delete 10100 --force         # delete by attachment ID
+jirac issue comment update PROJ-123 10001 --body "Updated context"
+jirac issue comment delete PROJ-123 10001             # prompts before deletion
+jirac issue worklog update PROJ-123 10234 --time 3h --comment "Re-estimated"
+jirac issue sprint-remove-issue PROJ-123              # return to board backlog
+jirac issue rank PROJ-123 --before PROJ-456
+jirac issue rank PROJ-123 --after PROJ-789 --json
 jirac issue bulk-comment --jql 'project = PROJ AND status = "In Progress"' --body "QA is reviewing this now"
 jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md
 jirac issue delete PROJ-123
@@ -188,6 +194,7 @@ jirac issue worklog add PROJ-123 --time 2h --comment "Fixed auth bug"
 jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
 jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
 jirac issue worklog delete PROJ-123 --id 10234
+jirac issue worklog update PROJ-123 10234 --time 3h --comment "Re-estimated"
 ```
 
 `jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
@@ -214,6 +221,11 @@ jirac board issues 12                               # issues currently on the bo
 jirac board issues 12 --jql 'status = "To Do"' --max 50
 jirac board backlog 12                              # issues not in an active/future sprint
 jirac board list -p PROJ --json                     # JSON output for scripting
+
+# Move an issue from its sprint back to backlog and adjust board order
+jirac issue sprint-remove-issue PROJ-123
+jirac issue rank PROJ-123 --before PROJ-456
+jirac issue rank PROJ-123 --after PROJ-789 --json
 ```
 
 Each board subcommand accepts `--json` for machine-readable output. Wraps the same `/rest/agile/1.0/board` endpoints used by the TUI board picker (press `B`).
@@ -344,7 +356,7 @@ export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
 
 Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then registers the server through [Kurir](https://github.com/suiflex/kurir). Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites and Kurir harness readiness without writing anything.
 
-Supported helpers include Claude Code, Claude Code CLI, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, Windsurf, Zed, OpenClaw, Hermes, generic JSON snippets, Antigravity CLI, and Antigravity Desktop.
+Supported helpers include ARSY CODE, Claude Code, Claude Code CLI, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, Windsurf, Zed, OpenClaw, Hermes, generic JSON snippets, Antigravity CLI, and Antigravity Desktop.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 

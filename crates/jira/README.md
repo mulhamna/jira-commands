@@ -133,6 +133,7 @@ jirac mcp install --client windsurf
 jirac mcp install --client zed
 jirac mcp install --client openclaw
 jirac mcp install --client hermes
+jirac mcp install --client arsy-code
 jirac mcp install --client antigravity-cli
 jirac mcp install --client antigravity-desktop
 jirac mcp install --client generic-json

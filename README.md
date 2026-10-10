@@ -344,7 +344,7 @@ export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
 
 Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then registers the server through [Kurir](https://github.com/suiflex/kurir). Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites and Kurir harness readiness without writing anything.
 
-Supported helpers include Claude Code, Claude Code CLI, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, Windsurf, Zed, OpenClaw, Hermes, generic JSON snippets, Antigravity CLI, and Antigravity Desktop.
+Supported helpers include ARSY CODE, Claude Code, Claude Code CLI, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, Windsurf, Zed, OpenClaw, Hermes, generic JSON snippets, Antigravity CLI, and Antigravity Desktop.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 

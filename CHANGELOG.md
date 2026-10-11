@@ -6,6 +6,19 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.11.0](https://github.com/mulhamna/jira-commands/compare/v2.10.1...v2.11.0) (2026-10-11)
+
+
+### Features
+
+* complete Jira issue workflows ([f9b63ce](https://github.com/mulhamna/jira-commands/commit/f9b63ce87dea6e37bfdc939ac4de76a4a61b6e88))
+* **mcp:** update Kurir and support ARSY CODE ([4be6191](https://github.com/mulhamna/jira-commands/commit/4be61916c298405cfb65b9433de88c1cb58cb2d9))
+
+
+### Bug Fixes
+
+* **cli:** redact watcher account IDs ([88fc946](https://github.com/mulhamna/jira-commands/commit/88fc946503b75dcc6a1a0739b6004c20355fa309))
+
 ## [2.10.1](https://github.com/mulhamna/jira-commands/compare/v2.10.0...v2.10.1) (2026-09-28)
 
 

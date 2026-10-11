@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.5.0...jira-mcp-v2.6.0) (2026-10-11)
+
+
+### Features
+
+* complete Jira issue workflows ([f9b63ce](https://github.com/mulhamna/jira-commands/commit/f9b63ce87dea6e37bfdc939ac4de76a4a61b6e88))
+
 ## [2.5.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.4.0...jira-mcp-v2.5.0) (2026-09-07)
 
 

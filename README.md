@@ -209,6 +209,7 @@ jirac issue watch PROJ-123 rm 5b10ac8d82e05b22cc7d4ef5
 ```
 
 `add` defaults to the current authenticated user (resolved via `/myself`). `rm` prompts for confirmation unless `--force` is given. In the TUI, the Summary tab shows the watcher count and the first few display names, and pressing `W` adds yourself as a watcher in place.
+`watch ... list` omits account IDs from terminal output. `watch ... rm` accepts an exact display name or account ID; ambiguous display names require an account ID.
 
 ### Boards (Agile)
 

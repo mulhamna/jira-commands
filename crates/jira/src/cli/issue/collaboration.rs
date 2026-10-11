@@ -48,7 +48,7 @@ async fn watch_add(client: JiraClient, key: String, account_id: Option<String>) 
         .context("Failed to add watcher")?;
     spinner.finish_and_clear();
 
-    println!("✓ Added watcher {target} to {key}");
+    println!("✓ Added watcher to {key}");
     Ok(())
 }
 
@@ -66,9 +66,9 @@ async fn watch_list(client: JiraClient, key: String) -> Result<()> {
     }
 
     println!("Watchers on {} ({} total):", key, watchers.watch_count);
-    for w in &watchers.watchers {
-        let status = if w.active { "active" } else { "inactive" };
-        println!("  - {} ({}) [{}]", w.display_name, w.account_id, status);
+    for watcher in &watchers.watchers {
+        let status = if watcher.active { "active" } else { "inactive" };
+        println!("  - {} [{}]", watcher.display_name, status);
     }
     if watchers.is_watching {
         println!("\nYou are currently watching this issue.");
@@ -76,10 +76,10 @@ async fn watch_list(client: JiraClient, key: String) -> Result<()> {
     Ok(())
 }
 
-async fn watch_rm(client: JiraClient, key: String, account_id: String, force: bool) -> Result<()> {
+async fn watch_rm(client: JiraClient, key: String, target: String, force: bool) -> Result<()> {
     if !force {
         require_interactive("confirmation", "--force")?;
-        let confirm = inquire::Confirm::new(&format!("Remove watcher {account_id} from {key}?"))
+        let confirm = inquire::Confirm::new(&format!("Remove this watcher from {key}?"))
             .with_default(false)
             .prompt()
             .context("Failed to read confirmation")?;
@@ -89,6 +89,14 @@ async fn watch_rm(client: JiraClient, key: String, account_id: String, force: bo
         }
     }
 
+    let spinner = spinner_new(format!("Resolving watcher on {key}..."));
+    let watchers = client
+        .list_watchers(&key)
+        .await
+        .context("Failed to fetch watchers")?;
+    let account_id = resolve_watcher_account_id(&watchers.watchers, &target)?;
+    spinner.finish_and_clear();
+
     let spinner = spinner_new(format!("Removing watcher from {key}..."));
     client
         .remove_watcher(&key, &account_id)
@@ -96,8 +104,30 @@ async fn watch_rm(client: JiraClient, key: String, account_id: String, force: bo
         .context("Failed to remove watcher")?;
     spinner.finish_and_clear();
 
-    println!("✓ Removed watcher {account_id} from {key}");
+    println!("✓ Removed watcher from {key}");
     Ok(())
+}
+
+fn resolve_watcher_account_id(
+    watchers: &[jira_core::model::watcher::Watcher],
+    target: &str,
+) -> Result<String> {
+    if let Some(watcher) = watchers.iter().find(|watcher| watcher.account_id == target) {
+        return Ok(watcher.account_id.clone());
+    }
+
+    let mut matching_names = watchers
+        .iter()
+        .filter(|watcher| watcher.display_name.eq_ignore_ascii_case(target));
+    let Some(watcher) = matching_names.next() else {
+        return Ok(target.to_string());
+    };
+    if matching_names.next().is_some() {
+        anyhow::bail!(
+            "Multiple watchers match that display name; use an account ID to disambiguate"
+        );
+    }
+    Ok(watcher.account_id.clone())
 }
 
 // ─── comment ─────────────────────────────────────────────────────────────────
@@ -571,4 +601,60 @@ async fn worklog_delete(client: JiraClient, key: String, id: String, force: bool
     spinner.finish_and_clear();
     println!("✓ Deleted worklog {id} from {key}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_watcher_account_id;
+    use jira_core::model::watcher::Watcher;
+
+    fn watcher(account_id: &str, display_name: &str) -> Watcher {
+        Watcher {
+            self_url: String::new(),
+            account_id: account_id.to_string(),
+            display_name: display_name.to_string(),
+            active: true,
+        }
+    }
+
+    #[test]
+    fn watcher_removal_target_accepts_id_or_unique_display_name() {
+        let watchers = vec![
+            watcher("account-1", "Watcher Alpha"),
+            watcher("account-2", "Watcher Beta"),
+        ];
+
+        assert_eq!(
+            resolve_watcher_account_id(&watchers, "account-2").unwrap(),
+            "account-2"
+        );
+        assert_eq!(
+            resolve_watcher_account_id(&watchers, "watcher alpha").unwrap(),
+            "account-1"
+        );
+    }
+
+    #[test]
+    fn ambiguous_watcher_name_requires_account_id_without_echoing_ids() {
+        let watchers = vec![
+            watcher("private-account-1", "Duplicate"),
+            watcher("private-account-2", "Duplicate"),
+        ];
+
+        let error = resolve_watcher_account_id(&watchers, "Duplicate")
+            .expect_err("ambiguous display names must not resolve");
+        assert!(error.to_string().contains("account ID"));
+        assert!(!error.to_string().contains("private-account"));
+    }
+
+    #[test]
+    fn unknown_watcher_target_remains_an_account_id_candidate() {
+        let watchers = vec![watcher("account-1", "Watcher Alpha")];
+
+        assert_eq!(
+            resolve_watcher_account_id(&watchers, "external-account")
+                .expect("unmatched targets remain account ID candidates"),
+            "external-account"
+        );
+    }
 }

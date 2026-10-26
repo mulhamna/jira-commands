@@ -75,6 +75,12 @@ enum Commands {
         #[command(subcommand)]
         command: cli::config::ConfigCommand,
     },
+    /// Update jirac to the latest release (uses brew/npm/cargo/scoop/winget when installed that way)
+    Update {
+        /// Only check whether a newer version exists
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -159,6 +165,12 @@ async fn main() -> Result<()> {
         }
         Commands::Config { command } => {
             cli::config::handle(command).await?;
+        }
+        Commands::Update { check } => {
+            let exe = std::env::current_exe().context("Failed to locate the jirac binary")?;
+            // Skip the trailing update notice: this command already reports it.
+            return cli::update::run(&cli::update::JIRAC, &exe, env!("CARGO_PKG_VERSION"), check)
+                .await;
         }
     }
 

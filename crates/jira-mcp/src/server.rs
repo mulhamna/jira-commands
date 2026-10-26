@@ -1,6 +1,6 @@
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{Implementation, ServerCapabilities, ServerConfig},
     tool, tool_handler, tool_router,
     transport::{
         stdio,
@@ -107,8 +107,8 @@ impl Default for JiraMcpServer {
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for JiraMcpServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(
                 Implementation::new("jira-commands", env!("CARGO_PKG_VERSION"))
                     .with_title("jira-commands MCP")
@@ -863,7 +863,7 @@ pub async fn run_streamable_http(host: &str, port: u16, path: &str) -> anyhow::R
 #[cfg(test)]
 mod tests {
     use rmcp::{
-        model::{CallToolRequestParams, ClientCapabilities, ClientInfo, Implementation},
+        model::{CallToolRequestParams, ClientCapabilities, ClientConfig, Implementation},
         transport::StreamableHttpClientTransport,
         ClientHandler, ServiceExt,
     };
@@ -1018,7 +1018,7 @@ mod tests {
                 .expect("http server");
         });
 
-        let client_info = ClientInfo::new(
+        let client_info = ClientConfig::new(
             ClientCapabilities::default(),
             Implementation::new("test-client", "0.1.0"),
         );

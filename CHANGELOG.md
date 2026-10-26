@@ -6,6 +6,21 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.12.0](https://github.com/mulhamna/jira-commands/compare/v2.11.0...v2.12.0) (2026-10-26)
+
+
+### Features
+
+* add jirac update command for self-updating ([b72ab67](https://github.com/mulhamna/jira-commands/commit/b72ab67cdb3c8dfde891ee2b569726a5e3025aad))
+* **cli:** add jirac mcp update command ([c733c03](https://github.com/mulhamna/jira-commands/commit/c733c0345439c6fc336b6375b2dec7fc6fdf29dc))
+
+
+### Bug Fixes
+
+* **cli:** satisfy clippy needless_return in Windows update path ([a4a99e0](https://github.com/mulhamna/jira-commands/commit/a4a99e026c7f8c12581fa31f434f6a7060166c47))
+* **deps:** bump crates flagged by cargo audit ([5a87da9](https://github.com/mulhamna/jira-commands/commit/5a87da94a048d639c474afb86b1fa1d53ee752a6))
+* **version-check:** filter releases by tag prefix for update notice ([9c6ad19](https://github.com/mulhamna/jira-commands/commit/9c6ad19c14ace69fcb05b63e979fd6671c76c7dc))
+
 ## [2.11.0](https://github.com/mulhamna/jira-commands/compare/v2.10.1...v2.11.0) (2026-10-11)
 
 

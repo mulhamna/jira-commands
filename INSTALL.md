@@ -195,6 +195,19 @@ jirac --help
 jirac tui --help
 ```
 
+## Updating
+
+```bash
+jirac update              # update jirac
+jirac mcp update          # update jirac-mcp found on PATH
+jirac update --check      # only report whether a newer release exists
+```
+
+Both commands detect how the binary was installed. Homebrew, npm, Cargo,
+Scoop, and winget installs are upgraded through that tool. Install-script
+and manual downloads are replaced in place with the release binary after
+its SHA-256 checksum is verified.
+
 ## MCP client install helper
 
 If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then run the helper.

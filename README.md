@@ -95,6 +95,9 @@ winget install mulhamna.jirac
 ```
 
 More methods (install script, PowerShell, GitHub Releases): [INSTALL.md](INSTALL.md)
+
+Update later with `jirac update` / `jirac mcp update` (add `--check` to only check).
+
 ## Quick start
 
 ```bash

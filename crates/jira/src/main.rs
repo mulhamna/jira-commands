@@ -157,7 +157,7 @@ async fn main() -> Result<()> {
             cli::plan::handle(command, client).await?;
         }
         Commands::Mcp { command } => {
-            cli::mcp::handle(command)?;
+            cli::mcp::handle(command).await?;
         }
         Commands::Board { command } => {
             let client = build_client().context("Failed to initialize Jira client")?;

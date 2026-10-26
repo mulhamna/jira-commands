@@ -37,6 +37,14 @@ pub enum McpCommand {
         #[arg(long, default_value = "jirac-mcp")]
         command: String,
     },
+    /// Update jirac-mcp to the latest release (uses brew/npm/cargo/scoop/winget when installed that way)
+    Update {
+        /// Only check whether a newer version exists
+        #[arg(long)]
+        check: bool,
+        #[arg(long, default_value = "jirac-mcp")]
+        command: String,
+    },
 }
 
 #[repr(u8)]
@@ -119,7 +127,7 @@ impl std::fmt::Display for McpClient {
     }
 }
 
-pub fn handle(command: McpCommand) -> Result<()> {
+pub async fn handle(command: McpCommand) -> Result<()> {
     match command {
         McpCommand::Install {
             client,
@@ -151,6 +159,15 @@ pub fn handle(command: McpCommand) -> Result<()> {
             )
         }
         McpCommand::Doctor { client, command } => doctor(client, &command),
+        McpCommand::Update { check, command } => {
+            let Some(exe) = resolve_command_path(&command) else {
+                bail!(
+                    "'{command}' was not found on PATH. Install it first:\n  cargo install jira-mcp\n  # or pass --command /path/to/jirac-mcp"
+                );
+            };
+            let current = crate::cli::update::installed_version(&exe)?;
+            crate::cli::update::run(&crate::cli::update::JIRAC_MCP, &exe, &current, check).await
+        }
     }
 }
 

@@ -136,18 +136,17 @@ async fn replace_binary(tool: &Tool, exe: &Path, version: &str) -> Result<()> {
     }
     // Windows cannot overwrite a running exe, but it can rename it out of the way.
     #[cfg(windows)]
-    {
+    let old = {
         let old = sibling(exe, "old");
         let _ = std::fs::remove_file(&old);
         std::fs::rename(exe, &old).map_err(|err| permission_hint(err, exe))?;
-        if let Err(err) = std::fs::rename(&staged, exe) {
-            let _ = std::fs::rename(&old, exe);
-            return Err(permission_hint(err, exe));
-        }
-        return Ok(());
-    }
-    #[cfg(not(windows))]
-    std::fs::rename(&staged, exe).map_err(|err| permission_hint(err, exe))
+        old
+    };
+    std::fs::rename(&staged, exe).map_err(|err| {
+        #[cfg(windows)]
+        let _ = std::fs::rename(&old, exe);
+        permission_hint(err, exe)
+    })
 }
 
 async fn download(client: &reqwest::Client, url: &str) -> Result<Vec<u8>> {

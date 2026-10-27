@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 
 use crate::{
     adf::markdown_to_adf,
-    config::{JiraAuthType, JiraConfig},
+    config::{JiraAuthType, JiraConfig, JiraDeployment},
     error::{JiraError, Result},
     model::{
         attachment::Attachment,
@@ -89,6 +89,14 @@ impl JiraClient {
         &self.config.base_url
     }
 
+    /// Data Center / Server addresses users by login name and lacks several Cloud-only
+    /// endpoints. This depends on the deployment, not on `api_version`: Cloud also serves
+    /// API v2, and there it still uses accountId and the Cloud endpoints. `api_version` only
+    /// decides the body format (plain text on v2, ADF on v3).
+    fn is_data_center(&self) -> bool {
+        self.config.deployment == JiraDeployment::DataCenter
+    }
+
     fn platform_url(&self, path: &str) -> String {
         format!(
             "{}/rest/api/{}{}",
@@ -149,7 +157,7 @@ impl JiraClient {
     /// (`name`, falling back to `key`) on Data Center / Server, where /myself has no accountId.
     pub async fn get_myself(&self) -> Result<String> {
         let me = self.get_myself_info().await?;
-        let preferred = if self.config.api_version < 3 {
+        let preferred = if self.is_data_center() {
             me.name.clone().or_else(|| me.key.clone())
         } else {
             me.account_id.clone()
@@ -202,7 +210,7 @@ impl JiraClient {
     /// `{"accountId": …}` on Cloud, `{"name": …}` on Data Center / Server.
     async fn resolve_assignee_field(&self, s: &str) -> Result<Value> {
         let id = self.resolve_assignee_id(s).await?;
-        if self.config.api_version < 3 {
+        if self.is_data_center() {
             Ok(json!({ "name": id }))
         } else {
             Ok(json!({ "accountId": id }))
@@ -323,7 +331,7 @@ impl JiraClient {
         // Jira Cloud (API v3) has the cursor-based /search/jql endpoint; Data Center / Server
         // (API v2) only has /search with offset pagination. Cursor tokens are not portable
         // between the two, so on v2 the "token" is the next startAt offset.
-        let legacy = self.config.api_version < 3;
+        let legacy = self.is_data_center();
         let start_at = if legacy {
             next_page_token
                 .and_then(|t| t.strip_prefix("offset:"))
@@ -643,7 +651,7 @@ impl JiraClient {
         let url = self.platform_url(&format!("/issue/{key}/watchers"));
 
         // Cloud removes by accountId, Data Center / Server by login name.
-        let param = if self.config.api_version < 3 {
+        let param = if self.is_data_center() {
             "username"
         } else {
             "accountId"
@@ -824,7 +832,7 @@ impl JiraClient {
 
         // Cloud matches on `query`; Data Center / Server only understand `username`
         // (`query=` there is a 400).
-        let param = if self.config.api_version < 3 {
+        let param = if self.is_data_center() {
             "username"
         } else {
             "query"
@@ -1739,7 +1747,7 @@ impl JiraClient {
         // Cloud serves attachments from /attachment/content/{id}; on Data Center / Server that
         // path is not routed (404 "null for uri") — the download URL comes from the attachment
         // metadata instead (`/secure/attachment/{id}/{filename}`).
-        let url = if self.config.api_version < 3 {
+        let url = if self.is_data_center() {
             let meta_headers = self.auth_headers()?;
             let meta_url = self.platform_url(&format!("/attachment/{attachment_id}"));
             let http = &self.http;
@@ -1934,7 +1942,7 @@ impl JiraClient {
 
         // Cloud-only endpoint: on Jira Server / Data Center /bulk/issues/move is not routed,
         // so explain that instead of failing with a bare 404.
-        if self.config.api_version < 3 {
+        if self.is_data_center() {
             return Err(JiraError::Api {
                 status: 0,
                 message: "Bulk issue move is not available on Jira Server / Data Center \
@@ -2059,7 +2067,7 @@ impl JiraClient {
     /// Check if this Jira instance is Premium tier.
     pub async fn is_premium(&self) -> bool {
         // Data Center / Server has no Plans API at all, so there is nothing to probe.
-        if self.config.api_version < 3 {
+        if self.is_data_center() {
             return false;
         }
         match self.get_server_info().await {
@@ -2090,7 +2098,7 @@ impl JiraClient {
     pub async fn get_plans(&self) -> Result<Vec<Value>> {
         // Plans API (Advanced Roadmaps) exists only on Jira Cloud Premium; on Data Center /
         // Server the path is not routed, so fail with an explanation instead of a bare 404.
-        if self.config.api_version < 3 {
+        if self.is_data_center() {
             return Err(JiraError::Api {
                 status: 0,
                 message:

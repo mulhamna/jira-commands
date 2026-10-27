@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.12.1](https://github.com/mulhamna/jira-commands/compare/v2.12.0...v2.12.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **jira-core:** gate DC identity and endpoints on deployment ([9e25578](https://github.com/mulhamna/jira-commands/commit/9e2557851ea104fee2e437f9188691f39c5fa72b))
+* **jira-core:** support Jira Server / Data Center (API v2) ([8f2aacc](https://github.com/mulhamna/jira-commands/commit/8f2aaccbe83ba0ce9a123b6c7b0917238fa14ab2))
+
 ## [2.12.0](https://github.com/mulhamna/jira-commands/compare/v2.11.0...v2.12.0) (2026-10-26)
 
 

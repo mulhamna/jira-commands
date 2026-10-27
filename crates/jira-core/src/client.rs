@@ -2341,7 +2341,7 @@ mod tests {
         model::FieldValue,
     };
     use wiremock::{
-        matchers::{body_json, header, method, path, query_param},
+        matchers::{body_json, body_partial_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -3692,6 +3692,228 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             requests.is_empty(),
             "no HTTP request should be sent on Data Center, got {requests:?}"
         );
+    }
+
+    fn dc_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            profile_name: Some("dc-main".into()),
+            base_url: server.uri(),
+            email: String::new(),
+            token: Some("dc-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+            default_issue_limit: None,
+            ca_bundle: None,
+        })
+    }
+
+    fn search_issue_json(key: &str) -> Value {
+        json!({
+            "id": "20001",
+            "key": key,
+            "fields": {
+                "summary": "Issue",
+                "status": { "name": "Open" },
+                "issuetype": { "name": "Task" },
+                "project": { "key": "DC" },
+                "created": "2023-01-01T00:00:00.000+0000",
+                "updated": "2023-01-01T00:00:00.000+0000"
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn search_issues_uses_offset_pagination_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search"))
+            .and(body_partial_json(json!({ "startAt": 0, "maxResults": 2 })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [search_issue_json("DC-1"), search_issue_json("DC-2")],
+                "total": 3
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search"))
+            .and(body_partial_json(json!({ "startAt": 2, "maxResults": 2 })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [search_issue_json("DC-3")],
+                "total": 3
+            })))
+            .mount(&server)
+            .await;
+
+        let client = dc_client(&server);
+        let first = client
+            .search_issues("project = DC", None, Some(2))
+            .await
+            .expect("first page");
+        assert_eq!(first.issues.len(), 2);
+        assert_eq!(first.next_page_token.as_deref(), Some("offset:2"));
+
+        let last = client
+            .search_issues("project = DC", first.next_page_token.as_deref(), Some(2))
+            .await
+            .expect("last page");
+        assert_eq!(last.issues[0].key, "DC-3");
+        assert!(last.next_page_token.is_none());
+    }
+
+    #[tokio::test]
+    async fn add_comment_sends_plain_string_body_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue/DC-1/comment"))
+            .and(body_json(json!({ "body": "hello **world**" })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "100",
+                "body": "hello **world**"
+            })))
+            .mount(&server)
+            .await;
+
+        let comment = dc_client(&server)
+            .add_comment("DC-1", "hello **world**")
+            .await
+            .expect("comment should be created");
+        assert_eq!(comment.body.as_deref(), Some("hello **world**"));
+    }
+
+    #[tokio::test]
+    async fn update_issue_sends_assignee_name_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(body_json(
+                json!({ "fields": { "assignee": { "name": "jdoe" } } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        dc_client(&server)
+            .update_issue(
+                "DC-1",
+                UpdateIssueRequest {
+                    assignee: Some("jdoe".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("update should succeed");
+    }
+
+    #[tokio::test]
+    async fn search_users_uses_username_param_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/user/search"))
+            .and(query_param("username", "jdoe"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                { "name": "jdoe", "key": "JIRAUSER100", "displayName": "John Doe" }
+            ])))
+            .mount(&server)
+            .await;
+
+        let users = dc_client(&server)
+            .search_users("jdoe")
+            .await
+            .expect("search should parse");
+        assert!(users[0].account_id.is_none());
+        assert_eq!(users[0].identifier().as_deref(), Some("jdoe"));
+    }
+
+    #[tokio::test]
+    async fn get_myself_returns_login_name_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/myself"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "name": "jdoe",
+                "key": "JIRAUSER100",
+                "displayName": "John Doe"
+            })))
+            .mount(&server)
+            .await;
+
+        let me = dc_client(&server).get_myself().await.expect("myself");
+        assert_eq!(me, "jdoe");
+    }
+
+    #[tokio::test]
+    async fn download_attachment_uses_metadata_content_url_on_data_center() {
+        let server = MockServer::start().await;
+        let content_url = format!("{}/secure/attachment/10/report.txt", server.uri());
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/attachment/10"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "content": content_url })),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/secure/attachment/10/report.txt"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"data".to_vec()))
+            .mount(&server)
+            .await;
+
+        let (filename, bytes, _) = dc_client(&server)
+            .download_attachment("10")
+            .await
+            .expect("download should follow metadata URL");
+        assert_eq!(filename, "report.txt");
+        assert_eq!(bytes, b"data");
+    }
+
+    #[tokio::test]
+    async fn cloud_on_api_v2_keeps_account_id_and_search_jql() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/TEST-1"))
+            .and(body_json(
+                json!({ "fields": { "assignee": { "accountId": "acct-1" } } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search/jql"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "issues": [] })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let mut config = cloud_client(&server).config.clone();
+        config.api_version = 2;
+        let client = JiraClient::new(config);
+
+        client
+            .update_issue(
+                "TEST-1",
+                UpdateIssueRequest {
+                    assignee: Some("acct-1".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("cloud v2 update");
+        client
+            .search_issues("project = TEST", None, None)
+            .await
+            .expect("cloud v2 search");
     }
 
     #[tokio::test]

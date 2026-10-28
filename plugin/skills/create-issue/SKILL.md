@@ -16,7 +16,7 @@ Steps:
    - `--assignee` (email or "me"), `--priority`, `--labels`, `--components`
    - `--parent <ISSUE-KEY>` for sub-tasks
    - `--sprint <ID|NAME>` to assign to a sprint on create
-   - `--fix-versions`, `--description-file <FILE>`
+   - `--fix-version`, `--description-file <FILE>`
    - `--field <ID=VALUE>` for custom fields (repeatable)
    - `--no-custom-fields` to skip required custom field prompts
 4. Run `jirac issue create` with the fields that are already known.

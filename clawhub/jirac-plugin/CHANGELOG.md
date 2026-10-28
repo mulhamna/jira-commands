@@ -2,6 +2,11 @@
 
 All notable changes to the ClawHub wrapper package for the `jirac` Claude plugin will be documented in this file.
 
+## [0.1.3] - 2026-10-29
+
+### Fixed
+- Republish the wrapper with plugin 0.18.1, which corrects CLI examples and skill instructions.
+
 ## [0.1.2] - 2026-06-14
 
 ### Changed

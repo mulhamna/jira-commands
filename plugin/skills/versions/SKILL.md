@@ -13,7 +13,7 @@ Steps:
 4. Report each version's status (released, archived, unreleased), start/release dates, and backlog summary.
 
 Notes:
-- Use this **before bulk updates** that touch `--fix-versions` — confirms the version name exists and is in the expected state.
+- Use this before creating or updating issues with `--fix-version` — confirms the version name exists and is in the expected state.
 - The TUI (`jirac tui` then `V`) offers an interactive version browser with backlog preview, including `Enter` to refresh and `n` / `e` to create or edit metadata.
 - For shipping prep, combine with JQL on `fixVersion in unreleasedVersions()` or `fixVersion = "v1.2.0"`.
 

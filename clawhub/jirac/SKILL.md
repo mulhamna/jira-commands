@@ -58,10 +58,10 @@ jirac issue jql --run                         # interactive JQL builder
 # Sprint lifecycle
 jirac issue sprints -p PROJ
 jirac issue sprint-create -p PROJ --name 'Sprint 25' --goal 'Ship auth v2'
-jirac issue sprint-start <SPRINT_ID>
-jirac issue sprint-complete <SPRINT_ID>
-jirac issue sprint-update <SPRINT_ID> --name 'Sprint 25 (extended)' --goal 'New goal'
-jirac issue sprint-delete <SPRINT_ID> --force # destructive
+jirac issue sprint-start -p PROJ --sprint <SPRINT_ID> --end-date 2026-06-03
+jirac issue sprint-complete -p PROJ --sprint <SPRINT_ID>
+jirac issue sprint-update -p PROJ --sprint <SPRINT_ID> --name 'Sprint 25 (extended)' --goal 'New goal'
+jirac issue sprint-delete -p PROJ --sprint <SPRINT_ID> --force # destructive
 
 # Versions
 jirac issue versions -p PROJ                  # browse + backlog preview
@@ -76,7 +76,7 @@ jirac issue create -p PROJ -t Sub-task -s 'sub-task' --parent PROJ-100
 # Update
 jirac issue update PROJ-123 --summary 'New title'
 jirac issue update PROJ-123 --priority High --assignee me
-jirac issue update PROJ-123 --labels backend,api --fix-versions v2.0
+jirac issue update PROJ-123 --labels backend,api --fix-version v2.0
 jirac issue update PROJ-123 --field story_points=8
 
 # Transition (positional, not --to)
@@ -85,15 +85,15 @@ jirac issue transition PROJ-123 'Done'
 jirac issue transition PROJ-123 'In Progress'
 
 # Comment / bulk-comment
-jirac issue comment list PROJ-123
-jirac issue comment add PROJ-123 --body 'QA verified in staging'
+jirac issue comment PROJ-123 list
+jirac issue comment PROJ-123 add --body 'QA verified in staging'
 jirac issue bulk-comment --jql 'project = PROJ AND sprint = openSprints()' --body 'Standup reminder'
 jirac issue bulk-comment --keys PROJ-1,PROJ-2,PROJ-3 --body 'Please update'
 
 # Worklog
-jirac issue worklog list PROJ-123
-jirac issue worklog add PROJ-123 --time '2h' --comment 'Implementation work'
-jirac issue worklog delete PROJ-123 <WORKLOG_ID>
+jirac issue worklog PROJ-123 list
+jirac issue worklog PROJ-123 add --time '2h' --comment 'Implementation work'
+jirac issue worklog PROJ-123 delete <WORKLOG_ID>
 
 # Attach
 jirac issue attach PROJ-123 ./screenshot.png
@@ -126,8 +126,8 @@ jirac issue batch --manifest ops.json
 jirac issue render --input description.md
 
 # Raw REST passthrough (last resort)
-jirac api GET /rest/api/3/myself
-jirac api POST /rest/api/3/issue --body '{"fields":{...}}'
+jirac api get /rest/api/3/myself
+jirac api post /rest/api/3/issue --body '{"fields":{"project":{"key":"PROJ"},"summary":"Issue title","issuetype":{"name":"Task"}}}'
 
 # TUI
 jirac tui                                     # uses default project or assigned issues

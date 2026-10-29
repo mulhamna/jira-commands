@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [2.12.2](https://github.com/mulhamna/jira-commands/compare/v2.12.1...v2.12.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* send plain string bodies when updating API v2 comments ([16ff9ee](https://github.com/mulhamna/jira-commands/commit/16ff9ee0686a38f4c3f63b0efcf27ce0193c7946))
+
 ## [2.12.1](https://github.com/mulhamna/jira-commands/compare/v2.12.0...v2.12.1) (2026-10-27)
 
 

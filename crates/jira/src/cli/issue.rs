@@ -730,9 +730,9 @@ pub enum IssueCommand {
     /// Markdown is converted to ADF before sending to Jira.
     ///
     /// Examples:
-    ///   jirac issue comment list PROJ-123
-    ///   jirac issue comment add PROJ-123 --body "Need follow-up from backend"
-    ///   jirac issue comment add PROJ-123 --file note.md
+    ///   jirac issue comment PROJ-123 list
+    ///   jirac issue comment PROJ-123 add --body "Need follow-up from backend"
+    ///   jirac issue comment PROJ-123 add --file note.md
     Comment {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -774,16 +774,16 @@ pub enum IssueCommand {
     ///
     /// List, add, edit, or delete a worklog entry.
     ///
-    /// Use `jirac issue worklog update KEY ID` to change only the supplied fields.
+    /// Use `jirac issue worklog KEY update ID` to change only the supplied fields.
     ///
     /// Time format: Jira duration syntax — "2h", "30m", "1d", "1h 30m"
     /// Note: 1d = 8 working hours (default Jira configuration).
     ///
     /// Examples:
-    ///   jirac issue worklog list PROJ-123
-    ///   jirac issue worklog add PROJ-123 --time "2h 30m"
-    ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented auth"
-    ///   jirac issue worklog delete PROJ-123 <worklog-id>
+    ///   jirac issue worklog PROJ-123 list
+    ///   jirac issue worklog PROJ-123 add --time "2h 30m"
+    ///   jirac issue worklog PROJ-123 add --time 1d --comment "Implemented auth"
+    ///   jirac issue worklog PROJ-123 delete <worklog-id>
     Worklog {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -1094,7 +1094,7 @@ pub enum IssueCommand {
     ///
     /// Examples:
     ///   jirac issue link list-types
-    ///   jirac issue link add PROJ-123 PROJ-456 --type Blocks
+    ///   jirac issue link add PROJ-123 PROJ-456 --link-type Blocks
     ///   jirac issue link delete 10000
     Link {
         #[command(subcommand)]
@@ -1182,8 +1182,8 @@ pub enum CommentCommand {
     /// Add a comment to an issue
     ///
     /// Examples:
-    ///   jirac issue comment add PROJ-123 --body "Please verify in staging"
-    ///   jirac issue comment add PROJ-123 --file note.md
+    ///   jirac issue comment PROJ-123 add --body "Please verify in staging"
+    ///   jirac issue comment PROJ-123 add --file note.md
     Add {
         /// Comment body in Markdown
         #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
@@ -1195,7 +1195,7 @@ pub enum CommentCommand {
 
     /// Replace a comment body
     Update {
-        /// Comment ID shown by `jirac issue comment list`
+        /// Comment ID shown by `jirac issue comment <KEY> list`
         id: String,
         /// Comment body in Markdown
         #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
@@ -1207,7 +1207,7 @@ pub enum CommentCommand {
 
     /// Delete a comment
     Delete {
-        /// Comment ID shown by `jirac issue comment list`
+        /// Comment ID shown by `jirac issue comment <KEY> list`
         id: String,
         /// Skip confirmation prompt
         #[arg(short, long)]
@@ -1230,10 +1230,10 @@ pub enum WorklogCommand {
     /// Note: 1d = 8 working hours in default Jira configuration.
     ///
     /// Examples:
-    ///   jirac issue worklog add PROJ-123 --time "2h 30m"
-    ///   jirac issue worklog add PROJ-123 --time 1d --comment "Implemented login"
-    ///   jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30
-    ///   jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends
+    ///   jirac issue worklog PROJ-123 add --time "2h 30m"
+    ///   jirac issue worklog PROJ-123 add --time 1d --comment "Implemented login"
+    ///   jirac issue worklog PROJ-123 add --time 2h --date 2026-04-21 --start 09:30
+    ///   jirac issue worklog PROJ-123 add --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends
     /// Range mode creates one worklog per included date.
     Add {
         /// Time spent in Jira duration format (e.g. "2h", "30m", "1d", "1h 30m")
@@ -1261,7 +1261,7 @@ pub enum WorklogCommand {
 
     /// Update an existing worklog entry
     Update {
-        /// Worklog ID shown by `jirac issue worklog list`
+        /// Worklog ID shown by `jirac issue worklog <KEY> list`
         id: String,
         /// Replace the time spent (e.g. 2h, 30m)
         #[arg(short, long, value_name = "DURATION")]
@@ -1279,14 +1279,14 @@ pub enum WorklogCommand {
 
     /// Delete a worklog entry
     ///
-    /// Use `jirac issue worklog list KEY` to find the worklog ID.
+    /// Use `jirac issue worklog KEY list` to find the worklog ID.
     /// Prompts for confirmation unless --force is used.
     ///
     /// Examples:
-    ///   jirac issue worklog delete PROJ-123 12345
-    ///   jirac issue worklog delete PROJ-123 12345 --force
+    ///   jirac issue worklog PROJ-123 delete 12345
+    ///   jirac issue worklog PROJ-123 delete 12345 --force
     Delete {
-        /// Worklog ID (see: jirac issue worklog list PROJ-123)
+        /// Worklog ID (see: jirac issue worklog PROJ-123 list)
         id: String,
         /// Skip confirmation prompt
         #[arg(short, long)]

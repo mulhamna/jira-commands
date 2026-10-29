@@ -118,7 +118,7 @@ jirac issue versions -p PROJ --create --version "v1.3.0" --description "June rel
 jirac issue create -p PROJ
 
 # Transition an issue
-jirac issue transition PROJ-123 --to "In Progress"
+jirac issue transition PROJ-123 "In Progress"
 
 # Launch the TUI
 jirac tui -p PROJ
@@ -151,7 +151,7 @@ jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --
 jirac issue versions -p PROJ --version "v1.2.0" --set-name "June 2026"
 jirac issue versions -p PROJ --create --version "v1.3.0" --description "June release"
 jirac issue create -p PROJ                          # create (interactive)
-jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
+jirac issue create -p PROJ --issue-type Bug --summary "Login fails on Safari"
 jirac issue render --input desc.md                  # preview Markdown -> ADF JSON
 jirac issue render --input desc.md --output text    # preview rendered plain text
 
@@ -159,15 +159,15 @@ jirac issue update PROJ-123 --summary "New title"
 jirac issue update PROJ-123 --assignee user@co.com
 
 jirac issue transition PROJ-123                     # interactive picker
-jirac issue transition PROJ-123 --to "In Progress"
+jirac issue transition PROJ-123 "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
 jirac issue attachment list PROJ-123                # list attachments on an issue
 jirac issue attachment download 10100 --out ./tmp   # download by attachment ID
 jirac issue attachment delete 10100 --force         # delete by attachment ID
-jirac issue comment update PROJ-123 10001 --body "Updated context"
-jirac issue comment delete PROJ-123 10001             # prompts before deletion
-jirac issue worklog update PROJ-123 10234 --time 3h --comment "Re-estimated"
+jirac issue comment PROJ-123 update 10001 --body "Updated context"
+jirac issue comment PROJ-123 delete 10001             # prompts before deletion
+jirac issue worklog PROJ-123 update 10234 --time 3h --comment "Re-estimated"
 jirac issue sprint-remove-issue PROJ-123              # return to board backlog
 jirac issue rank PROJ-123 --before PROJ-456
 jirac issue rank PROJ-123 --after PROJ-789 --json
@@ -179,7 +179,7 @@ jirac issue move PROJ-123 OTHER
 jirac issue clone PROJ-123
 
 jirac issue link list-types                          # list available link types
-jirac issue link add PROJ-123 PROJ-456 --type Blocks # link two issues
+jirac issue link add PROJ-123 PROJ-456 --link-type Blocks # link two issues
 jirac issue link delete 10000                        # delete link by ID
 
 jirac issue batch --manifest ops.json
@@ -189,15 +189,15 @@ jirac issue bulk-create --manifest issues.json
 ### Worklogs
 
 ```bash
-jirac issue worklog list PROJ-123
-jirac issue worklog add PROJ-123 --time 2h --comment "Fixed auth bug"
-jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
-jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
-jirac issue worklog delete PROJ-123 --id 10234
-jirac issue worklog update PROJ-123 10234 --time 3h --comment "Re-estimated"
+jirac issue worklog PROJ-123 list
+jirac issue worklog PROJ-123 add --time 2h --comment "Fixed auth bug"
+jirac issue worklog PROJ-123 add --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
+jirac issue worklog PROJ-123 add --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
+jirac issue worklog PROJ-123 delete 10234
+jirac issue worklog PROJ-123 update 10234 --time 3h --comment "Re-estimated"
 ```
 
-`jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
+`jirac issue worklog <KEY> add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
 
 ### Watchers
 

@@ -1540,7 +1540,7 @@ impl JiraClient {
         })
     }
 
-    /// Update a comment on an issue using Markdown content.
+    /// Update a comment using plain text/wiki for API v2 or Markdown for API v3.
     pub async fn update_comment(
         &self,
         issue_key: &str,
@@ -1549,7 +1549,11 @@ impl JiraClient {
     ) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
-        let payload = json!({ "body": markdown_to_adf(body) });
+        let payload = if self.config.api_version < 3 {
+            json!({ "body": body })
+        } else {
+            json!({ "body": markdown_to_adf(body) })
+        };
         let http = &self.http;
         let raw: Value = self
             .request(|| http.put(&url).headers(headers.clone()).json(&payload))
@@ -3783,6 +3787,64 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .await
             .expect("comment should be created");
         assert_eq!(comment.body.as_deref(), Some("hello **world**"));
+    }
+
+    #[tokio::test]
+    async fn update_comment_sends_plain_string_body_on_data_center() {
+        let server = MockServer::start().await;
+        let body = "h2. Updated\n\n*Привет*\n\n{code:javascript}\nconst value = `hello`;\n\nconsole.log(value);\n{code}\n";
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1/comment/100"))
+            .and(body_json(json!({ "body": body })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "100",
+                "body": body
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let comment = dc_client(&server)
+            .update_comment("DC-1", "100", body)
+            .await
+            .expect("comment should be updated");
+        assert_eq!(comment.id, "100");
+        assert_eq!(comment.body.as_deref(), Some(body));
+    }
+
+    #[tokio::test]
+    async fn update_comment_sends_adf_body_on_cloud() {
+        let server = MockServer::start().await;
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    { "type": "text", "text": "hello " },
+                    { "type": "text", "text": "world", "marks": [{ "type": "strong" }] }
+                ]
+            }]
+        });
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/3/issue/TEST-1/comment/100"))
+            .and(body_json(json!({ "body": adf })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "100",
+                "body": adf
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let comment = cloud_client(&server)
+            .update_comment("TEST-1", "100", "hello **world**")
+            .await
+            .expect("comment should be updated");
+        assert_eq!(comment.id, "100");
+        assert_eq!(comment.body.as_deref(), Some("hello world"));
     }
 
     #[tokio::test]

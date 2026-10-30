@@ -445,8 +445,10 @@ mod tests {
 
     #[test]
     fn resolve_command_path_finds_absolute_path() {
-        let path = resolve_command_path("/bin/sh").expect("shell exists");
-        assert_eq!(path, PathBuf::from("/bin/sh"));
+        let executable = env::current_exe().expect("test executable path");
+        let path = resolve_command_path(executable.to_str().expect("UTF-8 executable path"))
+            .expect("test executable exists");
+        assert_eq!(path, executable);
     }
 
     #[test]

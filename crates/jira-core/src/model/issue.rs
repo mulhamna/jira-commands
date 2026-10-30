@@ -44,9 +44,12 @@ pub struct CreateIssueRequest {
 pub struct CreateIssueRequestV2 {
     pub project_key: String,
     pub summary: String,
-    /// Markdown description — converted to ADF automatically. Ignored if `description_adf` is set.
+    /// Markdown description — converted to wiki markup on API v2 or ADF on API v3.
+    /// Ignored if `description_adf` is set.
     pub description: Option<String>,
     /// Pre-built ADF description — takes priority over `description`.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
+    /// Original API v2 string/null descriptions are preserved when copying issues.
     pub description_adf: Option<Value>,
     pub issue_type: String,
     pub assignee: Option<String>,
@@ -66,9 +69,12 @@ pub struct CreateIssueRequestV2 {
 #[derive(Debug, Clone, Default)]
 pub struct UpdateIssueRequest {
     pub summary: Option<String>,
-    /// Markdown description — converted to ADF. Ignored if `description_adf` is set.
+    /// Markdown description — converted to wiki markup on API v2 or ADF on API v3.
+    /// Ignored if `description_adf` is set.
     pub description: Option<String>,
     /// Pre-built ADF description — takes priority over `description`.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
+    /// Original API v2 string/null descriptions are preserved without conversion.
     pub description_adf: Option<Value>,
     pub assignee: Option<String>,
     pub priority: Option<String>,

@@ -75,11 +75,13 @@ pub enum McpClient {
     GenericJson,
     #[value(name = "arsy-code")]
     ArsyCode,
+    Jcode,
+    Zcode,
 }
 
 impl McpClient {
     fn harness(self) -> Harness {
-        const HARNESSES: [Harness; 17] = [
+        const HARNESSES: [Harness; 19] = [
             Harness::ClaudeCode,
             Harness::ClaudeCodeCli,
             Harness::ClaudeDesktop,
@@ -97,6 +99,8 @@ impl McpClient {
             Harness::AntigravityDesktop,
             Harness::Omp,
             Harness::ArsyCode,
+            Harness::Jcode,
+            Harness::Zcode,
         ];
         HARNESSES[self as usize]
     }
@@ -104,7 +108,7 @@ impl McpClient {
 
 impl std::fmt::Display for McpClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        const LABELS: [&str; 17] = [
+        const LABELS: [&str; 19] = [
             "claude-code        (Kurir: ~/.claude.json)",
             "claude-code-cli   (Kurir: delegates to `claude mcp add`)",
             "claude-desktop     (Kurir: Claude Desktop config)",
@@ -122,6 +126,8 @@ impl std::fmt::Display for McpClient {
             "antigravity-desktop (Kurir: Antigravity Desktop config)",
             "generic-json       (Kurir: print snippet only)",
             "arsy-code          (Kurir: delegates to `arsy mcp add`)",
+            "jcode              (Kurir: ~/.jcode/config.json)",
+            "zcode              (Kurir: ~/.zcode/cli/config.json)",
         ];
         f.write_str(LABELS[*self as usize])
     }
@@ -232,6 +238,9 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::Hermes,
             McpClient::AntigravityCli,
             McpClient::AntigravityDesktop,
+            McpClient::ArsyCode,
+            McpClient::Jcode,
+            McpClient::Zcode,
             McpClient::GenericJson,
         ],
     )
@@ -441,6 +450,8 @@ mod tests {
         );
         assert_eq!(McpClient::GenericJson.harness(), Harness::Omp);
         assert_eq!(McpClient::ArsyCode.harness(), Harness::ArsyCode);
+        assert_eq!(McpClient::Jcode.harness(), Harness::Jcode);
+        assert_eq!(McpClient::Zcode.harness(), Harness::Zcode);
     }
 
     #[test]

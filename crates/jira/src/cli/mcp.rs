@@ -450,6 +450,8 @@ mod tests {
         );
         assert_eq!(McpClient::GenericJson.harness(), Harness::Omp);
         assert_eq!(McpClient::ArsyCode.harness(), Harness::ArsyCode);
+        assert_eq!(McpClient::Jcode.harness(), Harness::Jcode);
+        assert_eq!(McpClient::Zcode.harness(), Harness::Zcode);
     }
 
     #[test]

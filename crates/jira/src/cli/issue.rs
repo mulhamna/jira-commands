@@ -727,7 +727,7 @@ pub enum IssueCommand {
     /// Manage comments on an issue
     ///
     /// List, add, edit, or delete a comment in Markdown.
-    /// Markdown is converted to ADF before sending to Jira.
+    /// Markdown is converted to ADF for API v3 or Jira wiki markup for API v2.
     ///
     /// Examples:
     ///   jirac issue comment PROJ-123 list

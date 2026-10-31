@@ -240,11 +240,12 @@ pub struct IssueCreateArgs {
     pub summary: String,
     pub issue_type: String,
     /// Issue description as plain Markdown (headings, lists, tables, code,
-    /// links). Auto-converted to Atlassian Document Format. Use this for
+    /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
     /// normal text — do NOT hand-build ADF.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -266,11 +267,12 @@ pub struct IssueUpdateArgs {
     pub key: String,
     pub summary: Option<String>,
     /// Issue description as plain Markdown (headings, lists, tables, code,
-    /// links). Auto-converted to Atlassian Document Format. Use this for
+    /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
     /// normal text — do NOT hand-build ADF.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -445,11 +447,12 @@ pub struct BatchCreateOp {
     pub project_key: String,
     pub summary: String,
     pub issue_type: Option<String>,
-    /// Issue description as plain Markdown. Auto-converted to ADF — do NOT
-    /// hand-build ADF.
+    /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
+    /// wiki markup for API v2 — do NOT hand-build ADF.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,
@@ -470,11 +473,12 @@ pub struct BatchCreateOp {
 pub struct BatchUpdateOp {
     pub key: String,
     pub summary: Option<String>,
-    /// Issue description as plain Markdown. Auto-converted to ADF — do NOT
-    /// hand-build ADF.
+    /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
+    /// wiki markup for API v2 — do NOT hand-build ADF.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
+    /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
     pub description_adf: Option<Value>,

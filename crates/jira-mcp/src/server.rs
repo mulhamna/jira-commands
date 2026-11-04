@@ -521,7 +521,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_create",
-        description = "Create a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
+        description = "Create a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
     )]
     pub async fn jira_issue_create(
         &self,
@@ -532,7 +532,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_update",
-        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF."
+        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it."
     )]
     pub async fn jira_issue_update(
         &self,
@@ -782,7 +782,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_batch",
-        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (auto-converted to ADF)."
+        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (converted to ADF for API v3 or Jira wiki markup for API v2)."
     )]
     pub async fn jira_issue_batch(
         &self,

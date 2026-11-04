@@ -186,6 +186,37 @@ jirac issue batch --manifest ops.json
 jirac issue bulk-create --manifest issues.json
 ```
 
+### Rich-text input
+
+Descriptions, comments, and worklog comments accept Markdown on both Cloud and
+Data Center. `jirac` converts it to ADF for API v3 or Jira wiki markup for API v2,
+including headings, emphasis, links, lists, tables, and code blocks.
+
+With `--description-file`, use `--description-format text` for literal text or
+`--description-format adf` for pre-built ADF. On API v2, supported ADF retains its
+formatting in wiki markup. Unsupported structures, nodes, or marks produce a
+warning and degrade to readable text instead of blocking the write. Labels and
+URLs are retained where available; opaque nodes use a visible placeholder.
+Malformed ADF and excessive nesting still return an error.
+On API v2, code-language hints use Jira's bundled formatters. Plain-text aliases
+and unsupported languages retain the code block without syntax highlighting;
+unsupported languages produce a warning.
+List items support code blocks, quotes, headings, and continuation paragraphs.
+Nested lists followed by more parent content are flattened within the parent item
+so the continuation does not become part of the last nested child.
+Emphasis inside words retains its formatting. Links sharing a text run that Jira
+cannot render are shown as label plus URL with a warning, rather than raw wiki syntax.
+Pipe characters in link labels retain native links. Relative paths and unsupported
+URL schemes use readable label-plus-target fallback instead of Jira error markup;
+compatible URL schemes, protocol-relative URLs, and fragments retain native links.
+ADF mentions use Data Center login names or Cloud account IDs for the selected deployment.
+Existing API v2 descriptions copied when cloning issues and unchanged worklog
+comments are preserved verbatim.
+
+API v2 inputs that previously contained native wiki markup should now be supplied
+as Markdown. Use `jirac api` with an explicit request body when sending native
+wiki markup without conversion.
+
 ### Worklogs
 
 ```bash

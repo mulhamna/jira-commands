@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.6.0...jira-mcp-v3.0.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522))
+
+### Bug Fixes
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522)) ([44f9fe7](https://github.com/mulhamna/jira-commands/commit/44f9fe7f0c4aea1512bd29c89d39455a31200894))
+
 ## [2.6.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.5.0...jira-mcp-v2.6.0) (2026-10-11)
 
 

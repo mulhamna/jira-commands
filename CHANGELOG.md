@@ -6,6 +6,22 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [3.0.0](https://github.com/mulhamna/jira-commands/compare/v2.12.2...v3.0.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522))
+
+### Features
+
+* **mcp:** add jcode and zcode install targets ([#523](https://github.com/mulhamna/jira-commands/issues/523)) ([e28589f](https://github.com/mulhamna/jira-commands/commit/e28589f5065d5b71c175cb2faf4b1852389f1cc7))
+
+
+### Bug Fixes
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522)) ([44f9fe7](https://github.com/mulhamna/jira-commands/commit/44f9fe7f0c4aea1512bd29c89d39455a31200894))
+
 ## [2.12.2](https://github.com/mulhamna/jira-commands/compare/v2.12.1...v2.12.2) (2026-10-29)
 
 

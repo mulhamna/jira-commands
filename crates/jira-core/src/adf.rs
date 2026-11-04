@@ -1,5 +1,8 @@
 use serde_json::{json, Value};
 
+mod wiki;
+pub use wiki::adf_to_wiki;
+
 /// Maximum recursion depth for ADF node rendering. Guards against
 /// stack overflow from maliciously deep or cyclic documents.
 const MAX_RENDER_DEPTH: usize = 128;

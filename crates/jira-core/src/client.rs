@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use tracing::{debug, warn};
 
 use crate::{
-    adf::markdown_to_adf,
+    adf::{adf_to_wiki, markdown_to_adf},
     config::{JiraAuthType, JiraConfig, JiraDeployment},
     error::{JiraError, Result},
     model::{
@@ -92,9 +92,22 @@ impl JiraClient {
     /// Data Center / Server addresses users by login name and lacks several Cloud-only
     /// endpoints. This depends on the deployment, not on `api_version`: Cloud also serves
     /// API v2, and there it still uses accountId and the Cloud endpoints. `api_version` only
-    /// decides the body format (plain text on v2, ADF on v3).
+    /// decides the body format (wiki markup on v2, ADF on v3).
     fn is_data_center(&self) -> bool {
         self.config.deployment == JiraDeployment::DataCenter
+    }
+
+    fn rich_text_body(&self, value: Value) -> Result<Value> {
+        // API v2 descriptions read back for cloning are already wiki strings or null.
+        if self.config.api_version < 3 && !value.is_string() && !value.is_null() {
+            Ok(json!(adf_to_wiki(&value, &self.config.deployment)?))
+        } else {
+            Ok(value)
+        }
+    }
+
+    fn markdown_body(&self, markdown: &str) -> Result<Value> {
+        self.rich_text_body(markdown_to_adf(markdown))
     }
 
     fn platform_url(&self, path: &str) -> String {
@@ -457,21 +470,14 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
 
-        let description_adf = req.description.as_deref().map(markdown_to_adf);
-
         let mut fields = json!({
             "project": { "key": req.project_key },
             "summary": req.summary,
             "issuetype": { "name": req.issue_type }
         });
 
-        if self.config.api_version < 3 {
-            // v2 stores the description as plain text, not as an ADF document.
-            if let Some(description) = req.description.clone() {
-                fields["description"] = json!(description);
-            }
-        } else if let Some(adf) = description_adf {
-            fields["description"] = adf;
+        if let Some(description) = &req.description {
+            fields["description"] = self.markdown_body(description)?;
         }
 
         if let Some(assignee) = &req.assignee {
@@ -509,17 +515,9 @@ impl JiraClient {
             fields["summary"] = json!(summary);
         }
         if let Some(adf) = &req.description_adf {
-            fields["description"] = if self.config.api_version < 3 {
-                json!(crate::adf::adf_to_text(adf))
-            } else {
-                adf.clone()
-            };
+            fields["description"] = self.rich_text_body(adf.clone())?;
         } else if let Some(description) = &req.description {
-            fields["description"] = if self.config.api_version < 3 {
-                json!(description)
-            } else {
-                markdown_to_adf(description)
-            };
+            fields["description"] = self.markdown_body(description)?;
         }
         if let Some(assignee) = &req.assignee {
             fields["assignee"] = self.resolve_assignee_field(assignee).await?;
@@ -1306,12 +1304,7 @@ impl JiraClient {
     pub async fn add_comment_adf(&self, issue_key: &str, adf: Value) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
-        // v2 cannot store ADF, so the document is flattened back to text.
-        let payload = if self.config.api_version < 3 {
-            json!({ "body": crate::adf::adf_to_text(&adf) })
-        } else {
-            json!({ "body": adf })
-        };
+        let payload = json!({ "body": self.rich_text_body(adf)? });
         let http = &self.http;
         let raw: Value = self
             .request(|| http.post(&url).headers(headers.clone()).json(&payload))
@@ -1396,14 +1389,6 @@ impl JiraClient {
         let fallback_summary = req.summary.clone();
         let fallback_issue_type = req.issue_type.clone();
 
-        // v2 stores the description as plain text, not as an ADF document, so the text form
-        // is taken before description_adf consumes the request fields.
-        let description_text = req
-            .description_adf
-            .as_ref()
-            .map(crate::adf::adf_to_text)
-            .or_else(|| req.description.clone());
-
         let description_adf = req
             .description_adf
             .or_else(|| req.description.as_deref().map(markdown_to_adf));
@@ -1414,12 +1399,8 @@ impl JiraClient {
             "issuetype": { "name": req.issue_type }
         });
 
-        if self.config.api_version < 3 {
-            if let Some(description) = description_text {
-                fields["description"] = json!(description);
-            }
-        } else if let Some(adf) = description_adf {
-            fields["description"] = adf;
+        if let Some(adf) = description_adf {
+            fields["description"] = self.rich_text_body(adf)?;
         }
         if let Some(assignee) = &req.assignee {
             fields["assignee"] = self.resolve_assignee_field(assignee).await?;
@@ -1521,13 +1502,7 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
 
-        // API v2 (Data Center / Server) expects the comment body as a plain string,
-        // v3 (Cloud) expects an Atlassian Document Format object.
-        let payload = if self.config.api_version < 3 {
-            json!({ "body": body })
-        } else {
-            json!({ "body": markdown_to_adf(body) })
-        };
+        let payload = json!({ "body": self.markdown_body(body)? });
 
         let http = &self.http;
         let raw: Value = self
@@ -1540,7 +1515,7 @@ impl JiraClient {
         })
     }
 
-    /// Update a comment using plain text/wiki for API v2 or Markdown for API v3.
+    /// Update a comment using Markdown, encoded as wiki markup on API v2 or ADF on API v3.
     pub async fn update_comment(
         &self,
         issue_key: &str,
@@ -1549,11 +1524,7 @@ impl JiraClient {
     ) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
-        let payload = if self.config.api_version < 3 {
-            json!({ "body": body })
-        } else {
-            json!({ "body": markdown_to_adf(body) })
-        };
+        let payload = json!({ "body": self.markdown_body(body)? });
         let http = &self.http;
         let raw: Value = self
             .request(|| http.put(&url).headers(headers.clone()).json(&payload))
@@ -1613,12 +1584,7 @@ impl JiraClient {
         });
 
         if let Some(c) = comment {
-            // v2 (Data Center / Server) takes a plain string, v3 (Cloud) an ADF object.
-            body["comment"] = if self.config.api_version < 3 {
-                json!(c)
-            } else {
-                markdown_to_adf(c)
-            };
+            body["comment"] = self.markdown_body(c)?;
         }
 
         let http = &self.http;
@@ -1682,7 +1648,7 @@ impl JiraClient {
             "started": started,
         });
         if let Some(comment) = comment {
-            body["comment"] = markdown_to_adf(comment);
+            body["comment"] = self.markdown_body(comment)?;
         } else if let Some(existing_comment) = existing.get("comment") {
             body["comment"] = existing_comment.clone();
         }
@@ -2169,7 +2135,7 @@ impl JiraClient {
 
         if let Some(c) = comment {
             payload["comment"] = json!({
-                "body": crate::adf::markdown_to_adf(c)
+                "body": self.markdown_body(c)?
             });
         }
 
@@ -3769,15 +3735,15 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
     }
 
     #[tokio::test]
-    async fn add_comment_sends_plain_string_body_on_data_center() {
+    async fn add_comment_sends_wiki_body_on_data_center() {
         let server = MockServer::start().await;
 
         Mock::given(method("POST"))
             .and(path("/rest/api/2/issue/DC-1/comment"))
-            .and(body_json(json!({ "body": "hello **world**" })))
+            .and(body_json(json!({ "body": "hello *world*" })))
             .respond_with(ResponseTemplate::new(201).set_body_json(json!({
                 "id": "100",
-                "body": "hello **world**"
+                "body": "hello *world*"
             })))
             .mount(&server)
             .await;
@@ -3786,20 +3752,21 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .add_comment("DC-1", "hello **world**")
             .await
             .expect("comment should be created");
-        assert_eq!(comment.body.as_deref(), Some("hello **world**"));
+        assert_eq!(comment.body.as_deref(), Some("hello *world*"));
     }
 
     #[tokio::test]
-    async fn update_comment_sends_plain_string_body_on_data_center() {
+    async fn update_comment_sends_wiki_body_on_data_center() {
         let server = MockServer::start().await;
-        let body = "h2. Updated\n\n*Привет*\n\n{code:javascript}\nconst value = `hello`;\n\nconsole.log(value);\n{code}\n";
+        let body = "## Updated\n\n**Привет**\n\n```javascript\nconst value = `hello`;\n\nconsole.log(value);\n```\n";
+        let wiki = "h2. Updated\n\n*Привет*\n\n{code:javascript}\nconst value = `hello`;\n\nconsole.log(value);\n{code}";
 
         Mock::given(method("PUT"))
             .and(path("/rest/api/2/issue/DC-1/comment/100"))
-            .and(body_json(json!({ "body": body })))
+            .and(body_json(json!({ "body": wiki })))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "id": "100",
-                "body": body
+                "body": wiki
             })))
             .expect(1)
             .mount(&server)
@@ -3810,7 +3777,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .await
             .expect("comment should be updated");
         assert_eq!(comment.id, "100");
-        assert_eq!(comment.body.as_deref(), Some(body));
+        assert_eq!(comment.body.as_deref(), Some(wiki));
     }
 
     #[tokio::test]
@@ -3845,6 +3812,326 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .expect("comment should be updated");
         assert_eq!(comment.id, "100");
         assert_eq!(comment.body.as_deref(), Some("hello world"));
+    }
+
+    #[tokio::test]
+    async fn rich_text_descriptions_use_wiki_on_v2_and_adf_on_v3() {
+        let markdown = "**Bold** and [Example](https://example.com)";
+        let adf = markdown_to_adf(markdown);
+        for api_version in [2, 3] {
+            let server = MockServer::start().await;
+            let client = if api_version == 2 {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            let expected = if api_version == 2 {
+                json!("*Bold* and [Example|https://example.com]")
+            } else {
+                adf.clone()
+            };
+            let issue_path = format!("/rest/api/{api_version}/issue/TEST-1");
+            Mock::given(method("PUT"))
+                .and(path(&issue_path))
+                .and(body_json(json!({ "fields": { "description": expected } })))
+                .respond_with(ResponseTemplate::new(204))
+                .expect(2)
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .and(path(format!("/rest/api/{api_version}/issue")))
+                .and(body_partial_json(
+                    json!({ "fields": { "description": expected } }),
+                ))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-1" })))
+                .expect(2)
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path(&issue_path))
+                .respond_with(ResponseTemplate::new(200).set_body_json(search_issue_json("TEST-1")))
+                .mount(&server)
+                .await;
+
+            for use_adf in [false, true] {
+                let description_adf = use_adf.then(|| adf.clone());
+                client
+                    .update_issue(
+                        "TEST-1",
+                        UpdateIssueRequest {
+                            description: Some(markdown.into()),
+                            description_adf: description_adf.clone(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .expect("update description");
+                client
+                    .create_issue_v2(CreateIssueRequestV2 {
+                        project_key: "TEST".into(),
+                        summary: "Rich description".into(),
+                        issue_type: "Task".into(),
+                        description: Some(markdown.into()),
+                        description_adf,
+                        ..Default::default()
+                    })
+                    .await
+                    .expect("create description");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_clone_preserves_existing_wiki_or_empty_description() {
+        let wiki =
+            "h1. Existing\n\n*Bold* [Example|https://example.com]\n\n{code}\nx = 1;\n{code}\n";
+        for description in [json!(wiki), Value::Null] {
+            let server = MockServer::start().await;
+            for key in ["DC-1", "DC-2"] {
+                let mut issue = search_issue_json(key);
+                issue["fields"]["description"] = description.clone();
+                Mock::given(method("GET"))
+                    .and(path(format!("/rest/api/2/issue/{key}")))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(issue))
+                    .expect(1)
+                    .mount(&server)
+                    .await;
+            }
+            Mock::given(method("POST"))
+                .and(path("/rest/api/2/issue"))
+                .and(body_json(json!({
+                    "fields": {
+                        "project": { "key": "DC" },
+                        "summary": "Issue",
+                        "issuetype": { "name": "Task" },
+                        "description": description
+                    }
+                })))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "DC-2" })))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            let client = dc_client(&server);
+            let source = client.get_issue("DC-1").await.expect("source issue");
+            let clone = client
+                .create_issue_v2(CreateIssueRequestV2 {
+                    project_key: source.project_key,
+                    summary: source.summary,
+                    issue_type: source.issue_type,
+                    description_adf: source.description,
+                    ..Default::default()
+                })
+                .await
+                .expect("clone must preserve the API v2 description without conversion");
+            assert_eq!(clone.description, Some(description));
+        }
+    }
+
+    #[tokio::test]
+    async fn rich_text_comments_and_worklogs_use_matching_wire_formats() {
+        let markdown = "**Bold** and [Example](https://example.com)";
+        let adf = markdown_to_adf(markdown);
+        let started = "2026-10-30T09:00:00.000+0000";
+        for api_version in [2, 3] {
+            let server = MockServer::start().await;
+            let client = if api_version == 2 {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            let expected = if api_version == 2 {
+                json!("*Bold* and [Example|https://example.com]")
+            } else {
+                adf.clone()
+            };
+            let base = format!("/rest/api/{api_version}");
+            for (method_name, suffix, times) in [("POST", "comment", 2), ("PUT", "comment/100", 1)]
+            {
+                Mock::given(method(method_name))
+                    .and(path(format!("{base}/issue/TEST-1/{suffix}")))
+                    .and(body_json(json!({ "body": expected })))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                        "id": "100", "body": expected
+                    })))
+                    .expect(times)
+                    .mount(&server)
+                    .await;
+            }
+            for (method_name, suffix) in [("POST", "worklog"), ("PUT", "worklog/200")] {
+                Mock::given(method(method_name))
+                    .and(path(format!("{base}/issue/TEST-1/{suffix}")))
+                    .and(body_json(json!({
+                        "timeSpent": "1h", "started": started, "comment": expected
+                    })))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                        "id": "200", "timeSpent": "1h", "started": started, "comment": expected
+                    })))
+                    .expect(1)
+                    .mount(&server)
+                    .await;
+            }
+            Mock::given(method("GET"))
+                .and(path(format!("{base}/issue/TEST-1/worklog/200")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "id": "200", "timeSpent": "1h", "started": started, "comment": expected
+                })))
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .and(path(format!("{base}/issueLink")))
+                .and(body_partial_json(
+                    json!({ "comment": { "body": expected } }),
+                ))
+                .respond_with(ResponseTemplate::new(201))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            client
+                .add_comment("TEST-1", markdown)
+                .await
+                .expect("add comment");
+            client
+                .add_comment_adf("TEST-1", adf.clone())
+                .await
+                .expect("add ADF comment");
+            client
+                .update_comment("TEST-1", "100", markdown)
+                .await
+                .expect("update comment");
+            client
+                .add_worklog("TEST-1", "1h", Some(markdown), Some(started))
+                .await
+                .expect("add worklog");
+            client
+                .update_worklog("TEST-1", "200", None, Some(markdown), None)
+                .await
+                .expect("update worklog");
+            client
+                .link_issues("TEST-1", "TEST-2", "Blocks", Some(markdown))
+                .await
+                .expect("link comment");
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_worklog_update_keeps_existing_wiki_when_comment_is_omitted() {
+        let server = MockServer::start().await;
+        let started = "2026-10-30T09:00:00.000+0000";
+        let wiki = "h1. Existing\n\n*Bold* [Example|https://example.com]";
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-1/worklog/200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "200", "timeSpent": "1h", "started": started, "comment": wiki
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1/worklog/200"))
+            .and(body_json(
+                json!({ "timeSpent": "2h", "started": started, "comment": wiki }),
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "200" })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        dc_client(&server)
+            .update_worklog("DC-1", "200", Some("2h"), None, None)
+            .await
+            .expect("existing wiki must not be reinterpreted as Markdown");
+    }
+
+    #[tokio::test]
+    async fn tui_mentions_use_deployment_specific_wiki_or_cloud_adf() {
+        for (deployment, api_version, identifier, expected_wiki) in [
+            (
+                JiraDeployment::DataCenter,
+                2,
+                "fixture.user",
+                "Hello [~fixture.user]",
+            ),
+            (
+                JiraDeployment::Cloud,
+                2,
+                "account:fixture",
+                "Hello [~accountid:account:fixture]",
+            ),
+            (JiraDeployment::Cloud, 3, "account:fixture", ""),
+        ] {
+            let server = MockServer::start().await;
+            let mut client = if deployment == JiraDeployment::DataCenter {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            client.config.api_version = api_version;
+            let mut adf = markdown_to_adf("Hello @Fixture User");
+            crate::adf::inject_mentions(&mut adf, &[("Fixture User".into(), identifier.into())]);
+            let expected = if api_version == 3 {
+                adf.clone()
+            } else {
+                json!(expected_wiki)
+            };
+            Mock::given(method("POST"))
+                .and(path(format!(
+                    "/rest/api/{api_version}/issue/TEST-1/comment"
+                )))
+                .and(body_json(json!({ "body": expected })))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                    "id": "100", "body": expected
+                })))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            client
+                .add_comment_adf("TEST-1", adf)
+                .await
+                .expect("TUI comment with a picked mention");
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_unsupported_adf_is_flattened_before_writing() {
+        let server = MockServer::start().await;
+        let adf = json!({
+            "type": "doc", "content": [{ "type": "inlineCard", "attrs": { "url": "https://example.com" } }]
+        });
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(body_json(
+                json!({"fields": {"description": "https&#58;//example.com"}}),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue/DC-1/comment"))
+            .and(body_json(json!({"body": "https&#58;//example.com"})))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "1", "body": "https&#58;//example.com"
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let client = dc_client(&server);
+        client
+            .update_issue(
+                "DC-1",
+                UpdateIssueRequest {
+                    description_adf: Some(adf.clone()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("unsupported description is flattened");
+        client
+            .add_comment_adf("DC-1", adf)
+            .await
+            .expect("unsupported comment is flattened");
     }
 
     #[tokio::test]

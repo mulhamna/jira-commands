@@ -238,6 +238,8 @@ jirac mcp install --client generic-json
 jirac mcp install --client antigravity-cli
 jirac mcp install --client arsy-code
 jirac mcp install --client antigravity-desktop
+jirac mcp install --client jcode
+jirac mcp install --client zcode
 ```
 
 The helper delegates registration, config merging, backups, conflict handling,
@@ -249,6 +251,7 @@ Supported targets now:
 - `cursor`, `gemini-cli`, `codex`, `vscode`, and `copilot-cli`
 - `opencode`, `windsurf`, `zed`, `openclaw`, and `hermes`
 - `arsy-code`, `generic-json`, `antigravity-cli`, and `antigravity-desktop`
+- `jcode` and `zcode`
 
 `antigravity` remains an alias for `antigravity-cli`.
 

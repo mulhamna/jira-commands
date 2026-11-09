@@ -1,21 +1,21 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac
-PackageVersion: 2.12.2
+PackageVersion: 3.0.0
 InstallerType: zip
 NestedInstallerType: portable
-ReleaseDate: 2026-10-29
+ReleaseDate: 2026-11-09
 Installers:
   - Architecture: x64
     NestedInstallerFiles:
       - RelativeFilePath: jirac-windows-x86_64.exe
         PortableCommandAlias: jirac
-    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v2.12.2/jirac-windows-x86_64.zip
-    InstallerSha256: e13b29784a7e8b3326bb960b9e5bab89d1eb7cc0303843c8d855bf44d8aedd51
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v3.0.0/jirac-windows-x86_64.zip
+    InstallerSha256: 3871ceadcc5321a318915fe4e6310c9ad529236b3bd2a809605ac6e148064822
   - Architecture: arm64
     NestedInstallerFiles:
       - RelativeFilePath: jirac-windows-aarch64.exe
         PortableCommandAlias: jirac
-    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v2.12.2/jirac-windows-aarch64.zip
-    InstallerSha256: a13737ddc34e43c391c99bc2d82807635198acbee9868640b4b7901aadb2994e
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/v3.0.0/jirac-windows-aarch64.zip
+    InstallerSha256: 3463c7524963b308c1bc6b528f2c9fb06565883feb52a12e7e7f8dc2649c9ac9
 ManifestType: installer
 ManifestVersion: 1.9.0

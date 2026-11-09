@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.0.0...jira-mcp-v3.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **mcp:** bump rmcp to 3.9.0 and refresh dependencies ([#530](https://github.com/mulhamna/jira-commands/issues/530)) ([a44cda0](https://github.com/mulhamna/jira-commands/commit/a44cda0a871a5d87f3754a5a6e189458d44d0aa1))
+* **mcp:** bump rmcp to 3.9.0 for RUSTSEC-2026-0462 ([bbdd264](https://github.com/mulhamna/jira-commands/commit/bbdd264ccf7796d3ae0af86f51458537b92c8ca7))
+
 ## [3.0.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.6.0...jira-mcp-v3.0.0) (2026-11-04)
 
 

@@ -213,9 +213,34 @@ ADF mentions use Data Center login names or Cloud account IDs for the selected d
 Existing API v2 descriptions copied when cloning issues and unchanged worklog
 comments are preserved verbatim.
 
-API v2 inputs that previously contained native wiki markup should now be supplied
-as Markdown. Use `jirac api` with an explicit request body when sending native
-wiki markup without conversion.
+By default, API v2 inputs are read as Markdown, so native wiki markup in them is
+escaped. To keep writing native wiki markup, opt in with `text_format = wiki`.
+
+#### Native Jira wiki markup (API v2)
+
+Profiles on API v2 can opt in to native Jira wiki markup. With
+`text_format = wiki`, descriptions, comments, worklog comments, and issue-link
+comments are sent to Jira unchanged, with no Markdown conversion or escaping:
+
+```bash
+jirac config set text_format wiki                # save in the active profile
+JIRA_TEXT_FORMAT=wiki jirac issue comment PROJ-123 add --file note.wiki
+jirac issue update PROJ-123 --description-file desc.wiki --description-format wiki
+JIRA_TEXT_FORMAT=markdown jirac issue comment PROJ-123 add --body "**Markdown** again"
+jirac config unset text_format                   # back to the Markdown default
+```
+
+`JIRA_TEXT_FORMAT` overrides the profile, and `--description-format markdown|wiki`
+overrides both for one call (`md` is accepted for `markdown`); `text` and `adf` keep
+their meaning. The setting also applies to the `description` key in `bulk-create`
+and `batch` manifests (including `batch` `update`, which now reads `description`)
+and to the MCP server tools; `jira_auth_status` reports the active `text_format`.
+`jirac auth status` and `jirac config show` print it too. The TUI always uses Markdown.
+
+On API v3, `wiki` is rejected before any request is sent when a command would write
+text: lookups, searches, and earlier manifest operations are not run either, and the
+command exits with an error. Commands that write no text are not affected. The
+default remains `markdown`.
 
 ### Worklogs
 
@@ -370,6 +395,10 @@ a self-hosted Jira presents a cert from an internal CA. You can also set it with
 `jirac auth login --cacert /path/to/ca.pem` (the interactive flow offers it for
 Data Center) or the `JIRA_CA_BUNDLE` env var.
 
+`text_format` is optional too: `markdown` (default) or `wiki` for native Jira wiki
+markup on API v2 profiles — see [Native Jira wiki markup](#native-jira-wiki-markup-api-v2).
+Set it with `jirac config set text_format wiki` or the `JIRA_TEXT_FORMAT` env var.
+
 Environment variables override the active profile:
 
 ```bash
@@ -378,6 +407,13 @@ export JIRA_URL=https://yourcompany.atlassian.net
 export JIRA_EMAIL=you@example.com
 export JIRA_TOKEN=your_api_token
 export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
+```
+
+For a Data Center (API v2) profile that should take native wiki markup:
+
+```bash
+export JIRA_PROFILE=client-dc
+export JIRA_TEXT_FORMAT=wiki
 ```
 
 ## MCP server

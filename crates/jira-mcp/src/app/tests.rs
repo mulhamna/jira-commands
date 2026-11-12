@@ -7,10 +7,11 @@ use wiremock::{
 };
 
 use crate::models::{
-    ApiRequestArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs, CommentDeleteArgs,
-    CommentUpdateArgs, IssueDeleteArgs, IssueKeyArgs, IssueListArgs, IssueNotificationsArgs,
-    IssueStandupArgs, ProjectKeyArgs, ProjectVersionUpdateArgs, SprintBacklogIssueArgs,
-    SprintListArgs, SprintRankIssueArgs, SprintUpdateArgs, WorklogUpdateArgs,
+    ApiRequestArgs, AuthSetCredentialsArgs, BatchArgs, BatchOperation, BatchUpdateOp,
+    BulkCommentArgs, CommentAddArgs, CommentDeleteArgs, CommentUpdateArgs, IssueDeleteArgs,
+    IssueKeyArgs, IssueLinkCreateArgs, IssueListArgs, IssueNotificationsArgs, IssueStandupArgs,
+    ProjectKeyArgs, ProjectVersionUpdateArgs, SprintBacklogIssueArgs, SprintListArgs,
+    SprintRankIssueArgs, SprintUpdateArgs, WorklogAddArgs, WorklogUpdateArgs,
 };
 
 use super::shared::build_api_path;
@@ -32,8 +33,21 @@ fn clear_config_home_vars() {
     std::env::remove_var("LOCALAPPDATA");
 }
 
+/// Variables that change how text is encoded or which API is used; a value exported
+/// in the developer's shell must not leak into these tests.
+const FORMAT_ENV_VARS: [&str; 5] = [
+    "JIRA_PROFILE",
+    "JIRA_DEPLOYMENT",
+    "JIRA_AUTH_TYPE",
+    "JIRA_API_VERSION",
+    "JIRA_TEXT_FORMAT",
+];
+
 fn set_test_env(temp_dir: &TempDir, base_url: Option<&str>) {
     set_config_home_vars(temp_dir);
+    for key in FORMAT_ENV_VARS {
+        std::env::remove_var(key);
+    }
     match base_url {
         Some(base_url) => {
             std::env::set_var("JIRA_URL", base_url);
@@ -53,6 +67,9 @@ fn clear_test_env() {
     std::env::remove_var("JIRA_URL");
     std::env::remove_var("JIRA_EMAIL");
     std::env::remove_var("JIRA_TOKEN");
+    for key in FORMAT_ENV_VARS {
+        std::env::remove_var(key);
+    }
 }
 
 fn sample_issue() -> Value {
@@ -672,6 +689,121 @@ async fn comment_worklog_and_agile_mutations_reach_their_jira_endpoints() {
         })
         .await
         .expect("rank issue after");
+
+    clear_test_env();
+}
+
+const WIKI: &str =
+    "h2. Plan\n\n* item *bold* {{mono}}\n{code}\nx = {y}\n{code}\n!shot.png|thumbnail!";
+
+fn batch_update(key: &str, summary: Option<&str>, description: Option<&str>) -> BatchOperation {
+    BatchOperation::Update(BatchUpdateOp {
+        key: key.into(),
+        summary: summary.map(Into::into),
+        description: description.map(Into::into),
+        description_adf: None,
+        assignee: None,
+        priority: None,
+        labels: None,
+        components: None,
+        parent: None,
+        fix_versions: None,
+        custom_fields: None,
+    })
+}
+
+#[tokio::test]
+#[serial]
+async fn wiki_profile_sends_text_unchanged_and_auth_status_reports_it() {
+    let temp_dir = TempDir::new().expect("tempdir");
+    let mock_server = MockServer::start().await;
+    set_test_env(&temp_dir, Some(&mock_server.uri()));
+    std::env::set_var("JIRA_API_VERSION", "2");
+    std::env::set_var("JIRA_TEXT_FORMAT", "wiki");
+
+    let status = JiraApp.auth_status().expect("auth status");
+    assert_eq!(status["text_format"], json!("wiki"));
+
+    Mock::given(method("POST"))
+        .and(path("/rest/api/2/issue/PROJ-1/comment"))
+        .and(body_json(json!({ "body": WIKI })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "id": "11", "body": WIKI })))
+        .expect(2)
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/rest/api/2/issue/PROJ-1/worklog"))
+        .and(body_json(json!({
+            "timeSpent": "1h", "started": "2026-11-11T09:00:00.000+0000", "comment": WIKI
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+            "id": "22", "timeSpent": "1h", "started": "2026-11-11T09:00:00.000+0000"
+        })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/rest/api/2/issueLink"))
+        .and(body_json(json!({
+            "type": { "name": "Blocks" },
+            "inwardIssue": { "key": "PROJ-2" },
+            "outwardIssue": { "key": "PROJ-1" },
+            "comment": { "body": WIKI }
+        })))
+        .respond_with(ResponseTemplate::new(201))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/rest/api/2/issue/PROJ-1"))
+        .and(body_json(json!({ "fields": { "description": WIKI } })))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    JiraApp
+        .comment_add(CommentAddArgs {
+            key: "PROJ-1".into(),
+            body: WIKI.into(),
+        })
+        .await
+        .expect("comment add");
+    JiraApp
+        .issue_bulk_comment(BulkCommentArgs {
+            jql: None,
+            keys: Some(vec!["PROJ-1".into()]),
+            body: WIKI.into(),
+            confirm: Some(true),
+        })
+        .await
+        .expect("bulk comment");
+    JiraApp
+        .worklog_add(WorklogAddArgs {
+            key: "PROJ-1".into(),
+            time_spent: "1h".into(),
+            comment: Some(WIKI.into()),
+            started: Some("2026-11-11T09:00:00.000+0000".into()),
+        })
+        .await
+        .expect("worklog add");
+    JiraApp
+        .issue_link_create(IssueLinkCreateArgs {
+            outward_key: "PROJ-1".into(),
+            inward_key: "PROJ-2".into(),
+            link_type: "Blocks".into(),
+            comment: Some(WIKI.into()),
+        })
+        .await
+        .expect("link create");
+    let batch = JiraApp
+        .issue_batch(BatchArgs {
+            operations: vec![batch_update("PROJ-1", None, Some(WIKI))],
+            confirm: Some(true),
+        })
+        .await
+        .expect("batch");
+    assert_eq!(batch["succeeded"], json!(1), "{batch}");
 
     clear_test_env();
 }

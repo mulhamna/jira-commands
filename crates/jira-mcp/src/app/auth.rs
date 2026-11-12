@@ -27,6 +27,7 @@ impl JiraApp {
             "deployment": format!("{:?}", config.deployment).to_lowercase(),
             "auth_type": format!("{:?}", config.auth_type).to_lowercase(),
             "api_version": config.api_version,
+            "text_format": config.text_format.as_str(),
             "profiles": store.profiles.keys().cloned().collect::<Vec<_>>(),
             "config_path": config_file_path().display().to_string()
         }))
@@ -102,7 +103,7 @@ impl JiraApp {
     }
 
     pub fn auth_logout(&self) -> AppResult<Value> {
-        let mut config = self.load_config().unwrap_or_default();
+        let mut config = JiraConfig::load_stored().unwrap_or_default();
         config.token = None;
         config.save()?;
         self.auth_status()

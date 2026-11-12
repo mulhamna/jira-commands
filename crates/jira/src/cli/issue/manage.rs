@@ -118,7 +118,7 @@ pub(super) async fn create_issue(
     assignee: Option<String>,
     priority: Option<String>,
     description_file: Option<std::path::PathBuf>,
-    description_format: String,
+    description_format: Option<DescriptionFormat>,
     labels: Option<String>,
     components: Option<String>,
     parent: Option<String>,
@@ -140,6 +140,12 @@ pub(super) async fn create_issue(
         }
     };
 
+    // Read before any lookup so wiki on API v3 fails without a request.
+    let (description, description_adf) =
+        read_description_file(description_file.as_deref(), description_format)?;
+    let client = client_for_description_format(client, description_format);
+    ensure_text_format(&client, description.is_some())?;
+
     // 2. Issue type — interactive picker if not supplied
     let (issue_type_name, issue_type_id) =
         resolve_issue_type(&client, &project_key, issue_type).await?;
@@ -155,11 +161,7 @@ pub(super) async fn create_issue(
         }
     };
 
-    // 4. Description from file
-    let (description, description_adf) =
-        read_description_file(description_file.as_deref(), &description_format)?;
-
-    // 5. Custom fields — combine --field flags + interactive prompts
+    // 4. Custom fields — combine --field flags + interactive prompts
     let mut custom_fields = parse_field_flags(&field)?;
     if !no_custom_fields {
         let interactive = collect_custom_fields(&client, &project_key, &issue_type_id).await?;
@@ -439,7 +441,7 @@ pub(super) async fn update_issue(
     assignee: Option<String>,
     priority: Option<String>,
     description_file: Option<std::path::PathBuf>,
-    description_format: String,
+    description_format: Option<DescriptionFormat>,
     labels: Option<String>,
     components: Option<String>,
     fix_version: Option<String>,
@@ -448,7 +450,9 @@ pub(super) async fn update_issue(
     json: bool,
 ) -> Result<()> {
     let (description, description_adf) =
-        read_description_file(description_file.as_deref(), &description_format)?;
+        read_description_file(description_file.as_deref(), description_format)?;
+    let client = client_for_description_format(client, description_format);
+    ensure_text_format(&client, description.is_some())?;
 
     let custom_fields = parse_field_flags(&field)?;
     let labels_vec = labels.as_deref().map(|s| parse_csv(Some(s)));

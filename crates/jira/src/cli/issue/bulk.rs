@@ -428,6 +428,34 @@ pub(super) async fn jql_builder(
 
 // ─── batch manifest runner ───────────────────────────────────────────────────
 
+/// True when a manifest entry carries a text `description` that will be sent to Jira.
+fn entry_has_description(entry: &Value) -> bool {
+    entry.get("description").and_then(|v| v.as_str()).is_some()
+}
+
+/// Build the update request for a `batch` manifest entry with `"op": "update"`.
+/// `description` is interpreted by the client's text format, like `"op": "create"`.
+fn batch_update_request(entry: &Value) -> UpdateIssueRequest {
+    let text = |key: &str| entry.get(key).and_then(|v| v.as_str()).map(String::from);
+    let list = |key: &str| {
+        entry.get(key).and_then(|v| v.as_array()).map(|a| {
+            a.iter()
+                .filter_map(|s| s.as_str())
+                .map(String::from)
+                .collect()
+        })
+    };
+    UpdateIssueRequest {
+        summary: text("summary"),
+        description: text("description"),
+        assignee: text("assignee"),
+        priority: text("priority"),
+        labels: list("labels"),
+        components: list("components"),
+        ..Default::default()
+    }
+}
+
 pub(super) async fn batch_manifest(
     client: JiraClient,
     manifest: std::path::PathBuf,
@@ -443,6 +471,15 @@ pub(super) async fn batch_manifest(
         println!("Manifest is empty — nothing to run.");
         return Ok(());
     }
+
+    // Fail before the first operation so the manifest is never partially applied.
+    let writes_description = entries.iter().any(|entry| {
+        matches!(
+            entry.get("op").and_then(|v| v.as_str()),
+            Some("create" | "update")
+        ) && entry_has_description(entry)
+    });
+    ensure_text_format(&client, writes_description)?;
 
     println!("Running {} operations...", entries.len());
     let pb = progress_bar(entries.len() as u64);
@@ -559,33 +596,7 @@ pub(super) async fn batch_manifest(
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
-                let req = UpdateIssueRequest {
-                    summary: entry
-                        .get("summary")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                    assignee: entry
-                        .get("assignee")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                    priority: entry
-                        .get("priority")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                    labels: entry.get("labels").and_then(|v| v.as_array()).map(|a| {
-                        a.iter()
-                            .filter_map(|s| s.as_str())
-                            .map(String::from)
-                            .collect()
-                    }),
-                    components: entry.get("components").and_then(|v| v.as_array()).map(|a| {
-                        a.iter()
-                            .filter_map(|s| s.as_str())
-                            .map(String::from)
-                            .collect()
-                    }),
-                    ..Default::default()
-                };
+                let req = batch_update_request(entry);
                 match client.update_issue(&key, req).await {
                     Ok(_) => serde_json::json!({ "op": op, "key": key, "status": "updated" }),
                     Err(e) => {
@@ -906,6 +917,8 @@ pub(super) async fn bulk_create(
         return Ok(());
     }
 
+    ensure_text_format(&client, entries.iter().any(entry_has_description))?;
+
     println!("Creating {} issues from manifest...", entries.len());
     let pb = progress_bar(entries.len() as u64);
 
@@ -1087,4 +1100,29 @@ pub(super) async fn handle_link_command(client: JiraClient, cmd: LinkCommand) ->
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn batch_update_reads_description_like_batch_create() {
+        let req = batch_update_request(&serde_json::json!({
+            "op": "update",
+            "key": "PROJ-1",
+            "summary": "New title",
+            "description": "h2. Wiki body",
+            "labels": ["a", "b"]
+        }));
+        assert_eq!(req.summary.as_deref(), Some("New title"));
+        assert_eq!(req.description.as_deref(), Some("h2. Wiki body"));
+        assert_eq!(req.description_adf, None);
+        assert_eq!(req.labels, Some(vec!["a".to_string(), "b".to_string()]));
+        assert_eq!(req.components, None);
+
+        let req = batch_update_request(&serde_json::json!({ "op": "update", "priority": "High" }));
+        assert_eq!(req.description, None);
+        assert_eq!(req.priority.as_deref(), Some("High"));
+    }
 }

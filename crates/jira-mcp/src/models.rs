@@ -241,7 +241,9 @@ pub struct IssueCreateArgs {
     pub issue_type: String,
     /// Issue description as plain Markdown (headings, lists, tables, code,
     /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
-    /// normal text — do NOT hand-build ADF.
+    /// normal text — do NOT hand-build ADF. When jira_auth_status reports
+    /// `text_format = wiki`, send native Jira wiki markup instead; it is passed through
+    /// unchanged (API v2 only).
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
@@ -268,7 +270,9 @@ pub struct IssueUpdateArgs {
     pub summary: Option<String>,
     /// Issue description as plain Markdown (headings, lists, tables, code,
     /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
-    /// normal text — do NOT hand-build ADF.
+    /// normal text — do NOT hand-build ADF. When jira_auth_status reports
+    /// `text_format = wiki`, send native Jira wiki markup instead; it is passed through
+    /// unchanged (API v2 only).
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
@@ -345,6 +349,8 @@ pub struct IssueAttachArgs {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommentAddArgs {
     pub key: String,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub body: String,
 }
 
@@ -352,6 +358,8 @@ pub struct CommentAddArgs {
 pub struct CommentUpdateArgs {
     pub key: String,
     pub comment_id: String,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub body: String,
 }
 
@@ -366,6 +374,8 @@ pub struct CommentDeleteArgs {
 pub struct BulkCommentArgs {
     pub jql: Option<String>,
     pub keys: Option<Vec<String>>,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub body: String,
     pub confirm: Option<bool>,
 }
@@ -375,6 +385,8 @@ pub struct IssueLinkCreateArgs {
     pub outward_key: String,
     pub inward_key: String,
     pub link_type: String,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub comment: Option<String>,
 }
 
@@ -402,6 +414,8 @@ pub struct RemoteLinkDeleteArgs {
 pub struct WorklogAddArgs {
     pub key: String,
     pub time_spent: String,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub comment: Option<String>,
     pub started: Option<String>,
 }
@@ -417,6 +431,8 @@ pub struct WorklogUpdateArgs {
     pub key: String,
     pub id: String,
     pub time_spent: Option<String>,
+    /// Markdown, or native Jira wiki markup sent unchanged when jira_auth_status reports
+    /// text_format = wiki (API v2 only).
     pub comment: Option<String>,
     pub started: Option<String>,
 }
@@ -448,7 +464,8 @@ pub struct BatchCreateOp {
     pub summary: String,
     pub issue_type: Option<String>,
     /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
-    /// wiki markup for API v2 — do NOT hand-build ADF.
+    /// wiki markup for API v2 — do NOT hand-build ADF. When jira_auth_status reports
+    /// `text_format = wiki`, send native Jira wiki markup instead (API v2 only).
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.
@@ -474,7 +491,8 @@ pub struct BatchUpdateOp {
     pub key: String,
     pub summary: Option<String>,
     /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
-    /// wiki markup for API v2 — do NOT hand-build ADF.
+    /// wiki markup for API v2 — do NOT hand-build ADF. When jira_auth_status reports
+    /// `text_format = wiki`, send native Jira wiki markup instead (API v2 only).
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
     /// for Markdown. If both are set, this one wins.

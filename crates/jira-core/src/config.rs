@@ -44,6 +44,31 @@ pub enum JiraAuthType {
     DataCenterBasic,
 }
 
+/// How description, comment and worklog text is interpreted.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextFormat {
+    /// Markdown, converted to ADF on API v3 or to Jira wiki markup on API v2.
+    #[default]
+    #[serde(alias = "md")]
+    Markdown,
+    /// Native Jira wiki markup, sent unchanged. Only valid on API v2.
+    Wiki,
+}
+
+impl TextFormat {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TextFormat::Markdown => "markdown",
+            TextFormat::Wiki => "wiki",
+        }
+    }
+
+    fn is_default(&self) -> bool {
+        *self == TextFormat::Markdown
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JiraConfig {
     #[serde(default)]
@@ -67,6 +92,9 @@ pub struct JiraConfig {
     /// talking to a self-hosted Jira presenting a cert from an internal CA.
     #[serde(default)]
     pub ca_bundle: Option<String>,
+    /// `markdown` (default) or `wiki` (native Jira wiki markup, API v2 only).
+    #[serde(default, skip_serializing_if = "TextFormat::is_default")]
+    pub text_format: TextFormat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +118,9 @@ pub struct JiraProfileConfig {
     /// Optional path to a PEM file with extra CA certificate(s) to trust.
     #[serde(default)]
     pub ca_bundle: Option<String>,
+    /// `markdown` (default) or `wiki` (native Jira wiki markup, API v2 only).
+    #[serde(default, skip_serializing_if = "TextFormat::is_default")]
+    pub text_format: TextFormat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -126,6 +157,7 @@ impl Default for JiraConfig {
             api_version: default_api_version(),
             default_issue_limit: None,
             ca_bundle: None,
+            text_format: TextFormat::default(),
         }
     }
 }
@@ -151,6 +183,7 @@ impl From<JiraProfileConfig> for JiraConfig {
             api_version,
             default_issue_limit: value.default_issue_limit,
             ca_bundle: value.ca_bundle,
+            text_format: value.text_format,
         }
     }
 }
@@ -158,6 +191,15 @@ impl From<JiraProfileConfig> for JiraConfig {
 impl JiraConfig {
     /// Load the active profile from ~/.config/jira/config.toml and env vars.
     pub fn load() -> Result<Self> {
+        let mut config = Self::load_stored()?;
+        config.apply_env_overrides();
+        config.api_version = normalize_api_version(config.api_version, &config.deployment);
+        Ok(config)
+    }
+
+    /// Load the active profile as stored, without `JIRA_*` value overrides
+    /// (`JIRA_PROFILE` still selects it), so saving it back keeps env-only values out.
+    pub fn load_stored() -> Result<Self> {
         let profile_override = env::var("JIRA_PROFILE")
             .ok()
             .filter(|s| !s.trim().is_empty());
@@ -179,7 +221,6 @@ impl JiraConfig {
                 .or_else(|| store.current_profile.clone())
                 .unwrap_or_else(default_profile_name),
         );
-        config.apply_env_overrides();
         config.api_version = normalize_api_version(config.api_version, &config.deployment);
 
         Ok(config)
@@ -198,6 +239,7 @@ impl JiraConfig {
             api_version,
             default_issue_limit: self.default_issue_limit,
             ca_bundle: self.ca_bundle,
+            text_format: self.text_format,
         }
     }
 
@@ -311,6 +353,14 @@ impl JiraConfig {
         if let Ok(issue_limit) = env::var("JIRA_ISSUE_LIMIT") {
             self.default_issue_limit = issue_limit.trim().parse::<u32>().ok().filter(|n| *n > 0);
         }
+        // An empty `JIRA_TEXT_FORMAT` resets to Markdown; unknown values are ignored.
+        if let Ok(text_format) = env::var("JIRA_TEXT_FORMAT") {
+            if text_format.trim().is_empty() {
+                self.text_format = TextFormat::default();
+            } else if let Some(value) = parse_text_format(&text_format) {
+                self.text_format = value;
+            }
+        }
     }
 }
 
@@ -363,6 +413,7 @@ impl JiraProfilesFile {
                 api_version: default_api_version(),
                 default_issue_limit: None,
                 ca_bundle: None,
+                text_format: TextFormat::default(),
             },
         );
 
@@ -446,6 +497,14 @@ pub fn parse_deployment(value: &str) -> Option<JiraDeployment> {
     }
 }
 
+pub fn parse_text_format(value: &str) -> Option<TextFormat> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "markdown" | "md" => Some(TextFormat::Markdown),
+        "wiki" => Some(TextFormat::Wiki),
+        _ => None,
+    }
+}
+
 pub fn parse_auth_type(value: &str) -> Option<JiraAuthType> {
     match value.trim().to_ascii_lowercase().as_str() {
         "cloud_api_token" | "cloud-api-token" | "cloud" | "api-token" | "api_token" => {
@@ -509,6 +568,8 @@ mod tests {
         std::env::remove_var("JIRA_AUTH_TYPE");
         std::env::remove_var("JIRA_API_VERSION");
         std::env::remove_var("JIRA_CA_BUNDLE");
+        std::env::remove_var("JIRA_TEXT_FORMAT");
+        std::env::remove_var("JIRA_PROJECT");
     }
 
     #[test]
@@ -633,6 +694,7 @@ ca_bundle = "/etc/ssl/internal-ca.pem"
                         api_version: 3,
                         default_issue_limit: None,
                         ca_bundle: None,
+                        text_format: TextFormat::default(),
                     },
                 ),
                 (
@@ -648,6 +710,7 @@ ca_bundle = "/etc/ssl/internal-ca.pem"
                         api_version: 2,
                         default_issue_limit: None,
                         ca_bundle: None,
+                        text_format: TextFormat::default(),
                     },
                 ),
             ]),
@@ -663,6 +726,96 @@ ca_bundle = "/etc/ssl/internal-ca.pem"
         assert_eq!(config.project.as_deref(), Some("OPS"));
         assert_eq!(config.auth_type, JiraAuthType::DataCenterPat);
         assert_eq!(config.api_version, 2);
+
+        clear_config_home();
+    }
+
+    fn write_dc_profile(extra: &str) {
+        std::fs::create_dir_all(config_file_path().parent().expect("parent")).expect("mkdir");
+        std::fs::write(
+            config_file_path(),
+            format!(
+                r#"current_profile = "dc"
+
+[profiles.dc]
+base_url = "https://jira.internal"
+email = "ops"
+token = "pat"
+project = "PROJ"
+timeout_secs = 30
+deployment = "data_center"
+auth_type = "data_center_pat"
+api_version = 2
+{extra}
+"#
+            ),
+        )
+        .expect("write");
+    }
+
+    #[test]
+    fn text_format_round_trips_through_profile_and_env_override() {
+        let _guard = env_lock().lock().expect("env lock");
+        let temp_dir = TempDir::new().expect("tempdir");
+        clear_config_home();
+        set_config_home(&temp_dir);
+
+        write_dc_profile("text_format = \"wiki\"");
+        let config = JiraConfig::load().expect("load");
+        assert_eq!(config.text_format, TextFormat::Wiki);
+        config.save().expect("save");
+        let saved = std::fs::read_to_string(config_file_path()).expect("read config");
+        assert!(saved.contains("text_format = \"wiki\""), "{saved}");
+
+        for (env, expected) in [
+            (" Markdown ", TextFormat::Markdown),
+            ("md", TextFormat::Markdown),
+            ("", TextFormat::Markdown),
+            ("bogus", TextFormat::Wiki),
+        ] {
+            std::env::set_var("JIRA_TEXT_FORMAT", env);
+            assert_eq!(
+                JiraConfig::load().expect(env).text_format,
+                expected,
+                "{env:?}"
+            );
+        }
+        std::env::remove_var("JIRA_TEXT_FORMAT");
+
+        write_dc_profile("text_format = \"md\"");
+        let config = JiraConfig::load().expect("load md");
+        assert_eq!(config.text_format, TextFormat::Markdown);
+        config.save().expect("save markdown");
+        let saved = std::fs::read_to_string(config_file_path()).expect("read config");
+        assert!(!saved.contains("text_format"), "{saved}");
+
+        clear_config_home();
+    }
+
+    #[test]
+    fn load_stored_ignores_env_value_overrides() {
+        let _guard = env_lock().lock().expect("env lock");
+        let temp_dir = TempDir::new().expect("tempdir");
+        clear_config_home();
+        set_config_home(&temp_dir);
+        write_dc_profile("text_format = \"wiki\"");
+
+        std::env::set_var("JIRA_URL", "https://env.example");
+        std::env::set_var("JIRA_TOKEN", "env-token");
+        std::env::set_var("JIRA_PROJECT", "ENV");
+        std::env::set_var("JIRA_TEXT_FORMAT", "markdown");
+
+        let stored = JiraConfig::load_stored().expect("load stored");
+        assert_eq!(stored.profile_name.as_deref(), Some("dc"));
+        assert_eq!(stored.base_url, "https://jira.internal");
+        assert_eq!(stored.token.as_deref(), Some("pat"));
+        assert_eq!(stored.project.as_deref(), Some("PROJ"));
+        assert_eq!(stored.text_format, TextFormat::Wiki);
+
+        let effective = JiraConfig::load().expect("load");
+        assert_eq!(effective.base_url, "https://env.example");
+        assert_eq!(effective.project.as_deref(), Some("ENV"));
+        assert_eq!(effective.text_format, TextFormat::Markdown);
 
         clear_config_home();
     }

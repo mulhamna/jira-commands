@@ -478,7 +478,8 @@ pub enum IssueCommand {
     /// missing ones will be prompted interactively.
     ///
     /// Use --no-custom-fields to skip required custom field prompts entirely.
-    /// --field takes any field ID (including customfield_XXXXX) as key=value.
+    /// --field takes a field ID as key=value; names are not resolved.
+    /// Custom field IDs vary by Jira instance.
     ///
     /// To discover available fields and their IDs for a project, run:
     ///   jirac issue fields -p PROJ --issue-type Bug
@@ -489,7 +490,7 @@ pub enum IssueCommand {
     ///   jirac issue create -p PROJ -s "API story" -t Story --assignee me --labels "backend,api"
     ///   jirac issue create -p PROJ -s "Sub-task" -t Sub-task --parent PROJ-100
     ///   jirac issue create -p PROJ -s "Feat" --description-file description.md
-    ///   jirac issue create -p PROJ -s "Fix" --field story_points=5 --field customfield_10020=sprint1
+    ///   jirac issue create -p PROJ -s "Fix" --field customfield_10016=5
     ///   jirac issue create -p PROJ -s "Plan sprint work" --issue-type Task --sprint "Sprint 24"
     Create {
         /// Project key (e.g. PROJ)
@@ -531,15 +532,16 @@ pub enum IssueCommand {
         /// Attach file(s) after creating the issue
         #[arg(long, value_name = "FILE")]
         attachments: Vec<std::path::PathBuf>,
-        /// Set any field by ID — repeatable. Value is parsed as JSON if valid,
-        /// otherwise treated as a plain string.
+        /// Set any field by ID — repeatable. Names are not resolved. Value is
+        /// parsed as JSON if valid, otherwise treated as a plain string.
         ///
-        /// Standard fields:  --field story_points=5
+        /// Standard fields:  --field summary="Updated title"
         /// Custom fields:    --field customfield_10016=5
         /// Select fields:    --field customfield_10020='{"value":"Option A"}'
         /// Multi-select:     --field customfield_10021='[{"value":"A"},{"value":"B"}]'
         ///
-        /// Run `jirac issue fields -p PROJ --issue-type Bug` to list all field IDs.
+        /// Custom field IDs vary by instance. Run
+        /// `jirac issue fields -p PROJ --issue-type Bug` to list create field IDs.
         #[arg(long, value_name = "FIELD_ID=VALUE")]
         field: Vec<String>,
         /// Skip required custom field prompts (fields will be omitted)
@@ -562,7 +564,7 @@ pub enum IssueCommand {
     ///   jirac issue update PROJ-123 --assignee me --priority High
     ///   jirac issue update PROJ-123 --description-file updated.md
     ///   jirac issue update PROJ-123 --labels "bug,backend" --components "auth"
-    ///   jirac issue update PROJ-123 --field story_points=8
+    ///   jirac issue update PROJ-123 --field customfield_10016=8
     Update {
         /// Issue key (e.g. PROJ-123)
         key: String,
@@ -593,14 +595,15 @@ pub enum IssueCommand {
         /// Set parent issue key (e.g. PROJ-100)
         #[arg(long, value_name = "KEY")]
         parent: Option<String>,
-        /// Set any field by ID — repeatable. Value is parsed as JSON if valid,
-        /// otherwise treated as a plain string.
+        /// Set any field by ID — repeatable. Names are not resolved. Value is
+        /// parsed as JSON if valid, otherwise treated as a plain string.
         ///
-        /// Standard fields:  --field story_points=5
+        /// Standard fields:  --field summary="Updated title"
         /// Custom fields:    --field customfield_10016=5
         /// Select fields:    --field customfield_10020='{"value":"Option A"}'
         ///
-        /// Run `jirac issue fields -p PROJ --issue-type Bug` to list all field IDs.
+        /// Custom field IDs vary by instance. Run
+        /// `jirac issue fields -p PROJ --issue-type Bug` to list create field IDs.
         #[arg(long, value_name = "FIELD_ID=VALUE")]
         field: Vec<String>,
         /// Re-fetch and output the updated issue as JSON

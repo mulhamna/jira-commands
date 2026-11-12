@@ -125,16 +125,7 @@ async fn main() -> Result<()> {
         anyhow::bail!("No command provided. Run `jirac --help` for usage.");
     };
 
-    match command {
-        Commands::Auth { command } => {
-            cli::auth::handle(command).await?;
-        }
-        Commands::Issue { command } => {
-            let client = build_client().context("Failed to initialize Jira client")?;
-            let config = JiraConfig::load().unwrap_or_default();
-            cli::issue::handle(*command, client, config.project, config.default_issue_limit)
-                .await?;
-        }
+    let command = match command {
         Commands::Tui { project } => {
             if cli::interactive::is_non_interactive() {
                 anyhow::bail!("`jirac tui` requires an interactive terminal");
@@ -142,37 +133,50 @@ async fn main() -> Result<()> {
             let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
             let effective_project = project.or(config.project);
-            // run_tui consumes update_notice and surfaces it itself; return so the
-            // post-match print below does not touch the moved value.
             return tui::run_tui(client, effective_project, update_notice)
                 .await
                 .context("TUI error");
         }
-        Commands::Api { command } => {
-            let client = build_client().context("Failed to initialize Jira client")?;
-            cli::api::handle(command, client).await?;
-        }
-        Commands::Plan { command } => {
-            let client = build_client().context("Failed to initialize Jira client")?;
-            cli::plan::handle(command, client).await?;
-        }
-        Commands::Mcp { command } => {
-            cli::mcp::handle(command).await?;
-        }
-        Commands::Board { command } => {
-            let client = build_client().context("Failed to initialize Jira client")?;
-            cli::board::handle(command, client).await?;
-        }
-        Commands::Config { command } => {
-            cli::config::handle(command).await?;
-        }
         Commands::Update { check } => {
             let exe = std::env::current_exe().context("Failed to locate the jirac binary")?;
-            // Skip the trailing update notice: this command already reports it.
             return cli::update::run(&cli::update::JIRAC, &exe, env!("CARGO_PKG_VERSION"), check)
                 .await;
         }
+        command => command,
+    };
+
+    let (result, warnings) = jira_core::adf::collect_formatting_warnings_silently(async {
+        match command {
+            Commands::Auth { command } => cli::auth::handle(command).await?,
+            Commands::Issue { command } => {
+                let client = build_client().context("Failed to initialize Jira client")?;
+                let config = JiraConfig::load().unwrap_or_default();
+                cli::issue::handle(*command, client, config.project, config.default_issue_limit)
+                    .await?;
+            }
+            Commands::Api { command } => {
+                let client = build_client().context("Failed to initialize Jira client")?;
+                cli::api::handle(command, client).await?;
+            }
+            Commands::Plan { command } => {
+                let client = build_client().context("Failed to initialize Jira client")?;
+                cli::plan::handle(command, client).await?;
+            }
+            Commands::Mcp { command } => cli::mcp::handle(command).await?,
+            Commands::Board { command } => {
+                let client = build_client().context("Failed to initialize Jira client")?;
+                cli::board::handle(command, client).await?;
+            }
+            Commands::Config { command } => cli::config::handle(command).await?,
+            Commands::Tui { .. } | Commands::Update { .. } => unreachable!(),
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .await;
+    for warning in warnings {
+        eprintln!("warning: {warning}");
     }
+    result?;
 
     if let Some(notice) = &update_notice {
         eprintln!("{}", version_check::cli_message(notice));

@@ -83,6 +83,7 @@ The MCP server includes tools for:
 - Destructive operations require `confirm: true`.
 - `jira_issue_clone` can optionally delete the source issue with `move_original: true`, but only when `confirm: true` is also set.
 - Attachment uploads support local file paths or inline base64 payloads.
+- Successful writes using Jira API v2 include an optional `warnings` array alongside `result` when formatting cannot be represented faithfully. Bulk and batch warnings describe the call as a whole; check individual operation results for failures.
 
 ## Client install helper
 

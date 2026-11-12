@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 mod wiki;
-pub use wiki::adf_to_wiki;
+pub use wiki::{adf_to_wiki, collect_formatting_warnings, collect_formatting_warnings_silently};
 
 /// Maximum recursion depth for ADF node rendering. Guards against
 /// stack overflow from maliciously deep or cyclic documents.

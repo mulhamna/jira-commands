@@ -94,18 +94,16 @@ If you want Claude Code integration, install the plugin from the main workspace 
 The plugin/package is the right discovery surface for ClawHub or Claude Code marketplace flows. Keep the `jirac` binary installation on the normal CLI distribution paths.
 
 Useful skills include:
-- `/jira:list-issues`
-- `/jira:view-issue`
-- `/jira:create-issue`
-- `/jira:update-issue`
-- `/jira:transition`
-- `/jira:fields`
+- `/jira:issue`
 - `/jira:comment`
-- `/jira:worklog`
-- `/jira:bulk-transition`
-- `/jira:attach`
-- `/jira:jql`
+- `/jira:bulk`
+- `/jira:search`
 - `/jira:api`
+- `/jira:sprint`
+- `/jira:versions`
+- `/jira:transition`
+
+See the [plugin migration table](https://github.com/mulhamna/jira-commands/blob/main/plugin/README.md#skills) for replacements for removed skill names.
 
 ## MCP helper
 

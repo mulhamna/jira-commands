@@ -2,6 +2,11 @@
 
 All notable changes to the ClawHub wrapper package for the `jirac` Claude plugin will be documented in this file.
 
+## [0.2.0] - 2026-11-12
+
+### Changed
+- Bundle plugin 0.19.0, which consolidates the skills and removes some direct skill names. See the [migration table](https://github.com/mulhamna/jira-commands/blob/main/plugin/README.md#skills).
+
 ## [0.1.3] - 2026-10-29
 
 ### Fixed

@@ -2,6 +2,15 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.19.0] - 2026-11-12
+
+### Changed
+- Consolidate the skills into eight task-oriented skills. Some direct skill names have been removed; see the migration table in `plugin/README.md`.
+- Streamline skill guidance and improve safety instructions for bulk and destructive operations.
+
+### Fixed
+- Correct API version and rich-text guidance for Jira Cloud and Data Center.
+
 ## [0.18.1] - 2026-10-28
 
 ### Fixed

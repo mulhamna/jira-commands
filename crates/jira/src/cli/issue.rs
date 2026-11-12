@@ -25,12 +25,28 @@ use serde_json::Value;
 mod browse;
 mod bulk;
 mod collaboration;
+#[cfg(test)]
+mod input_format_tests;
 mod manage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ExportFormat {
     Json,
     Csv,
+}
+
+/// Format of `--description-file`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DescriptionFormat {
+    /// Markdown, converted for the API version in use (alias: md)
+    #[value(alias = "md")]
+    Markdown,
+    /// Native Jira wiki markup, sent unchanged (Jira API v2 only)
+    Wiki,
+    /// Literal plain text
+    Text,
+    /// Pre-built ADF JSON
+    Adf,
 }
 
 /// Resolved request bounds for a list-like operation.
@@ -511,9 +527,10 @@ pub enum IssueCommand {
         /// Read description from a file
         #[arg(long, value_name = "FILE")]
         description_file: Option<std::path::PathBuf>,
-        /// Format of --description-file: markdown (default), adf, text
-        #[arg(long, value_name = "FORMAT", default_value = "markdown")]
-        description_format: String,
+        /// Format of --description-file. Defaults to the profile's input_format
+        /// (markdown, wiki, or adf)
+        #[arg(long, value_name = "FORMAT", value_enum, ignore_case = true)]
+        description_format: Option<DescriptionFormat>,
         /// Labels to set (comma-separated, e.g. "bug,backend")
         #[arg(long, value_name = "LABELS")]
         labels: Option<String>,
@@ -580,9 +597,10 @@ pub enum IssueCommand {
         /// Read new description from a file
         #[arg(long, value_name = "FILE")]
         description_file: Option<std::path::PathBuf>,
-        /// Format of --description-file: markdown (default), adf, text
-        #[arg(long, value_name = "FORMAT", default_value = "markdown")]
-        description_format: String,
+        /// Format of --description-file. Defaults to the profile's input_format
+        /// (markdown, wiki, or adf)
+        #[arg(long, value_name = "FORMAT", value_enum, ignore_case = true)]
+        description_format: Option<DescriptionFormat>,
         /// Replace labels (comma-separated, e.g. "bug,backend")
         #[arg(long, value_name = "LABELS")]
         labels: Option<String>,
@@ -729,8 +747,7 @@ pub enum IssueCommand {
 
     /// Manage comments on an issue
     ///
-    /// List, add, edit, or delete a comment in Markdown.
-    /// Markdown is converted to ADF for API v3 or Jira wiki markup for API v2.
+    /// Text follows input_format: Markdown (default), wiki (API v2 only), or ADF JSON.
     ///
     /// Examples:
     ///   jirac issue comment PROJ-123 list
@@ -743,7 +760,7 @@ pub enum IssueCommand {
         command: CommentCommand,
     },
 
-    /// Add the same Markdown comment to many issues
+    /// Add the same comment to many issues using the configured input_format
     ///
     /// Targets can come from a JQL query or an explicit key list.
     /// Prompts for confirmation unless --force is used.
@@ -759,10 +776,10 @@ pub enum IssueCommand {
         /// Explicit issue keys (space- or comma-separated)
         #[arg(long, value_name = "KEY", num_args = 1.., value_delimiter = ',', conflicts_with = "jql")]
         keys: Vec<String>,
-        /// Comment body in Markdown
+        /// Comment body in the configured input_format (markdown, wiki, or adf)
         #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
         body: Option<String>,
-        /// Read comment body from a Markdown file
+        /// Read comment body from a file in the configured input_format
         #[arg(long, value_name = "FILE", conflicts_with = "body")]
         file: Option<std::path::PathBuf>,
         /// Skip confirmation prompt
@@ -1029,7 +1046,7 @@ pub enum IssueCommand {
     ///
     /// Supported ops:
     ///   "create"     — create a new issue (same fields as bulk-create manifest)
-    ///   "update"     — update an existing issue by key
+    ///   "update"     — update an existing issue by key (summary, description, assignee, priority, labels, components)
     ///   "transition" — transition an issue to a new status
     ///   "archive"    — archive an issue by key
     ///
@@ -1072,7 +1089,7 @@ pub enum IssueCommand {
     ///     "components": ["auth"],
     ///     "parent": "PROJ-100",
     ///     "fix_versions": ["v1.0"],
-    ///     "description": "Markdown description",
+    ///     "description": "Description in the configured input_format",
     ///     "fields": { "customfield_10016": 5 }
     ///   }
     /// ]
@@ -1188,10 +1205,10 @@ pub enum CommentCommand {
     ///   jirac issue comment PROJ-123 add --body "Please verify in staging"
     ///   jirac issue comment PROJ-123 add --file note.md
     Add {
-        /// Comment body in Markdown
+        /// Comment body in the configured input_format (markdown, wiki, or adf)
         #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
         body: Option<String>,
-        /// Read comment body from a Markdown file
+        /// Read comment body from a file in the configured input_format
         #[arg(long, value_name = "FILE", conflicts_with = "body")]
         file: Option<std::path::PathBuf>,
     },
@@ -1200,10 +1217,10 @@ pub enum CommentCommand {
     Update {
         /// Comment ID shown by `jirac issue comment <KEY> list`
         id: String,
-        /// Comment body in Markdown
+        /// Comment body in the configured input_format (markdown, wiki, or adf)
         #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
         body: Option<String>,
-        /// Read comment body from a Markdown file
+        /// Read comment body from a file in the configured input_format
         #[arg(long, value_name = "FILE", conflicts_with = "body")]
         file: Option<std::path::PathBuf>,
     },
@@ -1242,7 +1259,7 @@ pub enum WorklogCommand {
         /// Time spent in Jira duration format (e.g. "2h", "30m", "1d", "1h 30m")
         #[arg(short, long, value_name = "DURATION")]
         time: String,
-        /// Optional comment describing the work done
+        /// Optional comment in the configured input_format (markdown, wiki, or adf)
         #[arg(short, long, value_name = "TEXT")]
         comment: Option<String>,
         /// Optional single work date in local time (YYYY-MM-DD)
@@ -1269,7 +1286,7 @@ pub enum WorklogCommand {
         /// Replace the time spent (e.g. 2h, 30m)
         #[arg(short, long, value_name = "DURATION")]
         time: Option<String>,
-        /// Replace the worklog comment
+        /// Replace the worklog comment using the configured input_format
         #[arg(short, long, value_name = "TEXT")]
         comment: Option<String>,
         /// Replace the work date (YYYY-MM-DD)
@@ -1316,7 +1333,7 @@ pub enum LinkCommand {
         /// Link type name (e.g. "Blocks", "Relates", "Duplicate")
         #[arg(short, long, value_name = "TYPE")]
         link_type: String,
-        /// Optional comment to add to the link
+        /// Optional link comment in the configured input_format (markdown, wiki, or adf)
         #[arg(short, long, value_name = "TEXT")]
         comment: Option<String>,
     },
@@ -1467,10 +1484,11 @@ fn parse_field_flags(fields: &[String]) -> Result<HashMap<String, FieldValue>> {
 }
 
 /// Read description from a file and convert to the right format.
-/// Returns `(markdown_str, adf_value)` — at most one is Some.
+/// Returns `(text, adf_value)` — at most one is Some. `text` is interpreted by the client's
+/// input format: Markdown by default, native Jira wiki, or ADF JSON.
 fn read_description_file(
     path: Option<&std::path::Path>,
-    format: &str,
+    format: Option<DescriptionFormat>,
 ) -> Result<(Option<String>, Option<Value>)> {
     let Some(p) = path else {
         return Ok((None, None));
@@ -1478,12 +1496,41 @@ fn read_description_file(
     let content = std::fs::read_to_string(p)
         .with_context(|| format!("Failed to read description file: {}", p.display()))?;
     match format {
-        "adf" => {
-            let adf: Value = serde_json::from_str(&content)
+        Some(DescriptionFormat::Adf) => {
+            let adf = jira_core::adf::parse_adf(&content)
                 .context("--description-format adf requires valid JSON ADF content")?;
             Ok((None, Some(adf)))
         }
-        "text" => Ok((None, Some(jira_core::adf::plain_text_to_adf(&content)))),
-        _ => Ok((Some(content), None)), // markdown (default)
+        Some(DescriptionFormat::Text) => {
+            Ok((None, Some(jira_core::adf::plain_text_to_adf(&content))))
+        }
+        Some(DescriptionFormat::Markdown | DescriptionFormat::Wiki) | None => {
+            Ok((Some(content), None))
+        }
     }
+}
+
+/// Apply a per-call `--description-format markdown|wiki` override to the client.
+/// Without the flag the profile's `input_format` applies.
+fn client_for_description_format(
+    client: JiraClient,
+    format: Option<DescriptionFormat>,
+) -> JiraClient {
+    match format {
+        Some(DescriptionFormat::Wiki) => {
+            client.with_input_format(jira_core::config::InputFormat::Wiki)
+        }
+        Some(DescriptionFormat::Markdown) => {
+            client.with_input_format(jira_core::config::InputFormat::Markdown)
+        }
+        Some(DescriptionFormat::Text | DescriptionFormat::Adf) | None => client,
+    }
+}
+
+/// Fail before any request when `writes_text` and the text format needs another API version.
+fn ensure_input_format(client: &JiraClient, writes_text: bool) -> Result<()> {
+    if writes_text {
+        client.ensure_input_format_supported()?;
+    }
+    Ok(())
 }

@@ -510,6 +510,33 @@ impl App {
         self.status = Some((msg.into(), is_error));
     }
 
+    fn set_modal_write_error(&mut self, message: impl Into<String>) {
+        if let Some(modal) = self.modal.as_mut() {
+            modal.set_error(message);
+        }
+        self.clear_status();
+    }
+
+    fn show_formatting_warning(&mut self, has_warning: bool) {
+        if has_warning {
+            const WARNING: &str = "Warning: formatting may be degraded";
+            if self.status.as_ref().is_some_and(|(message, _)| {
+                message
+                    .strip_prefix(WARNING)
+                    .is_some_and(|suffix| suffix.is_empty() || suffix.starts_with(" | "))
+            }) {
+                return;
+            }
+            let (message, is_error) = self.status.take().unwrap_or_default();
+            let message = if message.is_empty() {
+                WARNING.to_string()
+            } else {
+                format!("{WARNING} | {message}")
+            };
+            self.status = Some((message, is_error));
+        }
+    }
+
     pub(super) fn clear_status(&mut self) {
         self.status = None;
     }
@@ -1732,7 +1759,10 @@ pub async fn run_tui(
 
             AppAction::CreateIssue => {
                 suspend_tui(&mut terminal)?;
-                let result = tui_create_issue(&client, app.default_project.clone()).await;
+                let (result, warnings) = jira_core::adf::collect_formatting_warnings_silently(
+                    tui_create_issue(&client, app.default_project.clone()),
+                )
+                .await;
                 resume_tui(&mut terminal)?;
                 match result {
                     Ok(Some(key)) => {
@@ -1745,6 +1775,7 @@ pub async fn run_tui(
                     Ok(None) => app.set_status("Create cancelled", false),
                     Err(e) => app.set_status(format!("Create failed: {e}"), true),
                 }
+                app.show_formatting_warning(!warnings.is_empty());
             }
 
             AppAction::EditIssue(key) => {
@@ -1781,7 +1812,6 @@ pub async fn run_tui(
                     Err(e) => app.set_status(format!("Assign failed: {e}"), true),
                 }
             }
-
             AppAction::AddComment(key) => {
                 app.open_modal(Modal::add_comment(key));
             }
@@ -1900,7 +1930,12 @@ pub async fn run_tui(
                             m.busy = true;
                         }
                         terminal.draw(|f| ui(f, &mut app))?;
-                        match client.update_issue(&key, req).await {
+                        let (result, warnings) =
+                            jira_core::adf::collect_formatting_warnings_silently(
+                                client.update_issue(&key, req),
+                            )
+                            .await;
+                        match result {
                             Ok(()) => {
                                 app.close_modal();
                                 let jql = app.jql.clone();
@@ -1910,11 +1945,10 @@ pub async fn run_tui(
                                 app.set_status(format!("✓ Updated {key}"), false);
                             }
                             Err(e) => {
-                                if let Some(m) = app.modal.as_mut() {
-                                    m.set_error(format!("Update failed: {e}"));
-                                }
+                                app.set_modal_write_error(format!("Update failed: {e}"));
                             }
                         }
+                        app.show_formatting_warning(!warnings.is_empty());
                     }
                     ModalKind::AddComment { key } => {
                         let body = modal.field_text(0);
@@ -1949,7 +1983,12 @@ pub async fn run_tui(
                         terminal.draw(|f| ui(f, &mut app))?;
                         let mut adf = markdown_to_adf(&body_trim);
                         inject_mentions(&mut adf, &mention_map);
-                        match client.add_comment_adf(&key, adf).await {
+                        let (result, warnings) =
+                            jira_core::adf::collect_formatting_warnings_silently(
+                                client.add_comment_adf(&key, adf),
+                            )
+                            .await;
+                        match result {
                             Ok(_) => {
                                 if let Some(path) = attachment_path {
                                     match client.upload_attachment(&key, &path).await {
@@ -1963,12 +2002,9 @@ pub async fn run_tui(
                                             );
                                         }
                                         Err(e) => {
-                                            if let Some(m) = app.modal.as_mut() {
-                                                m.busy = false;
-                                                m.set_error(format!(
-                                                    "Comment added, but upload failed: {e}"
-                                                ));
-                                            }
+                                            app.set_modal_write_error(format!(
+                                                "Comment added, but upload failed: {e}"
+                                            ));
                                         }
                                     }
                                 } else {
@@ -1979,11 +2015,10 @@ pub async fn run_tui(
                                 }
                             }
                             Err(e) => {
-                                if let Some(m) = app.modal.as_mut() {
-                                    m.set_error(format!("Comment failed: {e}"));
-                                }
+                                app.set_modal_write_error(format!("Comment failed: {e}"));
                             }
                         }
+                        app.show_formatting_warning(!warnings.is_empty());
                     }
                     ModalKind::BulkComment => {
                         let jql_raw = modal.field_text(0);
@@ -2073,8 +2108,15 @@ pub async fn run_tui(
 
                         let mut ok = 0usize;
                         let mut failure: Option<String> = None;
+                        let mut has_warning = false;
                         for key in &target_keys {
-                            if let Err(e) = client.add_comment(key, &body_trim).await {
+                            let (result, warnings) =
+                                jira_core::adf::collect_formatting_warnings_silently(
+                                    client.add_comment(key, &body_trim),
+                                )
+                                .await;
+                            has_warning |= !warnings.is_empty();
+                            if let Err(e) = result {
                                 failure = Some(format!("{key}: {e}"));
                                 break;
                             }
@@ -2082,13 +2124,11 @@ pub async fn run_tui(
                         }
 
                         if let Some(err) = failure {
-                            if let Some(m) = app.modal.as_mut() {
-                                m.busy = false;
-                                m.set_error(format!(
-                                    "Commented on {ok}/{} issue(s); stopped at {err}",
-                                    target_keys.len()
-                                ));
-                            }
+                            app.set_modal_write_error(format!(
+                                "Commented on {ok}/{} issue(s); stopped at {err}",
+                                target_keys.len()
+                            ));
+                            app.show_formatting_warning(has_warning);
                             continue;
                         }
 
@@ -2099,6 +2139,7 @@ pub async fn run_tui(
                             format!("✓ Comment added to {} issue(s)", target_keys.len()),
                             false,
                         );
+                        app.show_formatting_warning(has_warning);
                     }
 
                     ModalKind::UploadAttachment { key } => {
@@ -2190,10 +2231,12 @@ pub async fn run_tui(
                             m.busy = true;
                         }
                         terminal.draw(|f| ui(f, &mut app))?;
-                        match client
-                            .add_worklog(&key, time_spent, comment, started.as_deref())
-                            .await
-                        {
+                        let (result, warnings) =
+                            jira_core::adf::collect_formatting_warnings_silently(
+                                client.add_worklog(&key, time_spent, comment, started.as_deref()),
+                            )
+                            .await;
+                        match result {
                             Ok(_) => {
                                 app.close_modal();
                                 app.detail.worklogs = None;
@@ -2201,11 +2244,10 @@ pub async fn run_tui(
                                 app.set_status(format!("✓ Worklog added to {key}"), false);
                             }
                             Err(e) => {
-                                if let Some(m) = app.modal.as_mut() {
-                                    m.set_error(format!("Worklog failed: {e}"));
-                                }
+                                app.set_modal_write_error(format!("Worklog failed: {e}"));
                             }
                         }
+                        app.show_formatting_warning(!warnings.is_empty());
                     }
                     ModalKind::AddBulkWorklog { key } => {
                         let time_spent = modal.field_text(0);
@@ -2334,6 +2376,7 @@ pub async fn run_tui(
 
                         let mut created = Vec::with_capacity(total);
                         let mut failure: Option<String> = None;
+                        let mut has_warning = false;
 
                         for date in dates {
                             let date_label = date.format("%Y-%m-%d").to_string();
@@ -2351,10 +2394,13 @@ pub async fn run_tui(
                                 }
                             };
 
-                            match client
-                                .add_worklog(&key, time_spent, comment, Some(&started))
-                                .await
-                            {
+                            let (result, warnings) =
+                                jira_core::adf::collect_formatting_warnings_silently(
+                                    client.add_worklog(&key, time_spent, comment, Some(&started)),
+                                )
+                                .await;
+                            has_warning |= !warnings.is_empty();
+                            match result {
                                 Ok(log) => created.push((date_label, log.id)),
                                 Err(e) => {
                                     let partial = if created.is_empty() {
@@ -2379,9 +2425,8 @@ pub async fn run_tui(
                         }
 
                         if let Some(err) = failure {
-                            if let Some(m) = app.modal.as_mut() {
-                                m.set_error(err);
-                            }
+                            app.set_modal_write_error(err);
+                            app.show_formatting_warning(has_warning);
                             continue;
                         }
 
@@ -2402,6 +2447,7 @@ pub async fn run_tui(
                             ),
                             false,
                         );
+                        app.show_formatting_warning(has_warning);
                     }
                     ModalKind::CreateProjectVersion { project_key } => {
                         let name = modal.field_text(0).trim().to_string();
@@ -3054,6 +3100,67 @@ fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
 mod tests {
     use super::*;
     use std::sync::{Mutex, OnceLock};
+
+    #[test]
+    fn formatting_warning_preserves_success_and_failure_status() {
+        let mut app = App::new(String::new(), String::new(), None);
+        app.set_status("Updated PROJ-1", false);
+        app.show_formatting_warning(false);
+        assert_eq!(app.status, Some(("Updated PROJ-1".into(), false)));
+        app.show_formatting_warning(true);
+        assert_eq!(
+            app.status,
+            Some((
+                "Warning: formatting may be degraded | Updated PROJ-1".into(),
+                false
+            ))
+        );
+        app.show_formatting_warning(true);
+        assert_eq!(
+            app.status,
+            Some((
+                "Warning: formatting may be degraded | Updated PROJ-1".into(),
+                false
+            ))
+        );
+        app.set_status("Upload failed", true);
+        app.show_formatting_warning(true);
+        assert_eq!(
+            app.status,
+            Some((
+                "Warning: formatting may be degraded | Upload failed".into(),
+                true
+            ))
+        );
+    }
+
+    #[test]
+    fn failed_modal_write_replaces_old_status_and_retry_warning() {
+        let mut app = App::new(String::new(), String::new(), None);
+        app.open_modal(Modal::add_comment("PROJ-1".into()));
+        app.set_status("✓ Updated PROJ-0", false);
+
+        for error in ["Comment failed", "Commented on 1/2 issue(s); stopped"] {
+            app.modal.as_mut().unwrap().busy = true;
+            app.set_modal_write_error(error);
+            app.show_formatting_warning(true);
+            assert_eq!(
+                app.status,
+                Some(("Warning: formatting may be degraded".into(), false))
+            );
+            let modal = app.modal.as_ref().unwrap();
+            assert_eq!(modal.error.as_deref(), Some(error));
+            assert!(!modal.busy);
+        }
+
+        app.set_modal_write_error("Comment failed again");
+        app.show_formatting_warning(false);
+        assert_eq!(app.status, None);
+        assert_eq!(
+            app.modal.as_ref().unwrap().error.as_deref(),
+            Some("Comment failed again")
+        );
+    }
 
     fn env_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();

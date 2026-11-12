@@ -1,9 +1,79 @@
+use std::{cell::RefCell, future::Future};
+
 use serde_json::Value;
 
 use crate::{
     config::JiraDeployment,
     error::{JiraError, Result},
 };
+
+tokio::task_local! {
+    static FORMATTING_WARNINGS: RefCell<WarningCollector>;
+}
+
+#[derive(Default)]
+struct WarningCollector {
+    warnings: Vec<String>,
+    suppress_logging: bool,
+}
+
+/// Collect distinct API v2 formatting-loss warnings produced by this future.
+///
+/// Warnings remain logged as usual and are isolated from other concurrent tasks.
+/// Independently spawned tasks do not inherit this collection scope.
+pub async fn collect_formatting_warnings<F: Future>(future: F) -> (F::Output, Vec<String>) {
+    collect_warnings(future, false).await
+}
+
+/// Collect formatting warnings without logging them during the future.
+///
+/// The caller is responsible for displaying or logging the returned warnings.
+/// Independently spawned tasks do not inherit this collection scope.
+pub async fn collect_formatting_warnings_silently<F: Future>(
+    future: F,
+) -> (F::Output, Vec<String>) {
+    collect_warnings(future, true).await
+}
+
+async fn collect_warnings<F: Future>(
+    future: F,
+    suppress_logging: bool,
+) -> (F::Output, Vec<String>) {
+    FORMATTING_WARNINGS
+        .scope(
+            RefCell::new(WarningCollector {
+                warnings: Vec::new(),
+                suppress_logging,
+            }),
+            async {
+                let result = future.await;
+                let warnings = FORMATTING_WARNINGS
+                    .with(|collector| std::mem::take(&mut collector.borrow_mut().warnings));
+                (result, warnings)
+            },
+        )
+        .await
+}
+
+fn record_warning(message: &str) -> bool {
+    FORMATTING_WARNINGS
+        .try_with(|collector| {
+            let mut collector = collector.borrow_mut();
+            if !collector.warnings.iter().any(|warning| warning == message) {
+                collector.warnings.push(message.to_owned());
+            }
+            !collector.suppress_logging
+        })
+        .unwrap_or(true)
+}
+
+macro_rules! formatting_warn {
+    ($message:expr, $($event:tt)+) => {
+        if record_warning($message) {
+            tracing::warn!($($event)+);
+        }
+    };
+}
 
 /// Convert ADF to Jira wiki markup, warning and preserving readable text for unsupported features.
 /// Mention IDs must be login names on Data Center or account IDs on Cloud.
@@ -98,7 +168,10 @@ fn render_children(
                     && !label.starts_with(char::is_whitespace)
                     && !href.trim().is_empty()
                 {
-                    tracing::warn!("Flattening a link without a Jira wiki word boundary");
+                    formatting_warn!(
+                        "A link was flattened because Jira wiki requires a word boundary.",
+                        "Flattening a link without a Jira wiki word boundary"
+                    );
                     flatten_link(label, &text, href)
                 } else {
                     render_link(label, &text, href)
@@ -172,7 +245,10 @@ fn link_target(node: &Value) -> Option<&str> {
 
 fn render_link(label: String, text: &str, href: &str) -> String {
     if href.trim().is_empty() {
-        tracing::warn!("Omitting link formatting without a URL for Jira API v2");
+        formatting_warn!(
+            "Link formatting was omitted because the URL is missing.",
+            "Omitting link formatting without a URL for Jira API v2"
+        );
         return label;
     }
     let target = href.to_ascii_lowercase();
@@ -184,14 +260,20 @@ fn render_link(label: String, text: &str, href: &str) -> String {
         .iter()
         .any(|prefix| target.starts_with(prefix));
     if !native_target || href.contains(['|', '[', ']', '\r', '\n']) || label.contains('\n') {
-        tracing::warn!("Flattening an unrepresentable link for Jira API v2");
+        formatting_warn!(
+            "A link was flattened because Jira wiki cannot represent it.",
+            "Flattening an unrepresentable link for Jira API v2"
+        );
         return flatten_link(label, text, href);
     }
     let label = label.replace("\\|", "&#124;");
     let start = label.len() - label.trim_start().len();
     let end = label.trim_end().len();
     if start >= end {
-        tracing::warn!("Flattening a link with an empty label for Jira API v2");
+        formatting_warn!(
+            "A link with an empty label was flattened.",
+            "Flattening a link with an empty label for Jira API v2"
+        );
         return format!("{label}{}", escape(href));
     }
     format!(
@@ -211,7 +293,8 @@ fn flatten_link(label: String, text: &str, href: &str) -> String {
 }
 
 fn flatten(node: &Value, depth: usize, reason: &str) -> Result<String> {
-    tracing::warn!(
+    formatting_warn!(
+        &format!("Rich text was flattened: {reason}."),
         node_type = node["type"].as_str().unwrap_or("unknown"),
         reason,
         "Flattening unsupported rich text for Jira API v2"
@@ -415,7 +498,8 @@ fn render(node: &Value, prefix: &str, depth: usize, deployment: &JiraDeployment)
                 | "swift" | "visualbasic" | "xml" | "yaml" => language.as_str(),
                 "text" | "txt" | "plain" | "plaintext" => "none",
                 language => {
-                    tracing::warn!(
+                    formatting_warn!(
+                        "Syntax highlighting was omitted for an unsupported code language.",
                         language,
                         "Omitting unsupported code language for Jira API v2"
                     );
@@ -490,7 +574,10 @@ fn render_text(node: &Value) -> Result<String> {
     };
     let mut code = marks.iter().any(|mark| mark["type"] == "code");
     if code && text.contains(['\r', '\n']) {
-        tracing::warn!("Flattening multiline inline code for Jira API v2");
+        formatting_warn!(
+            "Multiline inline code was flattened.",
+            "Flattening multiline inline code for Jira API v2"
+        );
         code = false;
     }
     let mut out = if code {
@@ -508,14 +595,18 @@ fn render_text(node: &Value) -> Result<String> {
             "code" => continue,
             "link" => {
                 let Some(href) = mark["attrs"]["href"].as_str() else {
-                    tracing::warn!("Omitting link formatting without a URL for Jira API v2");
+                    formatting_warn!(
+                        "Link formatting was omitted because the URL is missing.",
+                        "Omitting link formatting without a URL for Jira API v2"
+                    );
                     continue;
                 };
                 out = render_link(out, text, href);
                 continue;
             }
             _ => {
-                tracing::warn!(
+                formatting_warn!(
+                    "Unsupported text formatting was omitted.",
                     mark_type = kind,
                     "Omitting unsupported text formatting for Jira API v2"
                 );
@@ -544,6 +635,84 @@ mod tests {
 
     fn dc_wiki(document: &Value) -> Result<String> {
         adf_to_wiki(document, &JiraDeployment::DataCenter)
+    }
+
+    #[tokio::test]
+    async fn formatting_warnings_are_distinct_and_isolated_between_futures() {
+        let links = async {
+            let doc = markdown_to_adf("[first](relative) [second](other)");
+            dc_wiki(&doc).unwrap();
+            tokio::task::yield_now().await;
+            dc_wiki(&doc).unwrap();
+        };
+        let code = async {
+            tokio::task::yield_now().await;
+            dc_wiki(&markdown_to_adf("```rust\ncode\n```")).unwrap();
+        };
+        let ((_, link_warnings), (_, code_warnings)) = tokio::join!(
+            collect_formatting_warnings(links),
+            collect_formatting_warnings(code)
+        );
+        assert_eq!(
+            link_warnings,
+            ["A link was flattened because Jira wiki cannot represent it."]
+        );
+        assert_eq!(
+            code_warnings,
+            ["Syntax highlighting was omitted for an unsupported code language."]
+        );
+        let (_, warnings) = collect_formatting_warnings(async {
+            dc_wiki(&markdown_to_adf("plain text")).unwrap();
+        })
+        .await;
+        assert!(warnings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn formatting_warnings_include_unsupported_nodes_and_marks() {
+        let doc = json!({
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [
+                    {"type": "text", "text": "hello", "marks": [{"type": "unsupported"}]}
+                ]},
+                {"type": "unsupported", "content": [{"type": "text", "text": "world"}]}
+            ]
+        });
+        let (result, warnings) = collect_formatting_warnings(async { dc_wiki(&doc) }).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            warnings,
+            [
+                "Unsupported text formatting was omitted.",
+                "Rich text was flattened: unsupported ADF node."
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn silent_warning_scope_suppresses_logging_without_affecting_other_scopes() {
+        assert!(record_warning("outside"));
+        let ((logged, (_, silent)), warnings) = collect_formatting_warnings(async {
+            let logged = record_warning("outer");
+            let nested = collect_formatting_warnings_silently(async {
+                assert!(!record_warning("inner"));
+                dc_wiki(&markdown_to_adf("[link](relative)")).unwrap();
+            })
+            .await;
+            (logged, nested)
+        })
+        .await;
+        assert!(logged);
+        assert_eq!(warnings, ["outer"]);
+        assert_eq!(
+            silent,
+            [
+                "inner",
+                "A link was flattened because Jira wiki cannot represent it."
+            ]
+        );
+        assert!(record_warning("outside again"));
     }
 
     #[test]

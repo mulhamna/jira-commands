@@ -194,7 +194,7 @@ fn render_footer(f: &mut Frame, app: &mut App, area: Rect, palette: Palette) {
     let (fg, bg) = if let Some((_, true)) = &app.status {
         (Color::White, Color::Red)
     } else if let Some((msg, false)) = &app.status {
-        let (fg, bg) = if msg.starts_with("Update available:") {
+        let (fg, bg) = if msg.starts_with("Update available:") || msg.starts_with("Warning:") {
             (Color::Black, Color::Yellow)
         } else {
             (Color::Black, Color::Green)

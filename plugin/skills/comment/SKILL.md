@@ -1,26 +1,31 @@
 ---
-description: Manage Jira issue comments with jirac, including listing existing comments and adding a new Markdown comment to an issue
+name: comment
+description: Manage Jira comments, bulk comments, and worklogs, including logging or deleting time.
 ---
 
-Manage Jira comments using `jirac`.
+Use `jirac --version` to check availability; if missing, tell the user to install `jira-commands`.
 
-Steps:
-1. Check that `jirac` is available by running `jirac --version`. If it is missing, tell the user to install it with `cargo install jira-commands`.
-2. Determine whether the user wants to list comments or add a comment.
+## Comments
 
-For listing comments:
-- extract the issue key
-- run `jirac issue comment <ISSUE-KEY> list`
+- List: `jirac issue comment <KEY> list`
+- Add: `jirac issue comment <KEY> add --body '<COMMENT>'`, or use `--file <FILE>` for Markdown in a file.
 
-For adding a comment:
-- extract the issue key
-- extract the comment body
-- run `jirac issue comment <ISSUE-KEY> add --body '<COMMENT>'`
-- if the comment is long or already in a file, use `--file <FILE>` instead
+## Bulk comments
 
-3. Show the result clearly.
+Use `jirac issue bulk-comment --jql '<JQL>' --body '<COMMENT>'` or
+`jirac issue bulk-comment --keys PROJ-1 PROJ-2 --body '<COMMENT>'`; `--file`
+can replace `--body`. Before posting, show the target issues and comment and
+obtain explicit confirmation. For JQL, preview with `jirac issue list --all
+--jql '<JQL>'`. The CLI's 500-page safeguard can silently truncate results, so
+split broad queries rather than assuming completeness. The selection can change
+before execution. Use `--force` only after confirmation when needed for a
+non-interactive flow. Report failures.
 
-Examples:
-- "show comments on PROJ-123" → `jirac issue comment PROJ-123 list`
-- "add a comment to PROJ-123 saying QA verified this" → `jirac issue comment PROJ-123 add --body 'QA verified this'`
-- "comment on PROJ-456 with the contents of note.md" → `jirac issue comment PROJ-456 add --file note.md`
+## Worklogs
+
+- List: `jirac issue worklog <KEY> list`
+- Add: `jirac issue worklog <KEY> add --time '<DURATION>' [--date YYYY-MM-DD] [--start HH:MM] [--comment '<TEXT>']`
+- Delete: `jirac issue worklog <KEY> delete <WORKLOG-ID> [--force]`
+
+Use Jira duration syntax, e.g. `2h` or `1h 30m`. Confirm deletion explicitly;
+use `--force` only after confirmation when the CLI prompt cannot be answered.

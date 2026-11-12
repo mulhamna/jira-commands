@@ -27,10 +27,20 @@ Use `jirac` as the Jira execution surface. The CLI is a single Rust binary that 
 4. Use `jirac issue standup` for a concise personal update from assigned work, and `jirac issue sprint-summary -p PROJ` for a project sprint rollup.
 5. Use `jirac issue sprints -p PROJ` to see sprint lifecycle states before creating, starting, completing, updating, or deleting a sprint.
 6. Use `jirac issue notifications` to scan Jira @mentions from issue descriptions and comments.
-7. Use `jirac issue render --input file.md` to preview how Markdown will convert to Jira ADF before sending it as description or comment.
+7. Use `jirac issue render --input file.md` to preview Markdown as Jira ADF. This is not a preview of the wiki markup sent to API v2.
 8. Use `jirac tui -p PROJ` for any interactive bulk browse / triage / quick-edit workflow — supports mouse (click rows, tabs, picker options; scroll wheel; drag splitter; click `[?]` / `[🔔]`).
 9. Confirm intent before destructive or high-impact operations: `delete`, `archive`, `bulk-update`, `bulk-transition`, `bulk-comment`, `bulk-create`, `change-type`, `move`, `sprint-delete`, and attachment uploads.
 10. Keep Jira project keys, issue keys, status names, and transition names exact. Use quotes for any name with spaces.
+
+## Raw REST API
+
+Check the active profile and API version with `jirac auth status`; this may
+contact Jira. Keep the same profile and `JIRA_PROFILE` setting for the request.
+If the version is unknown, ask the user. Use `/rest/api/3/...` for API v3
+(normally Cloud) and `/rest/api/2/...` for API v2 (normally Data Center).
+Other API families have their own versions. Raw requests do not convert bodies:
+descriptions and comments generally use ADF objects in v3 and wiki-markup
+strings in v2. Check the endpoint schema before sending a request.
 
 ## Common commands
 
@@ -125,9 +135,12 @@ jirac issue batch --manifest ops.json
 # Render markdown → Jira ADF preview
 jirac issue render --input description.md
 
-# Raw REST passthrough (last resort)
+# Raw REST passthrough (last resort): Cloud / API v3
 jirac api get /rest/api/3/myself
 jirac api post /rest/api/3/issue --body '{"fields":{"project":{"key":"PROJ"},"summary":"Issue title","issuetype":{"name":"Task"}}}'
+
+# Data Center / API v2
+jirac api get /rest/api/2/myself
 
 # TUI
 jirac tui                                     # uses default project or assigned issues

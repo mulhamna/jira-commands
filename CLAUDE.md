@@ -31,7 +31,7 @@ cargo clippy --all-targets --all-features -- -D warnings  # lint
 
 ## Project overview
 
-Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynamic introspection, attachment upload, Jira REST API v3, interactive TUI (ratatui), single binary.
+Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynamic introspection, attachment upload, Jira REST API v2/v3, interactive TUI (ratatui), single binary.
 
 ### Workspace structure
 
@@ -72,7 +72,7 @@ crates/
         └── error.rs
 plugin/
 ├── .claude-plugin/             # Claude Code plugin metadata (plugin.json)
-└── skills/                     # 12 skills: api, attach, bulk-transition, comment, create-issue, fields, jql, list-issues, transition, update-issue, view-issue, worklog
+└── skills/                     # 8 skills: api, bulk, comment, issue, search, sprint, transition, versions
 ```
 
 ### Crate responsibilities
@@ -85,7 +85,7 @@ plugin/
 
 ## Jira API — implementation rules
 
-### Endpoint rules
+### Jira Cloud endpoint rules
 
 | Use                                         | Do NOT use                                           |
 | ------------------------------------------- | ---------------------------------------------------- |
@@ -96,12 +96,12 @@ plugin/
 
 ### Implementation principles
 
-- **Pagination**: cursor-based (`next_page_token`), not offset (`startAt`). Max 500 iterations as safeguard.
+- **Pagination**: Cloud search uses cursor tokens; Data Center search uses `startAt` offsets. The client exposes both through `next_page_token`; bulk search loops have a 500-page safeguard.
 - **Rate limiting**: handle 429 with `Retry-After` header, retry after delay.
 - **Field resolution**: always runtime via API, never hardcode `customfield_*`.
 - **Async tasks**: submit → poll → complete pattern for heavy operations (archive, bulk ops).
 - **Tier detection**: check `server_info.is_premium()` before using premium features (Plans API).
-- **Base URL**: Platform API (`/rest/api/3`) vs Agile API (`/rest/agile/1.0`) — don't mix, use client methods.
+- **Base URL**: Platform API (`/rest/api/2` or `/rest/api/3`, according to the profile) vs Agile API (`/rest/agile/1.0`) — don't mix, use client methods.
 
 ---
 
@@ -120,7 +120,7 @@ cargo build --all
 
 ## Release flow — release-please (automated)
 
-**Never manually bump versions, update CHANGELOG, or push tags.**
+For the CLI/MCP release lanes, release-please manages versions, changelogs, and tags. Do not change them manually without an explicit repo-owner request.
 
 ### How it works
 
@@ -187,6 +187,8 @@ To recover from a stomped manifest: edit `.release-please-manifest.json` to matc
 
 When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.
 
-**Manual bump required:** changes to `plugin/` (skills, metadata) must also bump the version in `plugin/.claude-plugin/plugin.json` — release-please does NOT touch this file.
+**Manual bump required:** plugin releases must synchronize `plugin/VERSION`, `plugin/.claude-plugin/plugin.json`, and both versions in `.claude-plugin/marketplace.json`, and update `plugin/CHANGELOG.md`. Release-please does not manage these files. Request explicit repo-owner approval before manual version or changelog changes.
+
+The ClawHub plugin wrapper has its own version in `clawhub/jirac-plugin/VERSION` and `marketplace.json`. Its publish workflow also runs for changes under `plugin/`; prepare a new wrapper version and changelog entry when releasing those changes.
 
 **Manual bump required:** changes to `clawhub/jirac/` (SKILL.md, references) must also bump `clawhub/jirac/VERSION` — release-please does NOT touch this file. CI publishes to ClawHub on push to `main` only when `clawhub/jirac/**` changes.

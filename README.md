@@ -289,9 +289,19 @@ The builder composes JQL through `jira_core::jql::compose_jql`, escaping user-su
 
 ### Raw API passthrough
 
+Check the active profile and API version with `jirac auth status` (which may
+contact Jira). Raw paths and bodies are passed through unchanged: API v3
+(normally Cloud) uses `/rest/api/3/...` and generally uses ADF for descriptions
+and comments; API v2 (normally Data Center) uses `/rest/api/2/...` and generally
+uses wiki-markup strings. Check the endpoint schema before sending a request.
+
 ```bash
+# Cloud / API v3
 jirac api get /rest/api/3/serverInfo
-jirac api post /rest/api/3/issue --body '{"fields":{...}}'
+jirac api post /rest/api/3/issue --body '{"fields":{"project":{"key":"PROJ"},"summary":"Issue title","issuetype":{"name":"Task"}}}'
+
+# Data Center / API v2
+jirac api get /rest/api/2/serverInfo
 ```
 
 ### Plans (Jira Premium)

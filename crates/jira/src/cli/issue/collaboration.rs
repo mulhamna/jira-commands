@@ -257,6 +257,7 @@ async fn bulk_comment(
     json: bool,
 ) -> Result<()> {
     let comment_body = read_comment_body(body, file)?;
+    ensure_text_format(&client, true)?;
 
     let target_keys = if let Some(jql) = jql.as_deref() {
         let spinner = spinner_new("Fetching issues...");
@@ -398,6 +399,7 @@ async fn worklog(client: JiraClient, key: String, cmd: WorklogCommand) -> Result
             if time.is_none() && comment.is_none() && date.is_none() && start.is_none() {
                 anyhow::bail!("Provide at least one of --time, --comment, --date, or --start");
             }
+            ensure_text_format(&client, comment.is_some())?;
             let jira_timezone = if date.is_some() || start.is_some() {
                 client
                     .get_myself_timezone()
@@ -462,6 +464,8 @@ async fn worklog_add(client: JiraClient, key: String, options: WorklogAddOptions
         start,
         range,
     } = options;
+
+    ensure_text_format(&client, comment.is_some())?;
 
     let jira_timezone = if date.is_some() || start.is_some() || range.is_some() {
         client

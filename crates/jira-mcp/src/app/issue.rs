@@ -339,6 +339,7 @@ impl JiraApp {
         }
 
         let client = self.build_client()?;
+        client.ensure_text_format_supported()?;
         let target_keys = if let Some(jql) = args.jql.as_deref() {
             client
                 .get_all_issues(jql)
@@ -386,6 +387,18 @@ impl JiraApp {
         }
 
         let client = self.build_client()?;
+        let writes_description = args.operations.iter().any(|operation| match operation {
+            BatchOperation::Create(entry) => {
+                entry.description.is_some() && entry.description_adf.is_none()
+            }
+            BatchOperation::Update(entry) => {
+                entry.description.is_some() && entry.description_adf.is_none()
+            }
+            _ => false,
+        });
+        if writes_description {
+            client.ensure_text_format_supported()?;
+        }
 
         let total = args.operations.len();
         let mut results = Vec::new();

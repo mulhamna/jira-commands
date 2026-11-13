@@ -50,6 +50,9 @@ The server reuses the same credentials/config as `jirac`:
 - `JIRA_URL`
 - `JIRA_EMAIL`
 - `JIRA_TOKEN`
+- `JIRA_TEXT_FORMAT` (`markdown` by default; `wiki` makes description, comment and
+  worklog text native Jira wiki markup, sent unchanged, API v2 only).
+  `jira_auth_status` reports the active value as `text_format`.
 
 You can initialize and switch credentials with:
 

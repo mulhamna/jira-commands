@@ -1,7 +1,10 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use jira_commands::{cli, help_text, tui, version_check};
-use jira_core::{config::JiraConfig, JiraClient};
+use jira_core::{
+    config::{JiraConfig, TextFormat},
+    JiraClient,
+};
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Debug, Parser)]
@@ -139,7 +142,10 @@ async fn main() -> Result<()> {
             if cli::interactive::is_non_interactive() {
                 anyhow::bail!("`jirac tui` requires an interactive terminal");
             }
-            let client = build_client().context("Failed to initialize Jira client")?;
+            // The TUI forms are Markdown regardless of the profile's text_format.
+            let client = build_client()
+                .context("Failed to initialize Jira client")?
+                .with_text_format(TextFormat::Markdown);
             let config = JiraConfig::load().unwrap_or_default();
             let effective_project = project.or(config.project);
             // run_tui consumes update_notice and surfaces it itself; return so the

@@ -5,7 +5,7 @@ use inquire::{Password, PasswordDisplayMode, Select, Text};
 use jira_core::{
     config::{
         config_file_path, default_profile_name, JiraAuthType, JiraConfig, JiraDeployment,
-        JiraProfilesFile,
+        JiraProfilesFile, TextFormat,
     },
     JiraClient,
 };
@@ -264,6 +264,7 @@ async fn login(args: LoginArgs) -> Result<()> {
         api_version: 0,
         default_issue_limit: None,
         ca_bundle,
+        text_format: Default::default(),
     };
 
     if config.requires_user_identity() {
@@ -299,6 +300,7 @@ async fn login(args: LoginArgs) -> Result<()> {
         .filter(|name| !name.trim().is_empty())
         .unwrap_or_else(|| derive_profile_name(&config));
     config.profile_name = Some(profile_name.clone());
+    config.text_format = preserved_text_format(&profile_name);
     config.save().context("Failed to save config")?;
 
     println!(
@@ -312,6 +314,14 @@ async fn login(args: LoginArgs) -> Result<()> {
     // CodeQL's cleartext-logging heuristic for little user benefit.
 
     Ok(())
+}
+
+/// Text format already saved for `profile_name`, so `auth login` does not reset it.
+fn preserved_text_format(profile_name: &str) -> TextFormat {
+    JiraProfilesFile::load()
+        .ok()
+        .and_then(|store| store.profiles.get(profile_name).map(|p| p.text_format))
+        .unwrap_or_default()
 }
 
 async fn logout(profile: Option<String>, all: bool) -> Result<()> {
@@ -475,6 +485,7 @@ async fn status(profile: Option<String>) -> Result<()> {
         println!("  Secret:         ✗ not found — run `jirac auth login`");
     }
     println!("  API version:    {}", config.api_version);
+    println!("  Text format:    {}", config.text_format.as_str());
     println!("  Profiles saved: {}", store.profiles.len().max(1));
 
     if let Some(project) = &config.project {
@@ -639,5 +650,40 @@ impl From<AuthTypeArg> for JiraAuthType {
             AuthTypeArg::DatacenterPat => JiraAuthType::DataCenterPat,
             AuthTypeArg::DatacenterBasic => JiraAuthType::DataCenterBasic,
         }
+    }
+}
+
+#[cfg(test)]
+mod text_format_tests {
+    use super::*;
+    use crate::test_support::TempHome;
+
+    fn login_args(token: &str) -> LoginArgs {
+        LoginArgs {
+            profile: Some("dc".into()),
+            url: Some("https://jira.internal".into()),
+            email: None,
+            token: Some(token.into()),
+            project: None,
+            timeout_secs: None,
+            deployment: Some(DeploymentArg::Datacenter),
+            auth_type: Some(AuthTypeArg::DatacenterPat),
+            cacert: Some(String::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn login_again_keeps_the_profile_text_format() {
+        let home = TempHome::new("auth-relogin");
+
+        login(login_args("first")).await.expect("first login");
+        let mut store = JiraProfilesFile::load().expect("load");
+        store.profiles.get_mut("dc").expect("dc").text_format = TextFormat::Wiki;
+        store.save().expect("save");
+
+        login(login_args("second")).await.expect("second login");
+        let saved = home.config_text();
+        assert!(saved.contains("text_format = \"wiki\""), "{saved}");
+        assert!(saved.contains("token = \"second\""), "{saved}");
     }
 }

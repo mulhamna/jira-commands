@@ -566,7 +566,7 @@ pub(super) async fn view_issue(
     }
 
     if let Some(desc) = &issue.description {
-        let text = jira_core::adf::adf_to_text(desc);
+        let text = jira_core::rich_text::rich_text_to_text(desc);
         if !text.is_empty() {
             println!();
             println!("  Description:");

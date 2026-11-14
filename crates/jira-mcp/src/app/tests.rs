@@ -505,6 +505,20 @@ fn slim_issue_drops_adf_and_caps_excerpt() {
 }
 
 #[test]
+fn slim_issue_renders_wiki_description_excerpt() {
+    let wiki = "h2. Details\n\n* Item with *bold* text\n{code}example{code}";
+    let mut issue = issue_with_description(0);
+    issue.description = Some(json!(wiki));
+
+    let slim = super::shared::slim_issue(&issue);
+
+    assert_eq!(
+        slim["description_excerpt"],
+        json!("## Details\n\n- Item with bold text\n```\nexample\n```")
+    );
+}
+
+#[test]
 fn slimmed_issue_list_stays_under_stdio_cap() {
     let issues: Vec<Value> = (0..25)
         .map(|_| super::shared::slim_issue(&issue_with_description(20_000)))

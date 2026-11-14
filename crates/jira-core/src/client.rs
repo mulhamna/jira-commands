@@ -3752,7 +3752,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .add_comment("DC-1", "hello **world**")
             .await
             .expect("comment should be created");
-        assert_eq!(comment.body.as_deref(), Some("hello *world*"));
+        assert_eq!(comment.body.as_deref(), Some("hello world"));
     }
 
     #[tokio::test]
@@ -3777,7 +3777,10 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             .await
             .expect("comment should be updated");
         assert_eq!(comment.id, "100");
-        assert_eq!(comment.body.as_deref(), Some(wiki));
+        assert_eq!(
+            comment.body.as_deref(),
+            Some("## Updated\n\nПривет\n\n```javascript\nconst value = `hello`;\n\nconsole.log(value);\n```")
+        );
     }
 
     #[tokio::test]

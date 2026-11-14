@@ -8,10 +8,8 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use jira_core::{
-    adf::{adf_to_text, mentioned_account_ids},
-    config::config_file_path,
-    model::Issue,
-    JiraClient,
+    adf::mentioned_account_ids, config::config_file_path, model::Issue,
+    rich_text::rich_text_to_text, JiraClient,
 };
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -141,7 +139,7 @@ pub async fn scan_mention_notifications(
                     source: "description-mention".to_string(),
                     author: issue.reporter.clone(),
                     created: issue.updated.clone(),
-                    excerpt: notification_excerpt(&adf_to_text(description)),
+                    excerpt: notification_excerpt(&rich_text_to_text(description)),
                     url: format!("{base_url}/browse/{}", issue.key),
                     read: read_state.read_ids.contains(&id),
                 });

@@ -1,6 +1,6 @@
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{Implementation, ServerCapabilities, ServerConfig},
     tool, tool_handler, tool_router,
     transport::{
         stdio,
@@ -20,14 +20,15 @@ use crate::{
         ApiRequestArgs, ArchiveArgs, AttachmentDeleteArgs, AttachmentDownloadArgs,
         AttachmentListArgs, AuthSetCredentialsArgs, BatchArgs, BoardGetArgs, BoardIssuesArgs,
         BoardListArgs, BulkCommentArgs, BulkTransitionArgs, BulkUpdateArgs, CommentAddArgs,
-        IssueAttachArgs, IssueCloneArgs, IssueCreateArgs, IssueDeleteArgs, IssueFieldsArgs,
-        IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs, IssueListArgs, IssueMoveArgs,
-        IssueNotificationsArgs, IssueStandupArgs, IssueTransitionArgs, IssueTypesListArgs,
-        IssueUpdateArgs, JqlBuildArgs, NotificationsMarkReadArgs, ProjectKeyArgs,
-        ProjectVersionCreateArgs, ProjectVersionUpdateArgs, RemoteLinkAddArgs,
-        RemoteLinkDeleteArgs, SearchUsersArgs, SprintAddIssueArgs, SprintCreateArgs,
-        SprintDeleteArgs, SprintListArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse,
-        WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs,
+        CommentDeleteArgs, CommentUpdateArgs, IssueAttachArgs, IssueCloneArgs, IssueCreateArgs,
+        IssueDeleteArgs, IssueFieldsArgs, IssueKeyArgs, IssueLinkCreateArgs, IssueLinkDeleteArgs,
+        IssueListArgs, IssueMoveArgs, IssueNotificationsArgs, IssueStandupArgs,
+        IssueTransitionArgs, IssueTypesListArgs, IssueUpdateArgs, JqlBuildArgs,
+        NotificationsMarkReadArgs, ProjectKeyArgs, ProjectVersionCreateArgs,
+        ProjectVersionUpdateArgs, RemoteLinkAddArgs, RemoteLinkDeleteArgs, SearchUsersArgs,
+        SprintAddIssueArgs, SprintBacklogIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintRankIssueArgs, SprintSummaryArgs, SprintUpdateArgs, ToolResponse,
+        WatcherAddArgs, WatcherRemoveArgs, WorklogAddArgs, WorklogDeleteArgs, WorklogUpdateArgs,
     },
 };
 
@@ -106,8 +107,8 @@ impl Default for JiraMcpServer {
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for JiraMcpServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(
                 Implementation::new("jira-commands", env!("CARGO_PKG_VERSION"))
                     .with_title("jira-commands MCP")
@@ -319,6 +320,28 @@ impl JiraMcpServer {
     }
 
     #[tool(
+        name = "jira_sprint_remove_issue",
+        description = "Move an issue from its sprint back to the board backlog"
+    )]
+    pub async fn jira_sprint_remove_issue(
+        &self,
+        Parameters(args): Parameters<SprintBacklogIssueArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_remove_issue(args).await)
+    }
+
+    #[tool(
+        name = "jira_sprint_rank_issue",
+        description = "Rank an issue immediately before or after another issue on its board"
+    )]
+    pub async fn jira_sprint_rank_issue(
+        &self,
+        Parameters(args): Parameters<SprintRankIssueArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.sprint_rank_issue(args).await)
+    }
+
+    #[tool(
         name = "jira_watcher_list",
         description = "List watchers on a Jira issue"
     )]
@@ -498,7 +521,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_create",
-        description = "Create a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
+        description = "Create a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
     )]
     pub async fn jira_issue_create(
         &self,
@@ -509,7 +532,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_update",
-        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (auto-converted to ADF); only use 'description_adf' for pre-built ADF."
+        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it."
     )]
     pub async fn jira_issue_update(
         &self,
@@ -593,6 +616,28 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         Parameters(args): Parameters<CommentAddArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.comment_add(args).await)
+    }
+
+    #[tool(
+        name = "jira_comment_update",
+        description = "Replace the Markdown body of a Jira issue comment"
+    )]
+    pub async fn jira_comment_update(
+        &self,
+        Parameters(args): Parameters<CommentUpdateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.comment_update(args).await)
+    }
+
+    #[tool(
+        name = "jira_comment_delete",
+        description = "Delete a Jira issue comment; requires confirm=true"
+    )]
+    pub async fn jira_comment_delete(
+        &self,
+        Parameters(args): Parameters<CommentDeleteArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.comment_delete(args).await)
     }
 
     #[tool(
@@ -692,6 +737,17 @@ save_path must be an absolute path inside $HOME unless force_path=true."
     }
 
     #[tool(
+        name = "jira_worklog_update",
+        description = "Update provided fields on a Jira worklog entry"
+    )]
+    pub async fn jira_worklog_update(
+        &self,
+        Parameters(args): Parameters<WorklogUpdateArgs>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        self.respond(self.app.worklog_update(args).await)
+    }
+
+    #[tool(
         name = "jira_worklog_delete",
         description = "Delete a worklog entry from a Jira issue"
     )]
@@ -726,7 +782,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_batch",
-        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (auto-converted to ADF)."
+        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (converted to ADF for API v3 or Jira wiki markup for API v2)."
     )]
     pub async fn jira_issue_batch(
         &self,
@@ -807,7 +863,7 @@ pub async fn run_streamable_http(host: &str, port: u16, path: &str) -> anyhow::R
 #[cfg(test)]
 mod tests {
     use rmcp::{
-        model::{CallToolRequestParams, ClientCapabilities, ClientInfo, Implementation},
+        model::{CallToolRequestParams, ClientCapabilities, ClientConfig, Implementation},
         transport::StreamableHttpClientTransport,
         ClientHandler, ServiceExt,
     };
@@ -962,7 +1018,7 @@ mod tests {
                 .expect("http server");
         });
 
-        let client_info = ClientInfo::new(
+        let client_info = ClientConfig::new(
             ClientCapabilities::default(),
             Implementation::new("test-client", "0.1.0"),
         );

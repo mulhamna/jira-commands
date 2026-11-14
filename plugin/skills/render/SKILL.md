@@ -11,7 +11,7 @@ Steps:
    - Inline content: pass via stdin (`echo '...' | jirac issue render`).
 3. Run `jirac issue render --input file.md` (or stdin variant).
 4. Show the rendered ADF preview. Highlight any nodes that may not render cleanly in Jira (unsupported HTML, raw images, complex tables).
-5. If the result looks correct, the same content can be fed into `jirac issue update --description-file`, `jirac issue comment add --body-file`, or used in batch/bulk manifests.
+5. If the result looks correct, the same Markdown file can be sent with `jirac issue update <KEY> --description-file file.md` or `jirac issue comment <KEY> add --file file.md`, or used in batch/bulk manifests.
 
 Notes:
 - Useful when authoring rich descriptions with mentions, code blocks, lists, and tables — confirms conversion before going live.

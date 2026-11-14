@@ -7,3 +7,4 @@ pub mod issue;
 pub mod mcp;
 pub mod plan;
 pub mod progress;
+pub mod update;

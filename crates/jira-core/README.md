@@ -84,7 +84,11 @@ timeout_secs = 30
 deployment = "cloud"
 auth_type = "cloud_api_token"
 api_version = 3
+# ca_bundle = "/path/to/internal-ca.pem"   # optional: trust an internal CA
 ```
+
+`ca_bundle` (or the `JIRA_CA_BUNDLE` env var) adds the PEM CA certificate(s) at
+that path to the TLS trust store, for self-hosted Jira behind an internal CA.
 
 ## Related crates
 

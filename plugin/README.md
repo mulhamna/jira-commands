@@ -45,7 +45,7 @@ jirac auth login
 | `/jira:view-issue` | View full issue detail — description, status, assignee, attachments |
 | `/jira:create-issue` | Create a new issue with interactive field prompts |
 | `/jira:update-issue` | Update summary, description, assignee, labels, versions, or custom fields |
-| `/jira:transition` | Move an issue to a new status (e.g. In Progress, Done) |
+| `/jira:transition` | Transition an issue by status name or numeric transition ID |
 | `/jira:comment` | List comments or add a new Markdown comment on an issue |
 | `/jira:worklog` | List, add, or delete time entries on an issue |
 | `/jira:bulk-comment` | Add one Markdown comment to many issues via JQL or explicit keys |
@@ -55,7 +55,7 @@ jirac auth login
 | `/jira:jql` | Build and run a JQL query interactively |
 | `/jira:daily-standup` | Generate a markdown-ready daily standup summary from assigned Jira issues |
 | `/jira:sprint-summary` | Summarize the current or named sprint by status and assignee |
-| `/jira:sprint-lifecycle` | List, create, start, complete, update, or delete sprints on a project board |
+| `/jira:sprint-lifecycle` | List, create, start, complete, update, or delete sprints by project and sprint name or ID |
 | `/jira:notifications` | Scan recent Jira `@mention` events from descriptions and comments |
 | `/jira:versions` | Browse project fix versions, backlog previews, and version metadata |
 | `/jira:render` | Preview Markdown → Jira ADF conversion before posting descriptions or comments |

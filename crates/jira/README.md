@@ -34,8 +34,9 @@ Or use one of the workspace-level install options from the root README:
 ## What this crate provides
 
 - `jirac` primary CLI binary
-- issue listing, viewing, create, update, transition, delete, clone
-- worklog, attachment, bulk-update, bulk-transition, archive, batch, and bulk-create flows
+- issue listing, viewing, create, update, transition, delete, clone, and bulk operations
+- comments (list, add, edit, delete), worklogs (list, add, edit, delete), and attachments
+- Agile sprints, backlog moves, relative issue ranking, project version management
 - interactive TUI flows, including split master-detail, saved JQL picker, theme picker, searchable assignee picker, project-scoped component picker, server summary, config summary, and saved column settings — fully usable with mouse (click rows, tabs, picker options; scroll wheel; click outside popup to dismiss)
 - raw Jira REST API passthrough
 - shared config with multi-profile auth support
@@ -121,20 +122,35 @@ Non-interactive (pass `--client` for scripts):
 
 ```bash
 jirac mcp install --client claude-code
+jirac mcp install --client claude-code-cli
 jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
 jirac mcp install --client codex
+jirac mcp install --client vscode
+jirac mcp install --client copilot-cli
 jirac mcp install --client opencode
+jirac mcp install --client windsurf
+jirac mcp install --client zed
+jirac mcp install --client openclaw
+jirac mcp install --client hermes
+jirac mcp install --client arsy-code
+jirac mcp install --client antigravity-cli
+jirac mcp install --client antigravity-desktop
+jirac mcp install --client jcode
+jirac mcp install --client zcode
 jirac mcp install --client generic-json
 ```
 
+The helper delegates client registration and config merging to the
+[`kurir`](https://github.com/suiflex/kurir) library. It keeps `jirac-mcp`
+as a local stdio server and passes `--transport` through to that server.
+
 Notes:
-- `claude-code` writes user-level `~/.claude.json` (`mcpServers`); the project-scoped `<repo>/.mcp.json` is not written by this helper
-- `claude-desktop` writes the platform support directory (`claude_desktop_config.json`) on macOS/Windows/Linux
-- `gemini-cli` and `codex` delegate to their native CLI `mcp add` flows; `opencode` writes `~/.config/opencode/opencode.jsonc` directly
-- `generic-json` prints a portable JSON snippet instead of writing a file
-- `cursor` remains provisional until verified in a real Cursor install
+- `claude-code` uses Kurir's user-level `~/.claude.json` target by default
+- delegated clients use their native CLI through Kurir
+- `generic-json` prints Kurir's portable snippet instead of writing a file
+- `--force`, `--dry-run`, and `--print` are forwarded to Kurir
 
 ## More docs
 

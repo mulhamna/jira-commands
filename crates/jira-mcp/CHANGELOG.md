@@ -1,5 +1,38 @@
 # Changelog
 
+## [3.0.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.0.0...jira-mcp-v3.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **mcp:** bump rmcp to 3.9.0 and refresh dependencies ([#530](https://github.com/mulhamna/jira-commands/issues/530)) ([a44cda0](https://github.com/mulhamna/jira-commands/commit/a44cda0a871a5d87f3754a5a6e189458d44d0aa1))
+* **mcp:** bump rmcp to 3.9.0 for RUSTSEC-2026-0462 ([bbdd264](https://github.com/mulhamna/jira-commands/commit/bbdd264ccf7796d3ae0af86f51458537b92c8ca7))
+
+## [3.0.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.6.0...jira-mcp-v3.0.0) (2026-11-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522))
+
+### Bug Fixes
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522)) ([44f9fe7](https://github.com/mulhamna/jira-commands/commit/44f9fe7f0c4aea1512bd29c89d39455a31200894))
+
+## [2.6.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.5.0...jira-mcp-v2.6.0) (2026-10-11)
+
+
+### Features
+
+* complete Jira issue workflows ([f9b63ce](https://github.com/mulhamna/jira-commands/commit/f9b63ce87dea6e37bfdc939ac4de76a4a61b6e88))
+
+## [2.5.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.4.0...jira-mcp-v2.5.0) (2026-09-07)
+
+
+### Features
+
+* **core:** trust an internal CA bundle via ca_bundle config ([3f41eeb](https://github.com/mulhamna/jira-commands/commit/3f41eeb48371f79c7705474681ea4f615f86a35a))
+
 ## [2.4.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v2.3.5...jira-mcp-v2.4.0) (2026-08-07)
 
 

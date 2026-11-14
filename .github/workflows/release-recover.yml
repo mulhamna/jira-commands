@@ -110,7 +110,7 @@ jobs:
         with:
           ref: ${{ inputs.release_tag }}
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -155,7 +155,7 @@ jobs:
           Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE dist/jirac/
           Compress-Archive -Path dist/jirac/* -DestinationPath ${{ matrix.archive_artifact }}
       - name: Upload artifact (jirac)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
           path: |
@@ -176,12 +176,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release_tag }}
-      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
         with:
           toolchain: stable
       - name: Authenticate to crates.io
         id: auth
-        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: Publish jira-core (skip if already published)
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
@@ -243,7 +243,7 @@ jobs:
           echo "=== checksums.txt ==="
           cat checksums.txt
       - name: Upload assets to existing release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           tag_name: ${{ inputs.release_tag }}
@@ -266,7 +266,7 @@ jobs:
           ref: ${{ inputs.release_tag }}
 
       - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'

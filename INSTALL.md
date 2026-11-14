@@ -195,6 +195,19 @@ jirac --help
 jirac tui --help
 ```
 
+## Updating
+
+```bash
+jirac update              # update jirac
+jirac mcp update          # update jirac-mcp found on PATH
+jirac update --check      # only report whether a newer release exists
+```
+
+Both commands detect how the binary was installed. Homebrew, npm, Cargo,
+Scoop, and winget installs are upgraded through that tool. Install-script
+and manual downloads are replaced in place with the release binary after
+its SHA-256 checksum is verified.
+
 ## MCP client install helper
 
 If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then run the helper.
@@ -209,6 +222,7 @@ Non-interactive mode for scripts — pass `--client` explicitly:
 
 ```bash
 jirac mcp install --client claude-code
+jirac mcp install --client claude-code-cli
 jirac mcp install --client claude-desktop
 jirac mcp install --client cursor
 jirac mcp install --client gemini-cli
@@ -216,25 +230,30 @@ jirac mcp install --client codex
 jirac mcp install --client vscode
 jirac mcp install --client copilot-cli
 jirac mcp install --client opencode
+jirac mcp install --client windsurf
+jirac mcp install --client zed
+jirac mcp install --client openclaw
+jirac mcp install --client hermes
 jirac mcp install --client generic-json
-jirac mcp install --client antigravity
 jirac mcp install --client antigravity-cli
-jirac mcp install --client kilocode
+jirac mcp install --client arsy-code
+jirac mcp install --client antigravity-desktop
+jirac mcp install --client jcode
+jirac mcp install --client zcode
 ```
 
+The helper delegates registration, config merging, backups, conflict handling,
+and delegated client CLIs to the
+[`kurir`](https://github.com/suiflex/kurir) library.
+
 Supported targets now:
-- `claude-code` (`~/.claude.json`, user-level JSON with `mcpServers`)
-- `claude-desktop` (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows)
-- `cursor` (`~/.cursor/mcp.json`, provisional path until verified in a real Cursor install)
-- `gemini-cli` (delegates to `gemini mcp add -s user ...`)
-- `codex` (delegates to `codex mcp add ...`)
-- `vscode` (delegates to `code --add-mcp ...` — GitHub Copilot in VS Code)
-- `copilot-cli` (`~/.copilot/mcp-config.json`, direct JSON write for GitHub Copilot CLI)
-- `opencode` (`~/.config/opencode/opencode.jsonc`, direct JSONC write)
-- `generic-json` (prints a portable JSON snippet instead of writing a file)
-- `antigravity` (`~/.gemini/antigravity/mcp_config.json`, user-level JSON with `mcpServers`)
-- `antigravity-cli` (`~/.gemini/config/mcp_config.json`, user-level JSON with `mcpServers`)
-- `kilocode` (`~/.config/kilo/kilo.json`, Kilo Code CLI global config with `mcp`)
+- `claude-code`, `claude-code-cli`, and `claude-desktop`
+- `cursor`, `gemini-cli`, `codex`, `vscode`, and `copilot-cli`
+- `opencode`, `windsurf`, `zed`, `openclaw`, and `hermes`
+- `arsy-code`, `generic-json`, `antigravity-cli`, and `antigravity-desktop`
+- `jcode` and `zcode`
+
+`antigravity` remains an alias for `antigravity-cli`.
 
 Helpful flags:
 - `--print` prints the JSON snippet or delegated client command first
@@ -252,11 +271,9 @@ jirac mcp doctor
 ```
 
 Local verification notes:
-- Claude Code user scope writes `~/.claude.json` (top-level `mcpServers`); project-scoped MCP servers live in `<repo>/.mcp.json` and are not written by this helper
-- Claude Desktop user scope writes the platform support directory (`claude_desktop_config.json`); override with `CLAUDE_DESKTOP_CONFIG`
-- Gemini CLI currently stores user MCP config in `~/.gemini/settings.json`; this helper delegates to the Gemini CLI directly
-- Codex stores MCP entries under `~/.codex/config.toml`; this helper delegates to the Codex CLI directly
-- Antigravity user scope writes `~/.gemini/antigravity/mcp_config.json` (top-level `mcpServers`); override with `ANTIGRAVITY_CONFIG`
-- Antigravity CLI user scope writes `~/.gemini/config/mcp_config.json` (`mcpServers`); override with `ANTIGRAVITY_CLI_CONFIG`
-- Kilo Code CLI user scope writes `~/.config/kilo/kilo.json` (top-level `mcp`, `{"type": "local", "command": [...], "enabled": true}` entries); override with `KILOCODE_CONFIG`. See [Kilo Code CLI MCP docs](https://kilo.ai/docs/automate/mcp/using-in-cli).
+- `claude-code` uses Kurir's user-level `~/.claude.json` target by default
+- delegated targets use their native CLI through Kurir
+- file targets are merged as JSON/JSONC and backed up before replacement
+- `generic-json` prints Kurir's portable `mcpServers` snippet
+- `jirac mcp install` always registers `jirac-mcp` as a local stdio server; `--transport` is passed as an argument to `jirac-mcp serve`
 - For local-binary clients, `jirac mcp install` requires `jirac-mcp` on PATH. Install it with `cargo install jira-mcp`, download a release binary, or pass `--command /path/to/jirac-mcp`.

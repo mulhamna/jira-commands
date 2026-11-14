@@ -3,7 +3,8 @@ use serde_json::{json, Value};
 use crate::{
     error::{AppError, AppResult},
     models::{
-        SprintAddIssueArgs, SprintCreateArgs, SprintDeleteArgs, SprintListArgs, SprintUpdateArgs,
+        SprintAddIssueArgs, SprintBacklogIssueArgs, SprintCreateArgs, SprintDeleteArgs,
+        SprintListArgs, SprintRankIssueArgs, SprintUpdateArgs,
     },
 };
 
@@ -107,6 +108,27 @@ impl JiraApp {
             "sprint_id": args.sprint_id,
             "issue_key": args.issue_key,
             "added": true
+        }))
+    }
+
+    pub async fn sprint_remove_issue(&self, args: SprintBacklogIssueArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        client.move_issue_to_backlog(&args.issue_key).await?;
+        Ok(json!({
+            "issue_key": args.issue_key,
+            "moved_to": "backlog"
+        }))
+    }
+
+    pub async fn sprint_rank_issue(&self, args: SprintRankIssueArgs) -> AppResult<Value> {
+        let client = self.build_client()?;
+        client
+            .rank_issue(&args.issue_key, &args.relative_issue_key, args.before)
+            .await?;
+        Ok(json!({
+            "issue_key": args.issue_key,
+            "relative_issue_key": args.relative_issue_key,
+            "position": if args.before { "before" } else { "after" }
         }))
     }
 }

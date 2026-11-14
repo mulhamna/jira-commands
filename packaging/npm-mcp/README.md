@@ -18,13 +18,13 @@ npm install -g @mulham28/jirac-mcp
 
 ## Register the MCP server with your CLI
 
-If the [jirac CLI](https://www.npmjs.com/package/@mulham28/jirac) is also installed, you can register the server interactively:
+If the [jirac CLI](https://www.npmjs.com/package/@mulham28/jirac) is also installed, you can register the server interactively. The helper uses the shared [Kurir](https://github.com/suiflex/kurir) registration library:
 
 ```bash
 jirac mcp install
 ```
 
-The interactive picker checks prerequisites (binary on PATH, Jira auth configured) and writes the right config file for your client (Claude Code, Claude Desktop, Cursor, Codex, Gemini CLI, OpenCode, Zed, or a generic JSON snippet).
+The picker checks prerequisites (binary on PATH, Jira auth configured) and registers the server with a supported Kurir harness (Claude Code, Claude Desktop, Cursor, Codex, Gemini CLI, OpenCode, Zed, or a generic JSON snippet).
 
 Without the jirac CLI, register manually — for example, OpenCode:
 

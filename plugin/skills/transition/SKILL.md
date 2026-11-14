@@ -10,11 +10,11 @@ Steps:
    - issue key
    - target status when provided
 3. Run:
-   - `jirac issue transition <ISSUE-KEY> --to '<STATUS>'` when the target status is known
+   - `jirac issue transition <ISSUE-KEY> '<STATUS>'` when the target status is known
    - `jirac issue transition <ISSUE-KEY>` when the user wants the interactive picker
 4. Confirm the transition result clearly.
 
 Examples:
-- "transition PROJ-123 to In Progress" → `jirac issue transition PROJ-123 --to 'In Progress'`
-- "mark PROJ-456 as done" → `jirac issue transition PROJ-456 --to 'Done'`
-- "move PROJ-789 to review" → `jirac issue transition PROJ-789 --to 'In Review'`
+- "transition PROJ-123 to In Progress" → `jirac issue transition PROJ-123 'In Progress'`
+- "mark PROJ-456 as done" → `jirac issue transition PROJ-456 'Done'`
+- "move PROJ-789 to review" → `jirac issue transition PROJ-789 'In Review'`

@@ -118,7 +118,7 @@ jirac issue versions -p PROJ --create --version "v1.3.0" --description "June rel
 jirac issue create -p PROJ
 
 # Transition an issue
-jirac issue transition PROJ-123 --to "In Progress"
+jirac issue transition PROJ-123 "In Progress"
 
 # Launch the TUI
 jirac tui -p PROJ
@@ -151,7 +151,7 @@ jirac issue versions -p PROJ --version "v1.2.0" --set-release-date 2026-05-30 --
 jirac issue versions -p PROJ --version "v1.2.0" --set-name "June 2026"
 jirac issue versions -p PROJ --create --version "v1.3.0" --description "June release"
 jirac issue create -p PROJ                          # create (interactive)
-jirac issue create -p PROJ --type Bug --summary "Login fails on Safari"
+jirac issue create -p PROJ --issue-type Bug --summary "Login fails on Safari"
 jirac issue render --input desc.md                  # preview Markdown -> ADF JSON
 jirac issue render --input desc.md --output text    # preview rendered plain text
 
@@ -159,12 +159,18 @@ jirac issue update PROJ-123 --summary "New title"
 jirac issue update PROJ-123 --assignee user@co.com
 
 jirac issue transition PROJ-123                     # interactive picker
-jirac issue transition PROJ-123 --to "In Progress"
+jirac issue transition PROJ-123 "In Progress"
 
 jirac issue attach PROJ-123 ./screenshot.png
 jirac issue attachment list PROJ-123                # list attachments on an issue
 jirac issue attachment download 10100 --out ./tmp   # download by attachment ID
 jirac issue attachment delete 10100 --force         # delete by attachment ID
+jirac issue comment PROJ-123 update 10001 --body "Updated context"
+jirac issue comment PROJ-123 delete 10001             # prompts before deletion
+jirac issue worklog PROJ-123 update 10234 --time 3h --comment "Re-estimated"
+jirac issue sprint-remove-issue PROJ-123              # return to board backlog
+jirac issue rank PROJ-123 --before PROJ-456
+jirac issue rank PROJ-123 --after PROJ-789 --json
 jirac issue bulk-comment --jql 'project = PROJ AND status = "In Progress"' --body "QA is reviewing this now"
 jirac issue bulk-comment --keys PROJ-123 PROJ-456 --file note.md
 jirac issue delete PROJ-123
@@ -173,24 +179,56 @@ jirac issue move PROJ-123 OTHER
 jirac issue clone PROJ-123
 
 jirac issue link list-types                          # list available link types
-jirac issue link add PROJ-123 PROJ-456 --type Blocks # link two issues
+jirac issue link add PROJ-123 PROJ-456 --link-type Blocks # link two issues
 jirac issue link delete 10000                        # delete link by ID
 
 jirac issue batch --manifest ops.json
 jirac issue bulk-create --manifest issues.json
 ```
 
+### Rich-text input
+
+Descriptions, comments, and worklog comments accept Markdown on both Cloud and
+Data Center. `jirac` converts it to ADF for API v3 or Jira wiki markup for API v2,
+including headings, emphasis, links, lists, tables, and code blocks.
+
+With `--description-file`, use `--description-format text` for literal text or
+`--description-format adf` for pre-built ADF. On API v2, supported ADF retains its
+formatting in wiki markup. Unsupported structures, nodes, or marks produce a
+warning and degrade to readable text instead of blocking the write. Labels and
+URLs are retained where available; opaque nodes use a visible placeholder.
+Malformed ADF and excessive nesting still return an error.
+On API v2, code-language hints use Jira's bundled formatters. Plain-text aliases
+and unsupported languages retain the code block without syntax highlighting;
+unsupported languages produce a warning.
+List items support code blocks, quotes, headings, and continuation paragraphs.
+Nested lists followed by more parent content are flattened within the parent item
+so the continuation does not become part of the last nested child.
+Emphasis inside words retains its formatting. Links sharing a text run that Jira
+cannot render are shown as label plus URL with a warning, rather than raw wiki syntax.
+Pipe characters in link labels retain native links. Relative paths and unsupported
+URL schemes use readable label-plus-target fallback instead of Jira error markup;
+compatible URL schemes, protocol-relative URLs, and fragments retain native links.
+ADF mentions use Data Center login names or Cloud account IDs for the selected deployment.
+Existing API v2 descriptions copied when cloning issues and unchanged worklog
+comments are preserved verbatim.
+
+API v2 inputs that previously contained native wiki markup should now be supplied
+as Markdown. Use `jirac api` with an explicit request body when sending native
+wiki markup without conversion.
+
 ### Worklogs
 
 ```bash
-jirac issue worklog list PROJ-123
-jirac issue worklog add PROJ-123 --time 2h --comment "Fixed auth bug"
-jirac issue worklog add PROJ-123 --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
-jirac issue worklog add PROJ-123 --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
-jirac issue worklog delete PROJ-123 --id 10234
+jirac issue worklog PROJ-123 list
+jirac issue worklog PROJ-123 add --time 2h --comment "Fixed auth bug"
+jirac issue worklog PROJ-123 add --time 2h --date 2026-04-21 --start 09:30 --comment "Backfilled worklog"
+jirac issue worklog PROJ-123 add --time 2h --from 2026-04-21 --to 2026-04-25 --exclude-weekends --comment "Backfill week"
+jirac issue worklog PROJ-123 delete 10234
+jirac issue worklog PROJ-123 update 10234 --time 3h --comment "Re-estimated"
 ```
 
-`jirac issue worklog add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
+`jirac issue worklog <KEY> add` also supports optional `--date YYYY-MM-DD` and `--start HH:MM[:SS]` flags to set the Jira worklog `started` timestamp explicitly. For backfills across multiple days, use `--from YYYY-MM-DD --to YYYY-MM-DD`, plus `--exclude-weekends` if Saturdays/Sundays should be skipped. In the TUI, pressing `w` opens the single-worklog modal, while `b` opens a bulk worklog modal for date ranges with weekend exclusion and a submit-confirm step.
 
 ### Watchers
 
@@ -202,6 +240,7 @@ jirac issue watch PROJ-123 rm 5b10ac8d82e05b22cc7d4ef5
 ```
 
 `add` defaults to the current authenticated user (resolved via `/myself`). `rm` prompts for confirmation unless `--force` is given. In the TUI, the Summary tab shows the watcher count and the first few display names, and pressing `W` adds yourself as a watcher in place.
+`watch ... list` omits account IDs from terminal output. `watch ... rm` accepts an exact display name or account ID; ambiguous display names require an account ID.
 
 ### Boards (Agile)
 
@@ -214,6 +253,11 @@ jirac board issues 12                               # issues currently on the bo
 jirac board issues 12 --jql 'status = "To Do"' --max 50
 jirac board backlog 12                              # issues not in an active/future sprint
 jirac board list -p PROJ --json                     # JSON output for scripting
+
+# Move an issue from its sprint back to backlog and adjust board order
+jirac issue sprint-remove-issue PROJ-123
+jirac issue rank PROJ-123 --before PROJ-456
+jirac issue rank PROJ-123 --after PROJ-789 --json
 ```
 
 Each board subcommand accepts `--json` for machine-readable output. Wraps the same `/rest/agile/1.0/board` endpoints used by the TUI board picker (press `B`).
@@ -318,7 +362,13 @@ timeout_secs = 30
 deployment = "data_center"
 auth_type = "datacenter_pat"
 api_version = 2
+ca_bundle = "/path/to/internal-ca.pem"
 ```
+
+`ca_bundle` is optional — point it at a PEM file with your CA certificate(s) when
+a self-hosted Jira presents a cert from an internal CA. You can also set it with
+`jirac auth login --cacert /path/to/ca.pem` (the interactive flow offers it for
+Data Center) or the `JIRA_CA_BUNDLE` env var.
 
 Environment variables override the active profile:
 
@@ -327,6 +377,7 @@ export JIRA_PROFILE=work-cloud
 export JIRA_URL=https://yourcompany.atlassian.net
 export JIRA_EMAIL=you@example.com
 export JIRA_TOKEN=your_api_token
+export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
 ```
 
 ## MCP server
@@ -335,9 +386,9 @@ export JIRA_TOKEN=your_api_token
 
 ### MCP install helpers
 
-Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then writes the right config file for the client you pick. Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites without writing anything.
+Run `jirac mcp install` with no arguments for an interactive picker that first verifies the prerequisites (jirac-mcp binary on PATH, Jira auth configured) and then registers the server through [Kurir](https://github.com/suiflex/kurir). Pass `--client <target>` to skip the picker for scripts, or `jirac mcp doctor` to check prerequisites and Kurir harness readiness without writing anything.
 
-Supported helpers include Claude Code, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, generic JSON snippets, Antigravity, antigravity-cli, and Kilo Code CLI.
+Supported helpers include ARSY CODE, Claude Code, Claude Code CLI, Claude Desktop, Cursor, Gemini CLI, Codex, VS Code (GitHub Copilot), GitHub Copilot CLI, OpenCode, Windsurf, Zed, OpenClaw, Hermes, generic JSON snippets, Antigravity CLI, and Antigravity Desktop.
 
 See [INSTALL.md](INSTALL.md) for the supported target matrix, client-specific notes, and recommended install flow.
 
@@ -404,5 +455,5 @@ Thanks to everyone helping shape `jirac`. This footer is refreshed automatically
 
 | <a href="https://github.com/mulhamna" title="@mulhamna"><img src="https://avatars.githubusercontent.com/u/97831705?v=4&s=72" width="36" height="36" alt="mulhamna" /></a> | <a href="https://github.com/apps/github-actions" title="@github-actions[bot]"><img src="https://avatars.githubusercontent.com/in/15368?v=4&s=72" width="36" height="36" alt="github-actions[bot]" /></a> | <a href="https://github.com/apps/dependabot" title="@dependabot[bot]"><img src="https://avatars.githubusercontent.com/in/29110?v=4&s=72" width="36" height="36" alt="dependabot[bot]" /></a> | <a href="https://github.com/badrus123" title="@badrus123"><img src="https://avatars.githubusercontent.com/u/21188155?v=4&s=72" width="36" height="36" alt="badrus123" /></a> | <a href="https://github.com/chmdznr" title="@chmdznr"><img src="https://avatars.githubusercontent.com/u/6890365?v=4&s=72" width="36" height="36" alt="chmdznr" /></a> | <a href="https://github.com/EnrikoAviyantoPutra" title="@EnrikoAviyantoPutra"><img src="https://avatars.githubusercontent.com/u/71826526?v=4&s=72" width="36" height="36" alt="EnrikoAviyantoPutra" /></a> |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| <a href="https://github.com/resincode" title="@resincode"><img src="https://avatars.githubusercontent.com/u/5574999?v=4&s=72" width="36" height="36" alt="resincode" /></a> | <a href="https://github.com/wahyuakbarwibowo" title="@wahyuakbarwibowo"><img src="https://avatars.githubusercontent.com/u/25057573?v=4&s=72" width="36" height="36" alt="wahyuakbarwibowo" /></a> | <a href="https://github.com/ekacahya21" title="@ekacahya21"><img src="https://avatars.githubusercontent.com/u/15162377?v=4&s=72" width="36" height="36" alt="ekacahya21" /></a> |   |   |   |
+| <a href="https://github.com/wahyuakbarwibowo" title="@wahyuakbarwibowo"><img src="https://avatars.githubusercontent.com/u/25057573?v=4&s=72" width="36" height="36" alt="wahyuakbarwibowo" /></a> | <a href="https://github.com/resincode" title="@resincode"><img src="https://avatars.githubusercontent.com/u/5574999?v=4&s=72" width="36" height="36" alt="resincode" /></a> | <a href="https://github.com/tibel" title="@tibel"><img src="https://avatars.githubusercontent.com/u/387395?v=4&s=72" width="36" height="36" alt="tibel" /></a> | <a href="https://github.com/a-kras" title="@a-kras"><img src="https://avatars.githubusercontent.com/u/1763747?v=4&s=72" width="36" height="36" alt="a-kras" /></a> | <a href="https://github.com/alexey-lapin" title="@alexey-lapin"><img src="https://avatars.githubusercontent.com/u/15038348?v=4&s=72" width="36" height="36" alt="alexey-lapin" /></a> | <a href="https://github.com/ekacahya21" title="@ekacahya21"><img src="https://avatars.githubusercontent.com/u/15162377?v=4&s=72" width="36" height="36" alt="ekacahya21" /></a> |
 <!-- contributors:end -->

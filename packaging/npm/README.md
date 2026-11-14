@@ -42,7 +42,7 @@ jirac mcp install   # interactive picker, registers the server into your MCP cli
 ```bash
 jirac issue list
 jirac issue view PROJ-123
-jirac issue transition PROJ-123 --to "In Progress"
+jirac issue transition PROJ-123 "In Progress"
 jirac issue bulk-comment --jql 'project = PROJ AND sprint = openSprints()' --body 'Please post your update before standup'
 jirac tui -p PROJ
 ```

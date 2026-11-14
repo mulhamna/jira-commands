@@ -6,6 +6,13 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [3.0.1](https://github.com/mulhamna/jira-commands/compare/v3.0.0...v3.0.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **deps:** patch quinn-udp and rustix security advisories ([#540](https://github.com/mulhamna/jira-commands/issues/540)) ([ad7640a](https://github.com/mulhamna/jira-commands/commit/ad7640a6a6ffd78b2877a8a42bd2a25ef8b4ee1f))
+
 ## [3.0.0](https://github.com/mulhamna/jira-commands/compare/v2.12.2...v3.0.0) (2026-11-09)
 
 

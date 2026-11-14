@@ -2,14 +2,15 @@ use serde_json::{json, Value};
 use serial_test::serial;
 use tempfile::TempDir;
 use wiremock::{
-    matchers::{method, path, query_param},
+    matchers::{body_json, method, path, query_param},
     Mock, MockServer, ResponseTemplate,
 };
 
 use crate::models::{
-    ApiRequestArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs, IssueDeleteArgs,
-    IssueKeyArgs, IssueListArgs, IssueNotificationsArgs, IssueStandupArgs, ProjectKeyArgs,
-    ProjectVersionUpdateArgs, SprintListArgs, SprintUpdateArgs,
+    ApiRequestArgs, AuthSetCredentialsArgs, BatchArgs, BulkCommentArgs, CommentDeleteArgs,
+    CommentUpdateArgs, IssueDeleteArgs, IssueKeyArgs, IssueListArgs, IssueNotificationsArgs,
+    IssueStandupArgs, ProjectKeyArgs, ProjectVersionUpdateArgs, SprintBacklogIssueArgs,
+    SprintListArgs, SprintRankIssueArgs, SprintUpdateArgs, WorklogUpdateArgs,
 };
 
 use super::shared::build_api_path;
@@ -521,4 +522,156 @@ fn truncate_chars_appends_marker_when_over_limit() {
     assert_eq!(super::shared::truncate_chars("short", 10), "short");
     let out = super::shared::truncate_chars(&"a".repeat(50), 10);
     assert_eq!(out, format!("{}…[truncated]", "a".repeat(10)));
+}
+
+#[tokio::test]
+#[serial]
+async fn comment_worklog_and_agile_mutations_reach_their_jira_endpoints() {
+    let temp_dir = TempDir::new().expect("tempdir");
+    let mock_server = MockServer::start().await;
+    set_test_env(&temp_dir, Some(&mock_server.uri()));
+
+    Mock::given(method("PUT"))
+        .and(path("/rest/api/3/issue/PROJ-1/comment/11"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "11",
+            "body": {"type": "doc", "content": []}
+        })))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/rest/api/3/issue/PROJ-1/worklog/22"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "22",
+            "timeSpent": "1h",
+            "timeSpentSeconds": 3600,
+            "started": "2026-10-10T09:00:00.000+0000",
+            "comment": "Existing"
+        })))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("DELETE"))
+        .and(path("/rest/api/3/issue/PROJ-1/comment/11"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/rest/api/3/issue/PROJ-1/worklog/22"))
+        .and(body_json(json!({
+            "timeSpent": "2h",
+            "started": "2026-10-10T09:00:00.000+0000",
+            "comment": "Existing"
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "22",
+            "timeSpent": "2h",
+            "timeSpentSeconds": 7200,
+            "started": "2026-10-11T09:00:00.000+0000"
+        })))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/rest/agile/1.0/backlog/issue"))
+        .and(body_json(json!({"issues": ["PROJ-1"]})))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/rest/agile/1.0/issue/rank"))
+        .and(body_json(json!({
+            "issues": ["PROJ-1"],
+            "rankBeforeIssue": "PROJ-2"
+        })))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&mock_server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/rest/agile/1.0/issue/rank"))
+        .and(body_json(json!({
+            "issues": ["PROJ-1"],
+            "rankAfterIssue": "PROJ-2"
+        })))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&mock_server)
+        .await;
+
+    let comment = JiraApp
+        .comment_update(CommentUpdateArgs {
+            key: "PROJ-1".into(),
+            comment_id: "11".into(),
+            body: "Updated".into(),
+        })
+        .await
+        .expect("update comment");
+    assert_eq!(comment["id"], json!("11"));
+
+    let err = JiraApp
+        .comment_delete(CommentDeleteArgs {
+            key: "PROJ-1".into(),
+            comment_id: "11".into(),
+            confirm: None,
+        })
+        .await
+        .expect_err("comment deletion requires confirmation");
+    assert_eq!(err.to_mcp().message, "unsafe_operation");
+
+    let deleted = JiraApp
+        .comment_delete(CommentDeleteArgs {
+            key: "PROJ-1".into(),
+            comment_id: "11".into(),
+            confirm: Some(true),
+        })
+        .await
+        .expect("delete comment");
+    assert_eq!(deleted["deleted"], json!(true));
+
+    let worklog = JiraApp
+        .worklog_update(WorklogUpdateArgs {
+            key: "PROJ-1".into(),
+            id: "22".into(),
+            time_spent: Some("2h".into()),
+            comment: None,
+            started: None,
+        })
+        .await
+        .expect("update worklog");
+    assert_eq!(worklog["time_spent"], json!("2h"));
+    let err = JiraApp
+        .worklog_update(WorklogUpdateArgs {
+            key: "PROJ-1".into(),
+            id: "22".into(),
+            time_spent: None,
+            comment: None,
+            started: None,
+        })
+        .await
+        .expect_err("empty worklog updates should fail");
+    assert_eq!(err.to_mcp().message, "validation_error");
+
+    let backlog = JiraApp
+        .sprint_remove_issue(SprintBacklogIssueArgs {
+            issue_key: "PROJ-1".into(),
+        })
+        .await
+        .expect("move to backlog");
+    assert_eq!(backlog["moved_to"], json!("backlog"));
+
+    JiraApp
+        .sprint_rank_issue(SprintRankIssueArgs {
+            issue_key: "PROJ-1".into(),
+            relative_issue_key: "PROJ-2".into(),
+            before: true,
+        })
+        .await
+        .expect("rank issue");
+    JiraApp
+        .sprint_rank_issue(SprintRankIssueArgs {
+            issue_key: "PROJ-1".into(),
+            relative_issue_key: "PROJ-2".into(),
+            before: false,
+        })
+        .await
+        .expect("rank issue after");
+
+    clear_test_env();
 }

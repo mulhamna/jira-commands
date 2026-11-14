@@ -6,6 +6,102 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [3.0.0](https://github.com/mulhamna/jira-commands/compare/v2.12.2...v3.0.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522))
+
+### Features
+
+* **mcp:** add jcode and zcode install targets ([#523](https://github.com/mulhamna/jira-commands/issues/523)) ([e28589f](https://github.com/mulhamna/jira-commands/commit/e28589f5065d5b71c175cb2faf4b1852389f1cc7))
+
+
+### Bug Fixes
+
+* **core:** accept Markdown consistently on API v2 ([#522](https://github.com/mulhamna/jira-commands/issues/522)) ([44f9fe7](https://github.com/mulhamna/jira-commands/commit/44f9fe7f0c4aea1512bd29c89d39455a31200894))
+* **mcp:** bump rmcp to 3.9.0 and refresh dependencies ([#530](https://github.com/mulhamna/jira-commands/issues/530)) ([a44cda0](https://github.com/mulhamna/jira-commands/commit/a44cda0a871a5d87f3754a5a6e189458d44d0aa1))
+* **mcp:** bump rmcp to 3.9.0 for RUSTSEC-2026-0462 ([bbdd264](https://github.com/mulhamna/jira-commands/commit/bbdd264ccf7796d3ae0af86f51458537b92c8ca7))
+
+## [2.12.2](https://github.com/mulhamna/jira-commands/compare/v2.12.1...v2.12.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* send plain string bodies when updating API v2 comments ([16ff9ee](https://github.com/mulhamna/jira-commands/commit/16ff9ee0686a38f4c3f63b0efcf27ce0193c7946))
+
+## [2.12.1](https://github.com/mulhamna/jira-commands/compare/v2.12.0...v2.12.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **jira-core:** gate DC identity and endpoints on deployment ([9e25578](https://github.com/mulhamna/jira-commands/commit/9e2557851ea104fee2e437f9188691f39c5fa72b))
+* **jira-core:** support Jira Server / Data Center (API v2) ([8f2aacc](https://github.com/mulhamna/jira-commands/commit/8f2aaccbe83ba0ce9a123b6c7b0917238fa14ab2))
+
+## [2.12.0](https://github.com/mulhamna/jira-commands/compare/v2.11.0...v2.12.0) (2026-10-26)
+
+
+### Features
+
+* add jirac update command for self-updating ([b72ab67](https://github.com/mulhamna/jira-commands/commit/b72ab67cdb3c8dfde891ee2b569726a5e3025aad))
+* **cli:** add jirac mcp update command ([c733c03](https://github.com/mulhamna/jira-commands/commit/c733c0345439c6fc336b6375b2dec7fc6fdf29dc))
+
+
+### Bug Fixes
+
+* **cli:** satisfy clippy needless_return in Windows update path ([a4a99e0](https://github.com/mulhamna/jira-commands/commit/a4a99e026c7f8c12581fa31f434f6a7060166c47))
+* **deps:** bump crates flagged by cargo audit ([5a87da9](https://github.com/mulhamna/jira-commands/commit/5a87da94a048d639c474afb86b1fa1d53ee752a6))
+* **version-check:** filter releases by tag prefix for update notice ([9c6ad19](https://github.com/mulhamna/jira-commands/commit/9c6ad19c14ace69fcb05b63e979fd6671c76c7dc))
+
+## [2.11.0](https://github.com/mulhamna/jira-commands/compare/v2.10.1...v2.11.0) (2026-10-11)
+
+
+### Features
+
+* complete Jira issue workflows ([f9b63ce](https://github.com/mulhamna/jira-commands/commit/f9b63ce87dea6e37bfdc939ac4de76a4a61b6e88))
+* **mcp:** update Kurir and support ARSY CODE ([4be6191](https://github.com/mulhamna/jira-commands/commit/4be61916c298405cfb65b9433de88c1cb58cb2d9))
+
+
+### Bug Fixes
+
+* **cli:** redact watcher account IDs ([88fc946](https://github.com/mulhamna/jira-commands/commit/88fc946503b75dcc6a1a0739b6004c20355fa309))
+
+## [2.10.1](https://github.com/mulhamna/jira-commands/compare/v2.10.0...v2.10.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **security:** resolve rustls advisory and update yanked chacha20 ([a5ccc61](https://github.com/mulhamna/jira-commands/commit/a5ccc612cdbbd939b8e166786479588d020784ef))
+
+## [2.10.0](https://github.com/mulhamna/jira-commands/compare/v2.9.0...v2.10.0) (2026-09-14)
+
+
+### Features
+
+* trust CA certificates from the OS trust store ([82affd7](https://github.com/mulhamna/jira-commands/commit/82affd71d546897976fb7777b3dc6c1860f2cb24))
+
+## [2.9.0](https://github.com/mulhamna/jira-commands/compare/v2.8.5...v2.9.0) (2026-09-07)
+
+
+### Features
+
+* **auth:** expose ca_bundle in the auth login/update/status flow ([2e42a4d](https://github.com/mulhamna/jira-commands/commit/2e42a4d74adacf4fb95472d868dfeb3d4aae65cb))
+* **core:** trust an internal CA bundle via ca_bundle config ([3f41eeb](https://github.com/mulhamna/jira-commands/commit/3f41eeb48371f79c7705474681ea4f615f86a35a))
+
+
+### Bug Fixes
+
+* **auth:** keep CA bundle echo off the tokened config value ([90e8d0e](https://github.com/mulhamna/jira-commands/commit/90e8d0e827421d482e2fb7d33c399148a4c76ba8))
+* **auth:** stop echoing the CA bundle path from login output ([fbb6a27](https://github.com/mulhamna/jira-commands/commit/fbb6a27054cf7cea23ce9cfbbd1bda6a890d7860))
+
+## [2.8.5](https://github.com/mulhamna/jira-commands/compare/v2.8.4...v2.8.5) (2026-09-04)
+
+
+### Bug Fixes
+
+* **auth:** skip confirmation prompt on login token entry ([6815f65](https://github.com/mulhamna/jira-commands/commit/6815f65e5e710d79a3b2d2f342c5ad639016e910))
+
 ## [2.8.4](https://github.com/mulhamna/jira-commands/compare/v2.8.3...v2.8.4) (2026-08-24)
 
 

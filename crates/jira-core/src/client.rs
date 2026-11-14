@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 use tracing::{debug, warn};
 
 use crate::{
-    adf::markdown_to_adf,
-    config::{JiraAuthType, JiraConfig},
+    adf::{adf_to_wiki, markdown_to_adf},
+    config::{JiraAuthType, JiraConfig, JiraDeployment},
     error::{JiraError, Result},
     model::{
         attachment::Attachment,
@@ -40,6 +40,11 @@ struct MyselfResponse {
     account_id: Option<String>,
     #[serde(rename = "timeZone")]
     time_zone: Option<String>,
+    /// Data Center / Server identify the current user by login name (and `key`), not accountId.
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    key: Option<String>,
 }
 
 #[derive(Clone)]
@@ -50,16 +55,59 @@ pub struct JiraClient {
 
 impl JiraClient {
     pub fn new(config: JiraConfig) -> Self {
-        let http = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_secs))
-            .build()
-            .expect("Failed to build HTTP client");
+        Self::try_new(config).expect("Failed to build HTTP client")
+    }
 
-        Self { http, config }
+    /// Build a client, failing instead of panicking when the configured
+    /// `ca_bundle` cannot be read or parsed.
+    pub fn try_new(config: JiraConfig) -> Result<Self> {
+        let mut builder = Client::builder().timeout(Duration::from_secs(config.timeout_secs));
+
+        if let Some(path) = config
+            .ca_bundle
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+        {
+            let pem = std::fs::read(path)
+                .map_err(|e| JiraError::Config(format!("failed to read CA bundle {path}: {e}")))?;
+            let certs = reqwest::Certificate::from_pem_bundle(&pem)
+                .map_err(|e| JiraError::Config(format!("invalid CA bundle {path}: {e}")))?;
+            for cert in certs {
+                builder = builder.add_root_certificate(cert);
+            }
+        }
+
+        let http = builder
+            .build()
+            .map_err(|e| JiraError::Config(format!("failed to build HTTP client: {e}")))?;
+
+        Ok(Self { http, config })
     }
 
     pub fn base_url(&self) -> &str {
         &self.config.base_url
+    }
+
+    /// Data Center / Server addresses users by login name and lacks several Cloud-only
+    /// endpoints. This depends on the deployment, not on `api_version`: Cloud also serves
+    /// API v2, and there it still uses accountId and the Cloud endpoints. `api_version` only
+    /// decides the body format (wiki markup on v2, ADF on v3).
+    fn is_data_center(&self) -> bool {
+        self.config.deployment == JiraDeployment::DataCenter
+    }
+
+    fn rich_text_body(&self, value: Value) -> Result<Value> {
+        // API v2 descriptions read back for cloning are already wiki strings or null.
+        if self.config.api_version < 3 && !value.is_string() && !value.is_null() {
+            Ok(json!(adf_to_wiki(&value, &self.config.deployment)?))
+        } else {
+            Ok(value)
+        }
+    }
+
+    fn markdown_body(&self, markdown: &str) -> Result<Value> {
+        self.rich_text_body(markdown_to_adf(markdown))
     }
 
     fn platform_url(&self, path: &str) -> String {
@@ -118,13 +166,22 @@ impl JiraClient {
             .await
     }
 
-    /// Get the current authenticated user's accountId.
+    /// Get the current authenticated user's identifier: `accountId` on Cloud, login name
+    /// (`name`, falling back to `key`) on Data Center / Server, where /myself has no accountId.
     pub async fn get_myself(&self) -> Result<String> {
         let me = self.get_myself_info().await?;
-        me.account_id.ok_or_else(|| JiraError::Api {
-            status: 0,
-            message: "Could not get accountId from /myself".into(),
-        })
+        let preferred = if self.is_data_center() {
+            me.name.clone().or_else(|| me.key.clone())
+        } else {
+            me.account_id.clone()
+        };
+        preferred
+            .or_else(|| me.account_id.clone())
+            .or_else(|| me.name.clone())
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Could not determine the current user from /myself".into(),
+            })
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.
@@ -132,19 +189,19 @@ impl JiraClient {
         Ok(self.get_myself_info().await?.time_zone)
     }
 
-    /// Resolve an assignee string to a Jira accountId.
+    /// Resolve an assignee string to the identifier used by the configured API version.
     ///
-    /// - `"me"` → current user's accountId via /myself
-    /// - contains `@` → search by email, return first match's accountId
-    /// - anything else → treated as a raw accountId and returned as-is
-    async fn resolve_assignee_account_id(&self, s: &str) -> Result<String> {
+    /// - `"me"` → the current user
+    /// - contains `@` → search by email, take the first match
+    /// - anything else → passed through as-is (accountId on Cloud, login name on DC)
+    async fn resolve_assignee_id(&self, s: &str) -> Result<String> {
         if s == "me" {
             return self.get_myself().await;
         }
         if !s.contains('@') {
             return Ok(s.to_string());
         }
-        // Resolve email → accountId via user search
+        // Resolve email → user via user search
         let users = self.search_users(s).await?;
         users
             .iter()
@@ -155,11 +212,22 @@ impl JiraClient {
                     .unwrap_or(false)
             })
             .or_else(|| users.first())
-            .map(|u| u.account_id.clone())
+            .and_then(|u| u.identifier())
             .ok_or_else(|| JiraError::Api {
                 status: 0,
                 message: format!("User not found: {s}"),
             })
+    }
+
+    /// Build the `assignee` field in the shape the configured API version expects:
+    /// `{"accountId": …}` on Cloud, `{"name": …}` on Data Center / Server.
+    async fn resolve_assignee_field(&self, s: &str) -> Result<Value> {
+        let id = self.resolve_assignee_id(s).await?;
+        if self.is_data_center() {
+            Ok(json!({ "name": id }))
+        } else {
+            Ok(json!({ "accountId": id }))
+        }
     }
 
     /// Send a request, retrying on HTTP 429 according to the `Retry-After` header.
@@ -271,15 +339,36 @@ impl JiraClient {
         fields: &[&str],
     ) -> Result<SearchResult> {
         let headers = self.auth_headers()?;
-        let url = self.platform_url("/search/jql");
+        let max = max_results.unwrap_or(50);
+
+        // Jira Cloud (API v3) has the cursor-based /search/jql endpoint; Data Center / Server
+        // (API v2) only has /search with offset pagination. Cursor tokens are not portable
+        // between the two, so on v2 the "token" is the next startAt offset.
+        let legacy = self.is_data_center();
+        let start_at = if legacy {
+            next_page_token
+                .and_then(|t| t.strip_prefix("offset:"))
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        let url = if legacy {
+            self.platform_url("/search")
+        } else {
+            self.platform_url("/search/jql")
+        };
 
         let mut body = json!({
             "jql": jql,
-            "maxResults": max_results.unwrap_or(50),
+            "maxResults": max,
             "fields": fields,
         });
 
-        if let Some(token) = next_page_token {
+        if legacy {
+            body["startAt"] = json!(start_at);
+        } else if let Some(token) = next_page_token {
             body["nextPageToken"] = json!(token);
         }
 
@@ -290,9 +379,25 @@ impl JiraClient {
             .request(|| http.post(&url).headers(headers.clone()).json(&body))
             .await?;
 
+        let page_len = raw.issues.len() as u32;
+        let next_page_token = if legacy {
+            let next_offset = start_at + page_len;
+            let has_more = match raw.total {
+                Some(total) => page_len > 0 && u64::from(next_offset) < total,
+                None => page_len >= max,
+            };
+            if has_more {
+                Some(format!("offset:{next_offset}"))
+            } else {
+                None
+            }
+        } else {
+            raw.next_page_token
+        };
+
         Ok(SearchResult {
             issues: raw.issues.into_iter().map(|r| r.into_issue()).collect(),
-            next_page_token: raw.next_page_token,
+            next_page_token,
             total: raw.total,
         })
     }
@@ -365,21 +470,18 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/issue");
 
-        let description_adf = req.description.as_deref().map(markdown_to_adf);
-
         let mut fields = json!({
             "project": { "key": req.project_key },
             "summary": req.summary,
             "issuetype": { "name": req.issue_type }
         });
 
-        if let Some(adf) = description_adf {
-            fields["description"] = adf;
+        if let Some(description) = &req.description {
+            fields["description"] = self.markdown_body(description)?;
         }
 
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
 
         if let Some(priority) = &req.priority {
@@ -413,13 +515,12 @@ impl JiraClient {
             fields["summary"] = json!(summary);
         }
         if let Some(adf) = &req.description_adf {
-            fields["description"] = adf.clone();
+            fields["description"] = self.rich_text_body(adf.clone())?;
         } else if let Some(description) = &req.description {
-            fields["description"] = markdown_to_adf(description);
+            fields["description"] = self.markdown_body(description)?;
         }
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
@@ -547,11 +648,18 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{key}/watchers"));
 
+        // Cloud removes by accountId, Data Center / Server by login name.
+        let param = if self.is_data_center() {
+            "username"
+        } else {
+            "accountId"
+        };
+
         let http = &self.http;
         self.request_no_body(|| {
             http.delete(&url)
                 .headers(headers.clone())
-                .query(&[("accountId", account_id)])
+                .query(&[(param, account_id)])
         })
         .await
     }
@@ -720,11 +828,19 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url("/user/search");
 
+        // Cloud matches on `query`; Data Center / Server only understand `username`
+        // (`query=` there is a 400).
+        let param = if self.is_data_center() {
+            "username"
+        } else {
+            "query"
+        };
+
         let http = &self.http;
         self.request(|| {
             http.get(&url)
                 .headers(headers.clone())
-                .query(&[("query", query), ("maxResults", "20")])
+                .query(&[(param, query), ("maxResults", "20")])
         })
         .await
     }
@@ -1158,11 +1274,37 @@ impl JiraClient {
         Ok(())
     }
 
+    /// Move an issue from a sprint back to its board backlog.
+    pub async fn move_issue_to_backlog(&self, issue_key: &str) -> Result<()> {
+        let body = json!({ "issues": [issue_key] });
+        self.raw_request("POST", "/rest/agile/1.0/backlog/issue", Some(body))
+            .await?;
+        Ok(())
+    }
+
+    /// Rank an issue immediately before or after another issue on its board.
+    pub async fn rank_issue(
+        &self,
+        issue_key: &str,
+        relative_issue_key: &str,
+        before: bool,
+    ) -> Result<()> {
+        let mut body = json!({ "issues": [issue_key] });
+        body[if before {
+            "rankBeforeIssue"
+        } else {
+            "rankAfterIssue"
+        }] = json!(relative_issue_key);
+        self.raw_request("PUT", "/rest/agile/1.0/issue/rank", Some(body))
+            .await?;
+        Ok(())
+    }
+
     /// Add a comment using pre-built ADF JSON (skips Markdown conversion).
     pub async fn add_comment_adf(&self, issue_key: &str, adf: Value) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
-        let payload = json!({ "body": adf });
+        let payload = json!({ "body": self.rich_text_body(adf)? });
         let http = &self.http;
         let raw: Value = self
             .request(|| http.post(&url).headers(headers.clone()).json(&payload))
@@ -1258,11 +1400,10 @@ impl JiraClient {
         });
 
         if let Some(adf) = description_adf {
-            fields["description"] = adf;
+            fields["description"] = self.rich_text_body(adf)?;
         }
         if let Some(assignee) = &req.assignee {
-            let account_id = self.resolve_assignee_account_id(assignee).await?;
-            fields["assignee"] = json!({ "accountId": account_id });
+            fields["assignee"] = self.resolve_assignee_field(assignee).await?;
         }
         if let Some(priority) = &req.priority {
             fields["priority"] = json!({ "name": priority });
@@ -1361,9 +1502,7 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
 
-        let payload = json!({
-            "body": markdown_to_adf(body)
-        });
+        let payload = json!({ "body": self.markdown_body(body)? });
 
         let http = &self.http;
         let raw: Value = self
@@ -1373,6 +1512,27 @@ impl JiraClient {
         Comment::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
             status: 0,
             message: "Failed to parse comment".into(),
+        })
+    }
+
+    /// Update a comment using Markdown, encoded as wiki markup on API v2 or ADF on API v3.
+    pub async fn update_comment(
+        &self,
+        issue_key: &str,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<Comment> {
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
+        let payload = json!({ "body": self.markdown_body(body)? });
+        let http = &self.http;
+        let raw: Value = self
+            .request(|| http.put(&url).headers(headers.clone()).json(&payload))
+            .await?;
+
+        Comment::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse updated comment".into(),
         })
     }
 
@@ -1424,7 +1584,7 @@ impl JiraClient {
         });
 
         if let Some(c) = comment {
-            body["comment"] = markdown_to_adf(c);
+            body["comment"] = self.markdown_body(c)?;
         }
 
         let http = &self.http;
@@ -1435,6 +1595,69 @@ impl JiraClient {
         Worklog::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
             status: 0,
             message: "Failed to parse worklog".into(),
+        })
+    }
+
+    /// Update a worklog entry. Omitted fields retain their existing Jira values.
+    pub async fn update_worklog(
+        &self,
+        issue_key: &str,
+        worklog_id: &str,
+        time_spent: Option<&str>,
+        comment: Option<&str>,
+        started: Option<&str>,
+    ) -> Result<Worklog> {
+        if time_spent.is_none() && comment.is_none() && started.is_none() {
+            return Err(JiraError::Api {
+                status: 0,
+                message: "At least one worklog field must be provided".into(),
+            });
+        }
+        let headers = self.auth_headers()?;
+        let url = self.platform_url(&format!("/issue/{issue_key}/worklog/{worklog_id}"));
+        let http = &self.http;
+        let existing: Value = self
+            .request(|| http.get(&url).headers(headers.clone()))
+            .await?;
+        let time_spent = time_spent
+            .map(str::to_owned)
+            .or_else(|| {
+                existing
+                    .get("timeSpent")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Existing worklog response is missing timeSpent".into(),
+            })?;
+        let started = started
+            .map(str::to_owned)
+            .or_else(|| {
+                existing
+                    .get("started")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .ok_or_else(|| JiraError::Api {
+                status: 0,
+                message: "Existing worklog response is missing started".into(),
+            })?;
+        let mut body = json!({
+            "timeSpent": time_spent,
+            "started": started,
+        });
+        if let Some(comment) = comment {
+            body["comment"] = self.markdown_body(comment)?;
+        } else if let Some(existing_comment) = existing.get("comment") {
+            body["comment"] = existing_comment.clone();
+        }
+        let raw: Value = self
+            .request(|| http.put(&url).headers(headers.clone()).json(&body))
+            .await?;
+        Worklog::from_value(&raw, issue_key).ok_or_else(|| JiraError::Api {
+            status: 0,
+            message: "Failed to parse updated worklog".into(),
         })
     }
 
@@ -1491,7 +1714,26 @@ impl JiraClient {
         attachment_id: &str,
     ) -> Result<(String, Vec<u8>, String)> {
         let headers = self.auth_headers_no_content_type()?;
-        let url = self.platform_url(&format!("/attachment/content/{attachment_id}"));
+        // Cloud serves attachments from /attachment/content/{id}; on Data Center / Server that
+        // path is not routed (404 "null for uri") — the download URL comes from the attachment
+        // metadata instead (`/secure/attachment/{id}/{filename}`).
+        let url = if self.is_data_center() {
+            let meta_headers = self.auth_headers()?;
+            let meta_url = self.platform_url(&format!("/attachment/{attachment_id}"));
+            let http = &self.http;
+            let meta: Value = self
+                .request(|| http.get(&meta_url).headers(meta_headers.clone()))
+                .await?;
+            meta.get("content")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .ok_or_else(|| JiraError::Api {
+                    status: 0,
+                    message: format!("Attachment {attachment_id} has no content URL"),
+                })?
+        } else {
+            self.platform_url(&format!("/attachment/content/{attachment_id}"))
+        };
 
         let http = &self.http;
         let response = self
@@ -1668,6 +1910,17 @@ impl JiraClient {
             }
         });
 
+        // Cloud-only endpoint: on Jira Server / Data Center /bulk/issues/move is not routed,
+        // so explain that instead of failing with a bare 404.
+        if self.is_data_center() {
+            return Err(JiraError::Api {
+                status: 0,
+                message: "Bulk issue move is not available on Jira Server / Data Center \
+                          (/bulk/issues/move exists only in Cloud) — move issues one by one"
+                    .into(),
+            });
+        }
+
         let bulk_move_path = self.platform_path("/bulk/issues/move");
         let submitted = self
             .raw_request("POST", &bulk_move_path, Some(body))
@@ -1783,6 +2036,10 @@ impl JiraClient {
 
     /// Check if this Jira instance is Premium tier.
     pub async fn is_premium(&self) -> bool {
+        // Data Center / Server has no Plans API at all, so there is nothing to probe.
+        if self.is_data_center() {
+            return false;
+        }
         match self.get_server_info().await {
             Ok(info) => {
                 let license = info
@@ -1809,6 +2066,16 @@ impl JiraClient {
 
     /// List Jira Plans (requires Jira Premium / Advanced Roadmaps).
     pub async fn get_plans(&self) -> Result<Vec<Value>> {
+        // Plans API (Advanced Roadmaps) exists only on Jira Cloud Premium; on Data Center /
+        // Server the path is not routed, so fail with an explanation instead of a bare 404.
+        if self.is_data_center() {
+            return Err(JiraError::Api {
+                status: 0,
+                message:
+                    "Plans API is not available on Jira Server / Data Center (Cloud Premium only)"
+                        .into(),
+            });
+        }
         let headers = self.auth_headers()?;
         let url = self.platform_url("/plans/plan");
 
@@ -1868,7 +2135,7 @@ impl JiraClient {
 
         if let Some(c) = comment {
             payload["comment"] = json!({
-                "body": crate::adf::markdown_to_adf(c)
+                "body": self.markdown_body(c)?
             });
         }
 
@@ -2044,7 +2311,7 @@ mod tests {
         model::FieldValue,
     };
     use wiremock::{
-        matchers::{body_json, header, method, path, query_param},
+        matchers::{body_json, body_partial_json, header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -2060,11 +2327,79 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         })
     }
 
     fn cloud_auth() -> String {
         format!("Basic {}", base64_encode("dev@example.com:cloud-token"))
+    }
+
+    const TEST_CA_PEM: &str = "-----BEGIN CERTIFICATE-----\n\
+MIICrDCCAZQCCQDtfJ8RzzHprDANBgkqhkiG9w0BAQsFADAYMRYwFAYDVQQDDA1q\n\
+aXJhYy10ZXN0LWNhMB4XDTI2MDkwNzAzMTU0NFoXDTM2MDkwNDAzMTU0NFowGDEW\n\
+MBQGA1UEAwwNamlyYWMtdGVzdC1jYTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC\n\
+AQoCggEBAMHZlL6Nsf9/gpb1aWl+nKkPxKZX9GQ3rBAPeRG9nhR8p+L4/+tXMJNj\n\
++HkLnz131t3CHMIjvazf4D3yBK6ELma7K+B3FRPvScM/IfAQiMk8lFJqUho9wZ5S\n\
+cWNLo3q4qmjApd2RwP9xyAVleOBNMm2DVuY5DKBIaWhlQ0f22S+9mndQRspKk61S\n\
+B1yBdOK0YbDmBmFPJ7IA01C8vWgrmyHklBiDQQaRlFqzf4ifyRQGFqK7ZpKDi9ri\n\
+Ck00M9c7ODDZM9ntRvXZGea8FSwc5T2i7nGmKYbJXnnmYgiZMgZLHLmJFGx/a7hE\n\
+mqWc7MAoD40ND94A2Rv/AL1NSqcuVUMCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEA\n\
+IX84vljbBzQkV/72p/a9GY34O6vjho9PfFg7v9kx0SUHjBKv7F6TGYxLOsMB7gDY\n\
+q4uONXLYnBYrRaslzfR9eFUwzwbNHE68xpE/8yatxANNqy2knChL64MwDzhL3gwv\n\
+yJSx5shgkCSQXhJpQGrfM/0dUgN8eJWyD183a1s7A77RyumEhFFF6C0JiyNsLEeQ\n\
+X4PL+4NsA69XN9MjJtyigJQ5JOFseNpLXlAkJ5DuNWudk8OhkQghl29+bO8otQ8t\n\
+g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
+/PFUwVFH7iRhosZhgYwcOw==\n\
+-----END CERTIFICATE-----\n";
+
+    fn ca_config(ca_bundle: Option<String>) -> JiraConfig {
+        JiraConfig {
+            ca_bundle,
+            ..JiraConfig::default()
+        }
+    }
+
+    #[test]
+    fn try_new_trusts_a_valid_ca_bundle() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pem_path = dir.path().join("ca.pem");
+        std::fs::write(&pem_path, TEST_CA_PEM).expect("write pem");
+
+        JiraClient::try_new(ca_config(Some(pem_path.to_string_lossy().into_owned())))
+            .expect("client builds with a valid CA bundle");
+    }
+
+    #[test]
+    fn try_new_errors_on_missing_ca_bundle_file() {
+        let Err(err) = JiraClient::try_new(ca_config(Some("/no/such/ca.pem".into()))) else {
+            panic!("missing CA bundle must fail");
+        };
+        assert!(err.to_string().contains("failed to read CA bundle"));
+    }
+
+    #[test]
+    fn try_new_errors_on_invalid_ca_bundle() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pem_path = dir.path().join("bad.pem");
+        std::fs::write(
+            &pem_path,
+            b"-----BEGIN CERTIFICATE-----\nnot-valid-base64!!!\n-----END CERTIFICATE-----\n",
+        )
+        .expect("write");
+
+        let Err(err) =
+            JiraClient::try_new(ca_config(Some(pem_path.to_string_lossy().into_owned())))
+        else {
+            panic!("invalid CA bundle must fail");
+        };
+        assert!(err.to_string().contains("invalid CA bundle"));
+    }
+
+    #[test]
+    fn try_new_ignores_blank_ca_bundle() {
+        JiraClient::try_new(ca_config(Some("   ".into()))).expect("blank CA bundle is a no-op");
+        JiraClient::try_new(ca_config(None)).expect("no CA bundle is fine");
     }
 
     #[tokio::test]
@@ -2092,6 +2427,7 @@ mod tests {
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2162,6 +2498,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2199,6 +2536,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let fields = client
@@ -2251,6 +2589,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let fields = client
@@ -2314,7 +2653,7 @@ mod tests {
             .expect("search should parse");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].account_id.as_deref(), Some("acct-1"));
         assert_eq!(users[0].display_name.as_deref(), Some("Alice Example"));
         assert!(users[0].email_address.is_none());
     }
@@ -3166,7 +3505,7 @@ mod tests {
             .expect("request should retry and succeed");
 
         assert_eq!(users.len(), 1);
-        assert_eq!(users[0].account_id, "acct-1");
+        assert_eq!(users[0].account_id.as_deref(), Some("acct-1"));
     }
 
     #[tokio::test]
@@ -3289,40 +3628,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn move_issue_uses_configured_api_version_for_data_center() {
+    async fn move_issue_reports_unavailable_bulk_move_on_data_center() {
         let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/rest/api/2/bulk/issues/move"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "taskId": "task-dc" })))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("GET"))
-            .and(path("/rest/api/2/bulk/queue/task-dc"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "COMPLETE" })))
-            .mount(&server)
-            .await;
-
-        Mock::given(method("GET"))
-            .and(path("/rest/api/2/issue/DC-1"))
-            .and(header("authorization", "Bearer dc-token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "id": "20001",
-                "key": "DC-1",
-                "fields": {
-                    "summary": "Moved issue",
-                    "status": { "name": "Done" },
-                    "issuetype": { "name": "Task" },
-                    "project": { "key": "OPS" },
-                    "created": "2023-01-01T00:00:00.000+0000",
-                    "updated": "2023-01-01T00:00:00.000+0000"
-                }
-            })))
-            .mount(&server)
-            .await;
 
         let client = JiraClient::new(JiraConfig {
             profile_name: Some("dc-main".into()),
@@ -3335,15 +3642,627 @@ mod tests {
             auth_type: JiraAuthType::DataCenterPat,
             api_version: 2,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
-        let issue = client
+        // Jira Server / Data Center does not route /bulk/issues/move at all, so the client must
+        // explain that instead of firing a request and surfacing a bare 404.
+        let error = client
             .move_issue("DC-1", "OPS", "10002", None)
             .await
-            .expect("data center move should use api v2");
+            .expect_err("bulk move is Cloud-only");
+        assert!(
+            error
+                .to_string()
+                .contains("not available on Jira Server / Data Center"),
+            "unexpected message: {error}"
+        );
+        let requests = server.received_requests().await.unwrap_or_default();
+        assert!(
+            requests.is_empty(),
+            "no HTTP request should be sent on Data Center, got {requests:?}"
+        );
+    }
 
-        assert_eq!(issue.key, "DC-1");
-        assert_eq!(issue.project_key, "OPS");
+    fn dc_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            profile_name: Some("dc-main".into()),
+            base_url: server.uri(),
+            email: String::new(),
+            token: Some("dc-token".into()),
+            project: None,
+            timeout_secs: 30,
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+            default_issue_limit: None,
+            ca_bundle: None,
+        })
+    }
+
+    fn search_issue_json(key: &str) -> Value {
+        json!({
+            "id": "20001",
+            "key": key,
+            "fields": {
+                "summary": "Issue",
+                "status": { "name": "Open" },
+                "issuetype": { "name": "Task" },
+                "project": { "key": "DC" },
+                "created": "2023-01-01T00:00:00.000+0000",
+                "updated": "2023-01-01T00:00:00.000+0000"
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn search_issues_uses_offset_pagination_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search"))
+            .and(body_partial_json(json!({ "startAt": 0, "maxResults": 2 })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [search_issue_json("DC-1"), search_issue_json("DC-2")],
+                "total": 3
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search"))
+            .and(body_partial_json(json!({ "startAt": 2, "maxResults": 2 })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [search_issue_json("DC-3")],
+                "total": 3
+            })))
+            .mount(&server)
+            .await;
+
+        let client = dc_client(&server);
+        let first = client
+            .search_issues("project = DC", None, Some(2))
+            .await
+            .expect("first page");
+        assert_eq!(first.issues.len(), 2);
+        assert_eq!(first.next_page_token.as_deref(), Some("offset:2"));
+
+        let last = client
+            .search_issues("project = DC", first.next_page_token.as_deref(), Some(2))
+            .await
+            .expect("last page");
+        assert_eq!(last.issues[0].key, "DC-3");
+        assert!(last.next_page_token.is_none());
+    }
+
+    #[tokio::test]
+    async fn add_comment_sends_wiki_body_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue/DC-1/comment"))
+            .and(body_json(json!({ "body": "hello *world*" })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "100",
+                "body": "hello *world*"
+            })))
+            .mount(&server)
+            .await;
+
+        let comment = dc_client(&server)
+            .add_comment("DC-1", "hello **world**")
+            .await
+            .expect("comment should be created");
+        assert_eq!(comment.body.as_deref(), Some("hello *world*"));
+    }
+
+    #[tokio::test]
+    async fn update_comment_sends_wiki_body_on_data_center() {
+        let server = MockServer::start().await;
+        let body = "## Updated\n\n**Привет**\n\n```javascript\nconst value = `hello`;\n\nconsole.log(value);\n```\n";
+        let wiki = "h2. Updated\n\n*Привет*\n\n{code:javascript}\nconst value = `hello`;\n\nconsole.log(value);\n{code}";
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1/comment/100"))
+            .and(body_json(json!({ "body": wiki })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "100",
+                "body": wiki
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let comment = dc_client(&server)
+            .update_comment("DC-1", "100", body)
+            .await
+            .expect("comment should be updated");
+        assert_eq!(comment.id, "100");
+        assert_eq!(comment.body.as_deref(), Some(wiki));
+    }
+
+    #[tokio::test]
+    async fn update_comment_sends_adf_body_on_cloud() {
+        let server = MockServer::start().await;
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    { "type": "text", "text": "hello " },
+                    { "type": "text", "text": "world", "marks": [{ "type": "strong" }] }
+                ]
+            }]
+        });
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/3/issue/TEST-1/comment/100"))
+            .and(body_json(json!({ "body": adf })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "100",
+                "body": adf
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let comment = cloud_client(&server)
+            .update_comment("TEST-1", "100", "hello **world**")
+            .await
+            .expect("comment should be updated");
+        assert_eq!(comment.id, "100");
+        assert_eq!(comment.body.as_deref(), Some("hello world"));
+    }
+
+    #[tokio::test]
+    async fn rich_text_descriptions_use_wiki_on_v2_and_adf_on_v3() {
+        let markdown = "**Bold** and [Example](https://example.com)";
+        let adf = markdown_to_adf(markdown);
+        for api_version in [2, 3] {
+            let server = MockServer::start().await;
+            let client = if api_version == 2 {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            let expected = if api_version == 2 {
+                json!("*Bold* and [Example|https://example.com]")
+            } else {
+                adf.clone()
+            };
+            let issue_path = format!("/rest/api/{api_version}/issue/TEST-1");
+            Mock::given(method("PUT"))
+                .and(path(&issue_path))
+                .and(body_json(json!({ "fields": { "description": expected } })))
+                .respond_with(ResponseTemplate::new(204))
+                .expect(2)
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .and(path(format!("/rest/api/{api_version}/issue")))
+                .and(body_partial_json(
+                    json!({ "fields": { "description": expected } }),
+                ))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "TEST-1" })))
+                .expect(2)
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path(&issue_path))
+                .respond_with(ResponseTemplate::new(200).set_body_json(search_issue_json("TEST-1")))
+                .mount(&server)
+                .await;
+
+            for use_adf in [false, true] {
+                let description_adf = use_adf.then(|| adf.clone());
+                client
+                    .update_issue(
+                        "TEST-1",
+                        UpdateIssueRequest {
+                            description: Some(markdown.into()),
+                            description_adf: description_adf.clone(),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .expect("update description");
+                client
+                    .create_issue_v2(CreateIssueRequestV2 {
+                        project_key: "TEST".into(),
+                        summary: "Rich description".into(),
+                        issue_type: "Task".into(),
+                        description: Some(markdown.into()),
+                        description_adf,
+                        ..Default::default()
+                    })
+                    .await
+                    .expect("create description");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_clone_preserves_existing_wiki_or_empty_description() {
+        let wiki =
+            "h1. Existing\n\n*Bold* [Example|https://example.com]\n\n{code}\nx = 1;\n{code}\n";
+        for description in [json!(wiki), Value::Null] {
+            let server = MockServer::start().await;
+            for key in ["DC-1", "DC-2"] {
+                let mut issue = search_issue_json(key);
+                issue["fields"]["description"] = description.clone();
+                Mock::given(method("GET"))
+                    .and(path(format!("/rest/api/2/issue/{key}")))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(issue))
+                    .expect(1)
+                    .mount(&server)
+                    .await;
+            }
+            Mock::given(method("POST"))
+                .and(path("/rest/api/2/issue"))
+                .and(body_json(json!({
+                    "fields": {
+                        "project": { "key": "DC" },
+                        "summary": "Issue",
+                        "issuetype": { "name": "Task" },
+                        "description": description
+                    }
+                })))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "DC-2" })))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            let client = dc_client(&server);
+            let source = client.get_issue("DC-1").await.expect("source issue");
+            let clone = client
+                .create_issue_v2(CreateIssueRequestV2 {
+                    project_key: source.project_key,
+                    summary: source.summary,
+                    issue_type: source.issue_type,
+                    description_adf: source.description,
+                    ..Default::default()
+                })
+                .await
+                .expect("clone must preserve the API v2 description without conversion");
+            assert_eq!(clone.description, Some(description));
+        }
+    }
+
+    #[tokio::test]
+    async fn rich_text_comments_and_worklogs_use_matching_wire_formats() {
+        let markdown = "**Bold** and [Example](https://example.com)";
+        let adf = markdown_to_adf(markdown);
+        let started = "2026-10-30T09:00:00.000+0000";
+        for api_version in [2, 3] {
+            let server = MockServer::start().await;
+            let client = if api_version == 2 {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            let expected = if api_version == 2 {
+                json!("*Bold* and [Example|https://example.com]")
+            } else {
+                adf.clone()
+            };
+            let base = format!("/rest/api/{api_version}");
+            for (method_name, suffix, times) in [("POST", "comment", 2), ("PUT", "comment/100", 1)]
+            {
+                Mock::given(method(method_name))
+                    .and(path(format!("{base}/issue/TEST-1/{suffix}")))
+                    .and(body_json(json!({ "body": expected })))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                        "id": "100", "body": expected
+                    })))
+                    .expect(times)
+                    .mount(&server)
+                    .await;
+            }
+            for (method_name, suffix) in [("POST", "worklog"), ("PUT", "worklog/200")] {
+                Mock::given(method(method_name))
+                    .and(path(format!("{base}/issue/TEST-1/{suffix}")))
+                    .and(body_json(json!({
+                        "timeSpent": "1h", "started": started, "comment": expected
+                    })))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                        "id": "200", "timeSpent": "1h", "started": started, "comment": expected
+                    })))
+                    .expect(1)
+                    .mount(&server)
+                    .await;
+            }
+            Mock::given(method("GET"))
+                .and(path(format!("{base}/issue/TEST-1/worklog/200")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "id": "200", "timeSpent": "1h", "started": started, "comment": expected
+                })))
+                .mount(&server)
+                .await;
+            Mock::given(method("POST"))
+                .and(path(format!("{base}/issueLink")))
+                .and(body_partial_json(
+                    json!({ "comment": { "body": expected } }),
+                ))
+                .respond_with(ResponseTemplate::new(201))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            client
+                .add_comment("TEST-1", markdown)
+                .await
+                .expect("add comment");
+            client
+                .add_comment_adf("TEST-1", adf.clone())
+                .await
+                .expect("add ADF comment");
+            client
+                .update_comment("TEST-1", "100", markdown)
+                .await
+                .expect("update comment");
+            client
+                .add_worklog("TEST-1", "1h", Some(markdown), Some(started))
+                .await
+                .expect("add worklog");
+            client
+                .update_worklog("TEST-1", "200", None, Some(markdown), None)
+                .await
+                .expect("update worklog");
+            client
+                .link_issues("TEST-1", "TEST-2", "Blocks", Some(markdown))
+                .await
+                .expect("link comment");
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_worklog_update_keeps_existing_wiki_when_comment_is_omitted() {
+        let server = MockServer::start().await;
+        let started = "2026-10-30T09:00:00.000+0000";
+        let wiki = "h1. Existing\n\n*Bold* [Example|https://example.com]";
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-1/worklog/200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "200", "timeSpent": "1h", "started": started, "comment": wiki
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1/worklog/200"))
+            .and(body_json(
+                json!({ "timeSpent": "2h", "started": started, "comment": wiki }),
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "200" })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        dc_client(&server)
+            .update_worklog("DC-1", "200", Some("2h"), None, None)
+            .await
+            .expect("existing wiki must not be reinterpreted as Markdown");
+    }
+
+    #[tokio::test]
+    async fn tui_mentions_use_deployment_specific_wiki_or_cloud_adf() {
+        for (deployment, api_version, identifier, expected_wiki) in [
+            (
+                JiraDeployment::DataCenter,
+                2,
+                "fixture.user",
+                "Hello [~fixture.user]",
+            ),
+            (
+                JiraDeployment::Cloud,
+                2,
+                "account:fixture",
+                "Hello [~accountid:account:fixture]",
+            ),
+            (JiraDeployment::Cloud, 3, "account:fixture", ""),
+        ] {
+            let server = MockServer::start().await;
+            let mut client = if deployment == JiraDeployment::DataCenter {
+                dc_client(&server)
+            } else {
+                cloud_client(&server)
+            };
+            client.config.api_version = api_version;
+            let mut adf = markdown_to_adf("Hello @Fixture User");
+            crate::adf::inject_mentions(&mut adf, &[("Fixture User".into(), identifier.into())]);
+            let expected = if api_version == 3 {
+                adf.clone()
+            } else {
+                json!(expected_wiki)
+            };
+            Mock::given(method("POST"))
+                .and(path(format!(
+                    "/rest/api/{api_version}/issue/TEST-1/comment"
+                )))
+                .and(body_json(json!({ "body": expected })))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                    "id": "100", "body": expected
+                })))
+                .expect(1)
+                .mount(&server)
+                .await;
+
+            client
+                .add_comment_adf("TEST-1", adf)
+                .await
+                .expect("TUI comment with a picked mention");
+        }
+    }
+
+    #[tokio::test]
+    async fn data_center_unsupported_adf_is_flattened_before_writing() {
+        let server = MockServer::start().await;
+        let adf = json!({
+            "type": "doc", "content": [{ "type": "inlineCard", "attrs": { "url": "https://example.com" } }]
+        });
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(body_json(
+                json!({"fields": {"description": "https&#58;//example.com"}}),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue/DC-1/comment"))
+            .and(body_json(json!({"body": "https&#58;//example.com"})))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "1", "body": "https&#58;//example.com"
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let client = dc_client(&server);
+        client
+            .update_issue(
+                "DC-1",
+                UpdateIssueRequest {
+                    description_adf: Some(adf.clone()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("unsupported description is flattened");
+        client
+            .add_comment_adf("DC-1", adf)
+            .await
+            .expect("unsupported comment is flattened");
+    }
+
+    #[tokio::test]
+    async fn update_issue_sends_assignee_name_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-1"))
+            .and(body_json(
+                json!({ "fields": { "assignee": { "name": "jdoe" } } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        dc_client(&server)
+            .update_issue(
+                "DC-1",
+                UpdateIssueRequest {
+                    assignee: Some("jdoe".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("update should succeed");
+    }
+
+    #[tokio::test]
+    async fn search_users_uses_username_param_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/user/search"))
+            .and(query_param("username", "jdoe"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                { "name": "jdoe", "key": "JIRAUSER100", "displayName": "John Doe" }
+            ])))
+            .mount(&server)
+            .await;
+
+        let users = dc_client(&server)
+            .search_users("jdoe")
+            .await
+            .expect("search should parse");
+        assert!(users[0].account_id.is_none());
+        assert_eq!(users[0].identifier().as_deref(), Some("jdoe"));
+    }
+
+    #[tokio::test]
+    async fn get_myself_returns_login_name_on_data_center() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/myself"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "name": "jdoe",
+                "key": "JIRAUSER100",
+                "displayName": "John Doe"
+            })))
+            .mount(&server)
+            .await;
+
+        let me = dc_client(&server).get_myself().await.expect("myself");
+        assert_eq!(me, "jdoe");
+    }
+
+    #[tokio::test]
+    async fn download_attachment_uses_metadata_content_url_on_data_center() {
+        let server = MockServer::start().await;
+        let content_url = format!("{}/secure/attachment/10/report.txt", server.uri());
+
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/attachment/10"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({ "content": content_url })),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/secure/attachment/10/report.txt"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"data".to_vec()))
+            .mount(&server)
+            .await;
+
+        let (filename, bytes, _) = dc_client(&server)
+            .download_attachment("10")
+            .await
+            .expect("download should follow metadata URL");
+        assert_eq!(filename, "report.txt");
+        assert_eq!(bytes, b"data");
+    }
+
+    #[tokio::test]
+    async fn cloud_on_api_v2_keeps_account_id_and_search_jql() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/TEST-1"))
+            .and(body_json(
+                json!({ "fields": { "assignee": { "accountId": "acct-1" } } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/search/jql"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "issues": [] })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let mut config = cloud_client(&server).config.clone();
+        config.api_version = 2;
+        let client = JiraClient::new(config);
+
+        client
+            .update_issue(
+                "TEST-1",
+                UpdateIssueRequest {
+                    assignee: Some("acct-1".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("cloud v2 update");
+        client
+            .search_issues("project = TEST", None, None)
+            .await
+            .expect("cloud v2 search");
     }
 
     #[tokio::test]
@@ -3387,6 +4306,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         // Test list
@@ -3456,6 +4376,7 @@ mod tests {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: 3,
             default_issue_limit: None,
+            ca_bundle: None,
         });
 
         let issue = client.get_issue("TEST-1").await.expect("get issue");

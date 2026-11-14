@@ -32,7 +32,7 @@ impl JiraApp {
             ));
         }
 
-        Ok(JiraClient::new(config))
+        JiraClient::try_new(config).map_err(Into::into)
     }
 
     /// Resolve the effective limit for a list-like call.

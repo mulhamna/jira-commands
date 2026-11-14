@@ -63,6 +63,10 @@ pub struct JiraConfig {
     /// commands when no explicit `--limit` is given. `None` means "fetch all".
     #[serde(default)]
     pub default_issue_limit: Option<u32>,
+    /// Optional path to a PEM file with extra CA certificate(s) to trust when
+    /// talking to a self-hosted Jira presenting a cert from an internal CA.
+    #[serde(default)]
+    pub ca_bundle: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +87,9 @@ pub struct JiraProfileConfig {
     /// commands when no explicit `--limit` is given. `None` means "fetch all".
     #[serde(default)]
     pub default_issue_limit: Option<u32>,
+    /// Optional path to a PEM file with extra CA certificate(s) to trust.
+    #[serde(default)]
+    pub ca_bundle: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -118,6 +125,7 @@ impl Default for JiraConfig {
             auth_type: JiraAuthType::CloudApiToken,
             api_version: default_api_version(),
             default_issue_limit: None,
+            ca_bundle: None,
         }
     }
 }
@@ -142,6 +150,7 @@ impl From<JiraProfileConfig> for JiraConfig {
             auth_type: value.auth_type,
             api_version,
             default_issue_limit: value.default_issue_limit,
+            ca_bundle: value.ca_bundle,
         }
     }
 }
@@ -188,6 +197,7 @@ impl JiraConfig {
             auth_type: self.auth_type,
             api_version,
             default_issue_limit: self.default_issue_limit,
+            ca_bundle: self.ca_bundle,
         }
     }
 
@@ -250,7 +260,8 @@ impl JiraConfig {
     ///   3. Built-in defaults
     ///
     /// Env vars always win because this runs *after* the file has been parsed
-    /// into `self`. Empty `JIRA_PROJECT` is treated as "unset" (clears project).
+    /// into `self`. Empty `JIRA_PROJECT` / `JIRA_CA_BUNDLE` is treated as
+    /// "unset" (clears the value).
     fn apply_env_overrides(&mut self) {
         if let Ok(url) = env::var("JIRA_URL") {
             self.base_url = url;
@@ -287,6 +298,13 @@ impl JiraConfig {
             if let Ok(value) = api_version.parse::<u8>() {
                 self.api_version = value;
             }
+        }
+        if let Ok(ca_bundle) = env::var("JIRA_CA_BUNDLE") {
+            self.ca_bundle = if ca_bundle.trim().is_empty() {
+                None
+            } else {
+                Some(ca_bundle)
+            };
         }
         // Reset-to-default semantics: `JIRA_ISSUE_LIMIT` overrides the file
         // value. `JIRA_ISSUE_LIMIT=0` is treated as "unset" (fetch all).
@@ -344,6 +362,7 @@ impl JiraProfilesFile {
                 auth_type: JiraAuthType::CloudApiToken,
                 api_version: default_api_version(),
                 default_issue_limit: None,
+                ca_bundle: None,
             },
         );
 
@@ -489,6 +508,7 @@ mod tests {
         std::env::remove_var("JIRA_DEPLOYMENT");
         std::env::remove_var("JIRA_AUTH_TYPE");
         std::env::remove_var("JIRA_API_VERSION");
+        std::env::remove_var("JIRA_CA_BUNDLE");
     }
 
     #[test]
@@ -541,6 +561,56 @@ timeout_secs = 55
     }
 
     #[test]
+    fn ca_bundle_round_trips_through_profile_and_env_override() {
+        let _guard = env_lock().lock().expect("env lock");
+        let temp_dir = TempDir::new().expect("tempdir");
+        clear_config_home();
+        set_config_home(&temp_dir);
+
+        std::fs::create_dir_all(config_file_path().parent().expect("parent")).expect("mkdir");
+        std::fs::write(
+            config_file_path(),
+            r#"current_profile = "dc"
+
+[profiles.dc]
+base_url = "https://jira.internal"
+email = "ops"
+token = "pat"
+timeout_secs = 30
+deployment = "data_center"
+auth_type = "data_center_pat"
+api_version = 2
+ca_bundle = "/etc/ssl/internal-ca.pem"
+"#,
+        )
+        .expect("write");
+
+        let config = JiraConfig::load().expect("load");
+        assert_eq!(
+            config.ca_bundle.as_deref(),
+            Some("/etc/ssl/internal-ca.pem")
+        );
+        // survives the profile <-> config conversion
+        assert_eq!(
+            config.clone().into_profile().ca_bundle.as_deref(),
+            Some("/etc/ssl/internal-ca.pem")
+        );
+
+        std::env::set_var("JIRA_CA_BUNDLE", "/tmp/override-ca.pem");
+        let overridden = JiraConfig::load().expect("load with env");
+        assert_eq!(
+            overridden.ca_bundle.as_deref(),
+            Some("/tmp/override-ca.pem")
+        );
+
+        std::env::set_var("JIRA_CA_BUNDLE", "");
+        let cleared = JiraConfig::load().expect("load with empty env");
+        assert_eq!(cleared.ca_bundle, None);
+
+        clear_config_home();
+    }
+
+    #[test]
     fn loads_named_profile_and_applies_env_overrides() {
         let _guard = env_lock().lock().expect("env lock");
         let temp_dir = TempDir::new().expect("tempdir");
@@ -562,6 +632,7 @@ timeout_secs = 55
                         auth_type: JiraAuthType::CloudApiToken,
                         api_version: 3,
                         default_issue_limit: None,
+                        ca_bundle: None,
                     },
                 ),
                 (
@@ -576,6 +647,7 @@ timeout_secs = 55
                         auth_type: JiraAuthType::DataCenterPat,
                         api_version: 2,
                         default_issue_limit: None,
+                        ca_bundle: None,
                     },
                 ),
             ]),

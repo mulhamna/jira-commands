@@ -1,8 +1,13 @@
 name: Release Please
 
 # ── HOW THIS WORKS ────────────────────────────────────────────────────────────
-# 1. Every push to main is analyzed for Conventional Commits.
-# 2. release-please creates/updates two Release PRs (one per package):
+# 1. Pushes to main do NOT run this workflow. Batch changes on main first.
+#    When ready, run it manually for ONE lane at a time:
+#      gh workflow run release-please.yml -f lane=jira-commands
+#      gh workflow run release-please.yml -f lane=jira-mcp
+#    Merging a Release PR runs it again, only for that PR's lane, to push the
+#    tag. That run never opens or refreshes a Release PR.
+# 2. A manual run creates/updates the Release PR of the selected lane:
 #      - `jira-commands` — covers the root release lane (`.`), which bumps
 #        jira-core + jira-commands in lockstep. Tag: vX.Y.Z.
 #        Source-of-truth: VERSION file at repo root + `.release-please-manifest.json`.
@@ -46,7 +51,19 @@ name: Release Please
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
-  push:
+  # Prepare or refresh one lane's Release PR after batching changes.
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Release lane to prepare
+        required: true
+        type: choice
+        options:
+          - jira-commands
+          - jira-mcp
+  # Finalize a merged Release PR into a tag + GitHub Release.
+  pull_request:
+    types: [closed]
     branches: [main]
 
 permissions: {}
@@ -58,6 +75,13 @@ concurrency:
 jobs:
   sync-npm-version:
     name: Sync npm package version
+    # Manual runs, or a merged release-please PR from this repo. Feature PRs
+    # never run release-please; the release-please job depends on this one.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -67,6 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
       - name: Set up Node
@@ -105,8 +130,19 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+    env:
+      ROOT_LANE: >-
+        ${{ (github.event_name == 'workflow_dispatch' && inputs.lane == 'jira-commands') ||
+        github.event.pull_request.head.ref == 'release-please--branches--main--components--jira-commands' }}
+      MCP_LANE: >-
+        ${{ (github.event_name == 'workflow_dispatch' && inputs.lane == 'jira-mcp') ||
+        github.event.pull_request.head.ref == 'release-please--branches--main--components--jira-mcp' }}
+      # A merged Release PR only needs its tag; do not open the next Release PR.
+      FINALIZE_ONLY: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
 
       - name: Verify manifest matches VERSION files
         run: |
@@ -125,27 +161,36 @@ jobs:
           fi
 
       - name: Release Please (jira-commands)
+        if: env.ROOT_LANE == 'true'
         uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-pull-request: ${{ env.FINALIZE_ONLY }}
 
       - name: Release Please (jira-mcp)
+        if: env.MCP_LANE == 'true'
         uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4
         id: release-mcp
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
           config-file: release-please-config-mcp.json
           manifest-file: .release-please-manifest-mcp.json
+          skip-github-pull-request: ${{ env.FINALIZE_ONLY }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.FINALIZE_ONLY != 'true'
         with:
+          ref: main
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           fetch-depth: 0
 
       - name: Sync npm package versions on each open release PR branch
+        if: env.FINALIZE_ONLY != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |

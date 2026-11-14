@@ -124,9 +124,10 @@ cargo build --all
 
 ### How it works
 
-1. Push commits to `main` with **Conventional Commits**
-2. release-please creates/updates a Release PR (version bump + CHANGELOG)
-3. Merge Release PR → pushes tag → `release.yml` triggers build + publish
+1. Push commits to `main` with **Conventional Commits** — this alone does not run release-please
+2. When ready to release, run it manually for one lane (version bump + CHANGELOG in a Release PR):
+   `gh workflow run release-please.yml -f lane=jira-commands` or `-f lane=jira-mcp`
+3. Merge Release PR → release-please runs for that lane only, pushes the tag → `release-tag*.yml` triggers build + publish
 
 ### Conventional Commits
 
@@ -148,7 +149,7 @@ Format: `<type>(<scope>): <description>` — in English.
 See `.github/workflows/` for details — actual files are source of truth.
 - **ci.yml**: fmt + clippy + test + build (matrix: ubuntu/macos/windows)
 - **security.yml**: `cargo audit`
-- **release-please.yml**: auto version bump + CHANGELOG + tag (both lanes)
+- **release-please.yml**: version bump + CHANGELOG + tag, one lane per run (trigger: manual `workflow_dispatch` with `lane`, or a merged Release PR)
 - **release-tag.yml**: build binaries + publish jirac (trigger: tag `v*`)
 - **release-tag-mcp.yml**: build binaries + publish jirac-mcp (trigger: tag `jira-mcp-v*`)
 - **release-recover.yml**: recovery workflow for failed releases
@@ -178,7 +179,7 @@ Two independent lanes via `separate-pull-requests: true`:
 
 **Manifest race (avoid):** if two release PRs are open at once, merging one stale-overwrites the other's manifest entry. Mitigation:
 
-1. Merge release PRs one at a time. After the first merges, **wait for release-please.yml to rebase the second PR** before merging it (it picks up updated manifest).
+1. Prepare one lane at a time: merge its Release PR and let the tag run finish before dispatching the other lane. If both are already open, merge one, then **re-run `gh workflow run release-please.yml -f lane=<other>`** to refresh the second PR before merging it (it picks up the updated manifest).
 2. `release-please.yml` has a `Verify manifest matches VERSION files` guard step — fails fast if state drifts.
 
 To recover from a stomped manifest: edit `.release-please-manifest.json` to match the latest published tag for each component, commit as `fix(release): correct manifest after parallel release PR race`.

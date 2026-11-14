@@ -1756,7 +1756,7 @@ pub async fn run_tui(
                         let desc = issue
                             .description
                             .as_ref()
-                            .map(jira_core::adf::adf_to_text)
+                            .map(jira_core::rich_text::rich_text_to_text)
                             .unwrap_or_default();
                         (issue.summary.clone(), desc)
                     })

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::adf::{adf_to_text, mentioned_account_ids};
+use crate::{adf::mentioned_account_ids, rich_text::rich_text_to_text};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
@@ -31,13 +31,9 @@ impl Comment {
                 .and_then(|a| a.get("accountId"))
                 .and_then(|n| n.as_str())
                 .map(|s| s.to_string()),
-            body: body_value.and_then(|body| {
-                if body.is_object() {
-                    Some(adf_to_text(body))
-                } else {
-                    body.as_str().map(|s| s.to_string())
-                }
-            }),
+            body: body_value
+                .filter(|body| !body.is_null())
+                .map(rich_text_to_text),
             mentions: body_value
                 .filter(|body| body.is_object())
                 .map(mentioned_account_ids)

@@ -1,113 +1,27 @@
 # CLAUDE.md — Rust Jira CLI
 
-Guide for Claude (and contributors) when working in this repo.
+## Repository safeguards
 
----
+- Git reads are allowed; request explicit repo-owner approval before git writes, including commits, pushes, and history rewrites.
+- Do not manually bump versions, edit generated changelogs, or create/push tags without an explicit repo-owner request. Do not publish crates manually.
+- `jira-core` is a public library; preserve compatibility for external callers.
+- When creating a pull request, use `.github/PULL_REQUEST_TEMPLATE.md`; preserve its sections and checklists and fill them accurately.
+- When creating a bug report or feature request, follow the appropriate template in `.github/ISSUE_TEMPLATE/`.
+- Report security vulnerabilities privately, not in public issues; follow `SECURITY.md`.
 
-## Claude rules — MUST follow
+## Jira API
 
-Claude may:
-- Create and edit files on the filesystem
-- Run `cargo` commands for build/test/check
-- Run `git` commands for read and write operations when explicitly requested by the repo owner, including `git add`, `git commit`, and `git push`
-- Do not manually bump versions, edit generated changelogs, create/push tags, or rewrite git history unless explicitly requested by the repo owner
+- Choose deployment-specific behavior by deployment type, not API version: Cloud can also use API v2. Use client methods for the configured Platform API and the separate Agile API.
+- Cloud search uses `/search/jql` with cursor tokens, not `/search`; Data Center uses `POST /rest/api/2/search` with `startAt`. The client exposes both through `next_page_token`; bulk search loops have a 500-page safeguard.
+- On Data Center, user search uses `username`, not `query`; download attachments using the `content` URL from attachment metadata, not `/attachment/content/{id}`. The client's Cloud bulk-move and Plans endpoints are unavailable on Data Center.
+- Rich-text fields use ADF on API v3 and Jira wiki markup on API v2. Reuse existing conversions and preserve native content when it is unchanged.
+- Do not use Cloud `/rest/api/3/fieldconfiguration*` endpoints; they were removed. Resolve custom fields at runtime, never by hardcoded `customfield_*` IDs.
+- Handle HTTP 429 using `Retry-After`. For asynchronous operations, submit, poll, and wait for completion.
+- Check `JiraClient::is_premium()` before using Cloud premium features such as the Plans API.
 
----
+## Validation
 
-## Common commands
-
-```bash
-cargo build --all                                  # build workspace
-cargo test --all                                   # run all tests
-cargo test -p jira-core auth::                     # run tests matching a path in one crate
-cargo test --all test_name                         # run a single test by name across workspace
-cargo run -p jira -- issue view KEY-123             # run the CLI binary
-cargo run -p jira-mcp                               # run the MCP server binary
-cargo fmt --all                                     # format
-cargo clippy --all-targets --all-features -- -D warnings  # lint
-```
-
----
-
-## Project overview
-
-Rust CLI for Atlassian Jira (`jirac` binary). Focus: full custom field via dynamic introspection, attachment upload, Jira REST API v3, interactive TUI (ratatui), single binary.
-
-### Workspace structure
-
-```
-crates/
-├── jira-core/                  # PUBLIC LIBRARY (crates.io: "jira-core")
-│   └── src/
-│       ├── adf.rs              # Atlassian Document Format parser
-│       ├── auth.rs             # auth + multi-profile (Cloud + Data Center)
-│       ├── client.rs           # JiraClient — REST API surface
-│       ├── config.rs           # JiraConfig loader (figment: toml + env)
-│       ├── error.rs            # JiraError + Result alias
-│       ├── field_cache.rs      # custom-field id ↔ name resolution cache
-│       └── model/              # attachment, comment, field, issue, sprint, worklog
-├── jira/                       # BINARY (crates.io: "jira-commands", binary: jirac)
-│   └── src/
-│       ├── main.rs
-│       ├── datetime.rs         # datetime helpers
-│       ├── cli/                # clap commands: api, auth, issue, plan
-│       └── tui/                # ratatui TUI — modular split
-│           ├── app.rs          # event loop coordinator
-│           ├── column.rs       # column layout
-│           ├── keys.rs         # keybinding map
-│           ├── mode.rs         # app mode state
-│           ├── panel.rs        # split-pane logic
-│           ├── picker.rs       # native pickers
-│           ├── prefs.rs        # prefs overlay
-│           ├── prompts.rs      # inline prompts
-│           ├── render.rs       # frame render
-│           └── theme.rs        # color theme
-└── jira-mcp/                   # MCP SERVER (crates.io: "jira-mcp", binary: jirac-mcp)
-    └── src/
-        ├── main.rs
-        ├── lib.rs
-        ├── app.rs              # MCP app wiring
-        ├── server.rs           # rmcp server impl
-        ├── models.rs           # MCP tool I/O types
-        └── error.rs
-plugin/
-├── .claude-plugin/             # Claude Code plugin metadata (plugin.json)
-└── skills/                     # 12 skills: api, attach, bulk-transition, comment, create-issue, fields, jql, list-issues, transition, update-issue, view-issue, worklog
-```
-
-### Crate responsibilities
-
-- **`jira-core`** — public API: `JiraClient`, model types (split under `model/`), ADF parser, auth (Cloud + Data Center multi-profile), `FieldCache` for custom-field resolution, error types. Library dependency.
-- **`jira/`** — clap commands (`cli/{api,auth,issue,mcp,plan}.rs`), modular TUI (ratatui + crossterm, 10 submodules under `tui/`), interactive prompts (inquire), datetime helpers. Binary: `jirac`. `mcp` subcommand: `jirac mcp doctor` + `jirac mcp install --client <target>` to register `jirac-mcp` into supported clients (claude-code, claude-desktop, cursor, gemini-cli, codex, vscode, copilot-cli, opencode, generic-json, antigravity, antigravity-cli, kilocode).
-- **`jira-mcp/`** — MCP server via `rmcp`, split into `app.rs` (wiring) + `server.rs` (impl) + `models.rs` (I/O types). Exposes `jira-core` as MCP tools for LLM clients. Binary: `jirac-mcp`.
-
----
-
-## Jira API — implementation rules
-
-### Endpoint rules
-
-| Use                                         | Do NOT use                                           |
-| ------------------------------------------- | ---------------------------------------------------- |
-| `GET/POST /rest/api/3/search/jql`           | `/rest/api/3/search` (dead since Oct 2025)           |
-| `POST /rest/api/3/search/approximate-count` | `/rest/api/3/fieldconfiguration*` (removed Jul 2026) |
-| `GET /rest/api/3/projects/fields`           |                                                      |
-| `GET /rest/api/3/priorityscheme`            |                                                      |
-
-### Implementation principles
-
-- **Pagination**: cursor-based (`next_page_token`), not offset (`startAt`). Max 500 iterations as safeguard.
-- **Rate limiting**: handle 429 with `Retry-After` header, retry after delay.
-- **Field resolution**: always runtime via API, never hardcode `customfield_*`.
-- **Async tasks**: submit → poll → complete pattern for heavy operations (archive, bulk ops).
-- **Tier detection**: check `server_info.is_premium()` before using premium features (Plans API).
-- **Base URL**: Platform API (`/rest/api/3`) vs Agile API (`/rest/agile/1.0`) — don't mix, use client methods.
-
----
-
-## Smoke test
-
-Claude runs this before reporting to repo owner. Fix until all green.
+Before reporting completion, run:
 
 ```bash
 cargo fmt --all -- --check && \
@@ -116,78 +30,13 @@ cargo test --all && \
 cargo build --all
 ```
 
----
+## Releases
 
-## Release flow — release-please (automated)
-
-**Never manually bump versions, update CHANGELOG, or push tags.**
-
-### How it works
-
-1. Push commits to `main` with **Conventional Commits** — this alone does not run release-please
-2. When ready to release, run it manually for one lane (version bump + CHANGELOG in a Release PR):
-   `gh workflow run release-please.yml -f lane=jira-commands` or `-f lane=jira-mcp`
-3. Merge Release PR → release-please runs for that lane only, pushes the tag → `release-tag*.yml` triggers build + publish
-
-### Conventional Commits
-
-Format: `<type>(<scope>): <description>` — in English.
-
-| Type                              | Bump       |
-| --------------------------------- | ---------- |
-| `feat:`                           | MINOR      |
-| `fix:`, `perf:`, `refactor:`      | PATCH      |
-| `feat!:` / `BREAKING CHANGE:`     | MAJOR      |
-| `chore:`, `docs:`, `ci:`, `test:` | No release |
-
-### crates.io publish order
-
-`jira-core` → sparse index ready → `jira-mcp` → `jira-commands`. Never publish manually.
-
-### CI workflows
-
-See `.github/workflows/` for details — actual files are source of truth.
-- **ci.yml**: fmt + clippy + test + build (matrix: ubuntu/macos/windows)
-- **security.yml**: `cargo audit`
-- **release-please.yml**: version bump + CHANGELOG + tag, one lane per run (trigger: manual `workflow_dispatch` with `lane`, or a merged Release PR)
-- **release-tag.yml**: build binaries + publish jirac (trigger: tag `v*`)
-- **release-tag-mcp.yml**: build binaries + publish jirac-mcp (trigger: tag `jira-mcp-v*`)
-- **release-recover.yml**: recovery workflow for failed releases
-- **clawhub-publish-jirac.yml**: publish the `clawhub/jirac` skill to ClawHub
-- **clawhub-publish-jirac-plugin.yml**: publish the `clawhub/jirac-plugin` wrapper package to ClawHub
-- **pr-automerge.yml**: auto-merge release-please PRs
-- **winget-submit.yml**: submit to Windows Package Manager
-
-### Release strategy
-
-Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files updated via `generic` updater in `release-please-config.json`. Plugin version in `plugin/.claude-plugin/plugin.json` is separate and NOT auto-bumped by release-please.
-
-### Dual release lanes (jira-commands vs jira-mcp)
-
-Two independent lanes via `separate-pull-requests: true`:
-
-| Lane            | Component        | Tag                  | Version source             | Excludes                                  |
-| --------------- | ---------------- | -------------------- | -------------------------- | ----------------------------------------- |
-| jira-commands   | jira + jira-core | `vX.Y.Z`             | `/VERSION`                 | `crates/jira-mcp`, `packaging/npm-mcp`    |
-| jira-mcp        | jira-mcp         | `jira-mcp-vX.Y.Z`    | `crates/jira-mcp/VERSION`  | —                                         |
-
-**Commit scoping → which lane bumps:**
-
-- Edits ONLY under `crates/jira-mcp/**` or `packaging/npm-mcp/**` → jira-mcp lane only. Use `feat(jira-mcp):` / `fix(jira-mcp):` (or `feat(mcp):`).
-- Edits to root files (`README.md`, `INSTALL.md`, `.github/workflows/**`, `release-please-config.json`, root `Cargo.toml`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`) → jira-commands lane bumps regardless of scope name.
-- Mixed PRs bump BOTH lanes → two release PRs open in parallel.
-
-**Manifest race (avoid):** if two release PRs are open at once, merging one stale-overwrites the other's manifest entry. Mitigation:
-
-1. Prepare one lane at a time: merge its Release PR and let the tag run finish before dispatching the other lane. If both are already open, merge one, then **re-run `gh workflow run release-please.yml -f lane=<other>`** to refresh the second PR before merging it (it picks up the updated manifest).
-2. `release-please.yml` has a `Verify manifest matches VERSION files` guard step — fails fast if state drifts.
-
-To recover from a stomped manifest: edit `.release-please-manifest.json` to match the latest published tag for each component, commit as `fix(release): correct manifest after parallel release PR race`.
-
-### Plugin marketplace
-
-When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.
-
-**Manual bump required:** changes to `plugin/` (skills, metadata) must also bump the version in `plugin/.claude-plugin/plugin.json` — release-please does NOT touch this file.
-
-**Manual bump required:** changes to `clawhub/jirac/` (SKILL.md, references) must also bump `clawhub/jirac/VERSION` — release-please does NOT touch this file. CI publishes to ClawHub on push to `main` only when `clawhub/jirac/**` changes.
+- CLI/core and MCP have separate release-please lanes, configs, and manifests. Lane routing is path-based, not commit-scope-based; check `release-please-config.json`, `release-please-config-mcp.json`, and `.github/workflows/release-please.yml` before splitting release-sensitive changes.
+- Use Conventional Commits. Release-please is dispatched manually for a selected lane; a push to `main` alone does not run it. Do not dispatch releases or merge release PRs without explicit approval.
+- The CLI lane publishes `jira-core` before `jira-commands`; the MCP lane publishes separately and requires the corresponding `jira-core` version to exist on crates.io.
+- MCP changes using new `jira-core` APIs must wait for a compatible core release and use a dependency version that includes those APIs.
+- Changes under `plugin/` require coordinated updates to `plugin/VERSION`, `plugin/.claude-plugin/plugin.json`, both versions in `.claude-plugin/marketplace.json`, and `plugin/CHANGELOG.md`. They also trigger the ClawHub plugin wrapper publish on merge to `main`: update `clawhub/jirac-plugin/VERSION`, both versions in its `marketplace.json`, and its changelog before merging. Obtain explicit repo-owner approval for these manual version and changelog changes.
+- Changes under `clawhub/jirac/` trigger its ClawHub publish on merge to `main`; update `clawhub/jirac/VERSION` with explicit repo-owner approval before merging.
+- Changes under `clawhub/jirac-plugin/` also trigger its publish on merge to `main`; synchronize its `VERSION`, both versions in `marketplace.json`, and changelog with explicit repo-owner approval before merging.
+- When changing skills, keep relevant user-facing documentation in sync.

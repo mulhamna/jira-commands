@@ -603,7 +603,7 @@ jobs:
           SHA_WINDOWS_ARM: ${{ needs.collect-release-metadata.outputs.sha_windows_arm }}
 
       - name: Create manifest refresh pull request
-        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           commit-message: "chore(packaging): refresh release docs and manifests for v${{ needs.collect-release-metadata.outputs.version }}"

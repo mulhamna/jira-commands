@@ -198,6 +198,11 @@ formatting in wiki markup. Unsupported structures, nodes, or marks produce a
 warning and degrade to readable text instead of blocking the write. Labels and
 URLs are retained where available; opaque nodes use a visible placeholder.
 Malformed ADF and excessive nesting still return an error.
+
+The CLI reports formatting warnings on stderr; the TUI shows a warning in its
+status line. MCP write results include an optional `warnings` array alongside
+`result`; bulk and batch warnings describe the call as a whole.
+
 On API v2, code-language hints use Jira's bundled formatters. Plain-text aliases
 and unsupported languages retain the code block without syntax highlighting;
 unsupported languages produce a warning.

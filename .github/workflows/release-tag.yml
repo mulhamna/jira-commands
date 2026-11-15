@@ -146,7 +146,7 @@ jobs:
           cargo install cargo-zigbuild --locked
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@258712b0b7b1ddf8bddc9fc3b0faca682b2736c3 # v2
+        uses: Swatinem/rust-cache@eedcf2fb1c22f010a0eb66b92f378c110977f266 # v2
 
       - name: Build (zigbuild — Linux x86_64)
         if: matrix.target == 'x86_64-unknown-linux-gnu'

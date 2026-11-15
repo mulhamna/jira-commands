@@ -51,6 +51,22 @@ impl JiraMcpServer {
             .map(|value| {
                 Json(ToolResponse {
                     result: bound_response(value),
+                    warnings: Vec::new(),
+                })
+            })
+            .map_err(|err| err.to_mcp())
+    }
+
+    async fn respond_with_warnings(
+        &self,
+        future: impl std::future::Future<Output = AppResult<Value>>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        let (result, warnings) = jira_core::adf::collect_formatting_warnings(future).await;
+        result
+            .map(|value| {
+                Json(ToolResponse {
+                    result: bound_response(value),
+                    warnings,
                 })
             })
             .map_err(|err| err.to_mcp())
@@ -115,7 +131,7 @@ impl ServerHandler for JiraMcpServer {
                     .with_description("Typed Jira tools for MCP clients powered by jira-core"),
             )
             .with_instructions(
-                "Use the jira_* tools for Jira issue operations, worklogs, plans, auth, and raw REST access. Destructive tools require confirm=true.",
+                "Use the jira_* tools for Jira issue operations, worklogs, plans, auth, and raw REST access. Destructive tools require confirm=true. Successful writes may include formatting-loss warnings when Jira API v2 cannot represent all input formatting.",
             )
     }
 }
@@ -527,7 +543,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<IssueCreateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_create(args).await)
+        self.respond_with_warnings(self.app.issue_create(args))
+            .await
     }
 
     #[tool(
@@ -538,7 +555,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<IssueUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_update(args).await)
+        self.respond_with_warnings(self.app.issue_update(args))
+            .await
     }
 
     #[tool(
@@ -560,7 +578,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<IssueCloneArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_clone(args).await)
+        self.respond_with_warnings(self.app.issue_clone(args)).await
     }
 
     #[tool(
@@ -571,7 +589,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<IssueMoveArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_move(args).await)
+        self.respond_with_warnings(self.app.issue_move(args)).await
     }
 
     #[tool(
@@ -615,7 +633,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<CommentAddArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.comment_add(args).await)
+        self.respond_with_warnings(self.app.comment_add(args)).await
     }
 
     #[tool(
@@ -626,7 +644,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<CommentUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.comment_update(args).await)
+        self.respond_with_warnings(self.app.comment_update(args))
+            .await
     }
 
     #[tool(
@@ -648,7 +667,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<BulkCommentArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_bulk_comment(args).await)
+        self.respond_with_warnings(self.app.issue_bulk_comment(args))
+            .await
     }
 
     #[tool(
@@ -667,7 +687,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<IssueLinkCreateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_link_create(args).await)
+        self.respond_with_warnings(self.app.issue_link_create(args))
+            .await
     }
 
     #[tool(
@@ -733,7 +754,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<WorklogAddArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.worklog_add(args).await)
+        self.respond_with_warnings(self.app.worklog_add(args)).await
     }
 
     #[tool(
@@ -744,7 +765,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<WorklogUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.worklog_update(args).await)
+        self.respond_with_warnings(self.app.worklog_update(args))
+            .await
     }
 
     #[tool(
@@ -777,7 +799,8 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<BulkUpdateArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_bulk_update(args).await)
+        self.respond_with_warnings(self.app.issue_bulk_update(args))
+            .await
     }
 
     #[tool(
@@ -788,7 +811,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
         &self,
         Parameters(args): Parameters<BatchArgs>,
     ) -> Result<Json<ToolResponse>, ErrorData> {
-        self.respond(self.app.issue_batch(args).await)
+        self.respond_with_warnings(self.app.issue_batch(args)).await
     }
 
     #[tool(
@@ -869,6 +892,10 @@ mod tests {
     };
     use serial_test::serial;
     use tempfile::TempDir;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     use super::*;
 
@@ -898,6 +925,88 @@ mod tests {
             len <= MAX_RESPONSE_BYTES,
             "bounded response was {len} bytes"
         );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn writes_return_formatting_warnings_without_changing_results() {
+        let temp_dir = TempDir::new().unwrap();
+        let mock = MockServer::start().await;
+        set_test_env(&temp_dir);
+        std::env::set_var("JIRA_URL", mock.uri());
+        std::env::set_var("JIRA_EMAIL", "dev@example.com");
+        std::env::set_var("JIRA_TOKEN", "token");
+        std::env::set_var("JIRA_API_VERSION", "2");
+        for version in [2, 3] {
+            Mock::given(method("POST"))
+                .and(path(format!("/rest/api/{version}/issue/PROJ-1/comment")))
+                .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+                    "id": "42", "body": "saved"
+                })))
+                .mount(&mock)
+                .await;
+        }
+        let server = JiraMcpServer::new();
+        let args = || {
+            Parameters(CommentAddArgs {
+                key: "PROJ-1".into(),
+                body: "[label](relative)\n\n```rust\ncode\n```".into(),
+            })
+        };
+        let Json(response) = server.jira_comment_add(args()).await.unwrap();
+        assert_eq!(response.result["id"], "42");
+        assert_eq!(
+            response.warnings,
+            [
+                "A link was flattened because Jira wiki cannot represent it.",
+                "Syntax highlighting was omitted for an unsupported code language."
+            ]
+        );
+        assert_eq!(
+            serde_json::to_value(&response).unwrap()["warnings"],
+            serde_json::json!(response.warnings)
+        );
+
+        let (server_transport, client_transport) = tokio::io::duplex(64 * 1024);
+        let server_task = tokio::spawn(async move {
+            JiraMcpServer::new()
+                .serve(server_transport)
+                .await
+                .unwrap()
+                .waiting()
+                .await
+                .unwrap();
+        });
+        let client = TestClient.serve(client_transport).await.unwrap();
+        let result = client
+            .call_tool(
+                CallToolRequestParams::new("jira_comment_add").with_arguments(
+                    serde_json::json!({"key": "PROJ-1", "body": "[label](relative)"})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                ),
+            )
+            .await
+            .unwrap();
+        let response = serde_json::to_value(result).unwrap();
+        assert_eq!(
+            response["structuredContent"]["warnings"],
+            serde_json::json!(["A link was flattened because Jira wiki cannot represent it."])
+        );
+        client.cancel().await.unwrap();
+        server_task.await.unwrap();
+
+        std::env::set_var("JIRA_API_VERSION", "3");
+        let Json(response) = server.jira_comment_add(args()).await.unwrap();
+        assert_eq!(response.result["id"], "42");
+        assert!(response.warnings.is_empty());
+        assert!(serde_json::to_value(response)
+            .unwrap()
+            .get("warnings")
+            .is_none());
+        std::env::remove_var("JIRA_API_VERSION");
+        clear_test_env();
     }
 
     fn set_config_home_vars(temp_dir: &TempDir) {

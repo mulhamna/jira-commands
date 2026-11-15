@@ -16,6 +16,7 @@ use super::theme::Palette;
 pub(super) enum ModalKind {
     EditIssue {
         key: String,
+        original_description: String,
     },
     AddComment {
         key: String,
@@ -51,7 +52,7 @@ pub(super) enum ModalKind {
 impl ModalKind {
     pub(super) fn title(&self) -> String {
         match self {
-            ModalKind::EditIssue { key } => format!(" Edit {key} "),
+            ModalKind::EditIssue { key, .. } => format!(" Edit {key} "),
             ModalKind::AddComment { key } => format!(" Comment on {key} "),
             ModalKind::BulkComment => " Bulk Comment ".to_string(),
             ModalKind::UploadAttachment { key } => format!(" Attach to {key} "),
@@ -124,6 +125,7 @@ pub(super) struct Modal {
 
 impl Modal {
     pub(super) fn edit_issue(key: String, summary: String, description: String) -> Self {
+        let original_description = description.clone();
         let mut summary_area = TextArea::from(vec![summary]);
         summary_area.set_cursor_line_style(Style::default());
 
@@ -135,7 +137,10 @@ impl Modal {
         desc_area.set_cursor_line_style(Style::default());
 
         Self {
-            kind: ModalKind::EditIssue { key },
+            kind: ModalKind::EditIssue {
+                key,
+                original_description,
+            },
             fields: vec![
                 ModalField {
                     label: "Summary",

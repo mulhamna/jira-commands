@@ -6,6 +6,7 @@ pub mod error;
 pub mod field_cache;
 pub mod jql;
 pub mod model;
+pub mod rich_text;
 
 pub use client::JiraClient;
 pub use error::{JiraError, Result};

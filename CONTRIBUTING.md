@@ -155,6 +155,35 @@ Please prefer focused PRs with a clear theme:
 
 If a PR touches release automation, call that out explicitly in the description and mention what downstream paths were considered.
 
+### One release lane per PR (`jirac` vs `jirac-mcp`)
+
+`jirac` and `jirac-mcp` are released independently by separate release-please
+lanes. A PR must touch **only one** lane, so the two binaries are never
+released together. Lane ownership is decided by file path, not by the commit
+scope:
+
+| Lane | Tag | Paths that count |
+|---|---|---|
+| `jirac` (jira-commands) | `vX.Y.Z` | `Cargo.toml`, `VERSION`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**` |
+| `jirac-mcp` (jira-mcp) | `jira-mcp-vX.Y.Z` | `crates/jira-mcp/**`, `packaging/npm-mcp/**`, `packaging/winget-mcp/**`, `.github/workflows/release-tag-mcp.yml` |
+
+Files outside both lists (for example root docs, `plugin/`, `clawhub/`, most
+workflows, `Cargo.lock`) do not trigger either lane.
+
+If a change needs both lanes, open two PRs:
+
+1. **PR A — `jirac` lane:** the `jira-core` and `jira` (CLI/TUI) changes.
+2. **PR B — `jirac-mcp` lane:** only `crates/jira-mcp/**` (and MCP packaging).
+   Open it after PR A is merged **and** the new `jira-core` is published by a
+   `jirac` release. `jira-mcp` depends on the published `jira-core`, so it
+   cannot ship new core APIs before that release exists.
+
+Use a commit scope that matches the lane, for example `feat(cli):` or
+`fix(core):` for `jirac`, and `feat(mcp):` or `fix(mcp):` for `jirac-mcp`.
+The `!` marker or a `BREAKING CHANGE:` footer bumps the major version of the
+lane it lands in; use it only for a real breaking change of that binary or of
+the public `jira-core` API.
+
 ## Release safety notes
 
 Release-related workflows are intentionally conservative.

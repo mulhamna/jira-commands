@@ -115,12 +115,13 @@ Interactive (recommended):
 
 ```bash
 jirac mcp doctor          # check prereqs only
-jirac mcp install         # verifies prereqs, then shows a client picker
+jirac mcp install         # verifies prereqs, then shows a multi-select client picker
 ```
 
-Non-interactive (pass `--client` for scripts):
+Non-interactive (pass `--client` for scripts; repeat or comma-separate for several):
 
 ```bash
+jirac mcp install --client claude-code,cursor,codex
 jirac mcp install --client claude-code
 jirac mcp install --client claude-code-cli
 jirac mcp install --client claude-desktop

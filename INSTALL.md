@@ -212,15 +212,19 @@ its SHA-256 checksum is verified.
 
 If you want Jira available inside an MCP-capable client, install `jirac-mcp` first, then run the helper.
 
-Interactive mode (recommended) — verifies prereqs and shows a picker:
+Interactive mode (recommended) — verifies prereqs and shows a multi-select
+picker (space to toggle, enter to confirm):
 
 ```bash
 jirac mcp install
 ```
 
-Non-interactive mode for scripts — pass `--client` explicitly:
+Non-interactive mode for scripts — pass `--client` explicitly. Repeat it or
+comma-separate values to install into several clients in one run; a failure
+in one client does not stop the others:
 
 ```bash
+jirac mcp install --client claude-code,cursor,codex
 jirac mcp install --client claude-code
 jirac mcp install --client claude-code-cli
 jirac mcp install --client claude-desktop

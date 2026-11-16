@@ -24,7 +24,7 @@ cargo install --path crates/jira-mcp --locked
 ```
 
 Or use one of the workspace-level install options from the root README:
-- Homebrew (`brew tap mulhamna/tap && brew install jira-commands jira-mcp`)
+- Homebrew (`brew tap mulhamna/tap && brew trust mulhamna/tap && brew install jira-commands jira-mcp`; newer Homebrew ignores untrusted third-party taps)
 - npm (`npm install -g @mulham28/jirac` / `@mulham28/jirac-mcp`)
 - Scoop (`scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket && scoop install mulhamna/jirac mulhamna/jirac-mcp`)
 - shell installer on macOS/Linux
@@ -115,12 +115,13 @@ Interactive (recommended):
 
 ```bash
 jirac mcp doctor          # check prereqs only
-jirac mcp install         # verifies prereqs, then shows a client picker
+jirac mcp install         # verifies prereqs, then shows a multi-select client picker
 ```
 
-Non-interactive (pass `--client` for scripts):
+Non-interactive (pass `--client` for scripts; repeat or comma-separate for several):
 
 ```bash
+jirac mcp install --client claude-code,cursor,codex
 jirac mcp install --client claude-code
 jirac mcp install --client claude-code-cli
 jirac mcp install --client claude-desktop

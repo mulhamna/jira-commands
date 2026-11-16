@@ -13,10 +13,17 @@ use std::path::{Path, PathBuf};
 pub enum McpCommand {
     /// Install jirac-mcp into a supported MCP client config.
     ///
-    /// Omit `--client` to run interactively: prereqs are checked and a picker is shown.
+    /// Omit `--client` to run interactively: prereqs are checked and a
+    /// multi-select picker is shown.
     Install {
-        #[arg(long, value_enum)]
-        client: Option<McpClient>,
+        /// Client to register with; repeat or comma-separate for several
+        #[arg(
+            long = "client",
+            value_name = "CLIENT",
+            value_enum,
+            value_delimiter = ','
+        )]
+        clients: Vec<McpClient>,
         #[arg(long, default_value = "jira")]
         name: String,
         #[arg(long, default_value = "jirac-mcp")]
@@ -48,7 +55,7 @@ pub enum McpCommand {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 pub enum McpClient {
     ClaudeCode,
     #[value(name = "claude-code-cli")]
@@ -136,7 +143,7 @@ impl std::fmt::Display for McpClient {
 pub async fn handle(command: McpCommand) -> Result<()> {
     match command {
         McpCommand::Install {
-            client,
+            clients,
             name,
             command,
             transport,
@@ -144,25 +151,25 @@ pub async fn handle(command: McpCommand) -> Result<()> {
             dry_run,
             force,
         } => {
-            let resolved_client = match client {
-                Some(c) => c,
-                None => {
-                    crate::cli::interactive::require_interactive(
-                        "MCP client",
-                        "--client <target>",
-                    )?;
-                    run_interactive_prereqs_and_pick(&command)?
-                }
+            let clients = if clients.is_empty() {
+                crate::cli::interactive::require_interactive("MCP client", "--client <target>")?;
+                run_interactive_prereqs_and_pick(&command)?
+            } else {
+                clients
             };
-            install_client(
-                resolved_client,
-                &name,
-                &command,
-                &transport,
-                print,
-                dry_run,
-                force,
-            )
+            let mut failed = 0;
+            for client in dedup_clients(clients) {
+                if let Err(e) =
+                    install_client(client, &name, &command, &transport, print, dry_run, force)
+                {
+                    failed += 1;
+                    eprintln!("[fail] {} → {}: {e:#}", name, client.harness());
+                }
+            }
+            if failed > 0 {
+                bail!("{failed} MCP registration(s) failed");
+            }
+            Ok(())
         }
         McpCommand::Doctor { client, command } => doctor(client, &command),
         McpCommand::Update { check, command } => {
@@ -177,8 +184,19 @@ pub async fn handle(command: McpCommand) -> Result<()> {
     }
 }
 
-fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
-    use inquire::Select;
+/// Keep the first occurrence of each client, preserving order.
+fn dedup_clients(clients: Vec<McpClient>) -> Vec<McpClient> {
+    let mut seen = Vec::with_capacity(clients.len());
+    for client in clients {
+        if !seen.contains(&client) {
+            seen.push(client);
+        }
+    }
+    seen
+}
+
+fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<Vec<McpClient>> {
+    use inquire::{validator::Validation, MultiSelect};
 
     println!("jirac mcp install — interactive setup");
     println!("─────────────────────────────────────");
@@ -220,8 +238,8 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
     }
 
     println!();
-    let choice = Select::new(
-        "Pick the MCP client to install into:",
+    let choices = MultiSelect::new(
+        "Install into which MCP clients? (space to toggle, enter to confirm)",
         vec![
             McpClient::ClaudeCode,
             McpClient::ClaudeCodeCli,
@@ -244,10 +262,18 @@ fn run_interactive_prereqs_and_pick(server_command: &str) -> Result<McpClient> {
             McpClient::GenericJson,
         ],
     )
+    .with_page_size(19)
+    .with_validator(|picked: &[inquire::list_option::ListOption<&McpClient>]| {
+        Ok(if picked.is_empty() {
+            Validation::Invalid("pick at least one client".into())
+        } else {
+            Validation::Valid
+        })
+    })
     .prompt()
     .context("MCP client selection cancelled")?;
 
-    Ok(choice)
+    Ok(choices)
 }
 
 fn install_client(
@@ -421,6 +447,33 @@ fn executable_path_candidates(path: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_accepts_repeated_and_comma_separated_clients_once_each() {
+        #[derive(clap::Parser)]
+        struct Wrapper {
+            #[command(subcommand)]
+            command: McpCommand,
+        }
+        let parsed = <Wrapper as clap::Parser>::try_parse_from([
+            "mcp",
+            "install",
+            "--client",
+            "cursor,codex",
+            "--client",
+            "cursor",
+            "--client",
+            "zed",
+        ])
+        .expect("parse");
+        let McpCommand::Install { clients, .. } = parsed.command else {
+            panic!("expected install");
+        };
+        assert_eq!(
+            dedup_clients(clients),
+            [McpClient::Cursor, McpClient::Codex, McpClient::Zed]
+        );
+    }
 
     #[test]
     fn server_spec_uses_stdio_and_preserves_server_transport() {

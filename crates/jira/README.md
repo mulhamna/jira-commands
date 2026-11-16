@@ -41,6 +41,9 @@ Or use one of the workspace-level install options from the root README:
 - raw Jira REST API passthrough
 - shared config with multi-profile auth support
 
+When Jira API v2 cannot represent all input formatting, the CLI reports a
+warning on stderr and the TUI displays a warning in its status line.
+
 ## Quick start
 
 ```bash

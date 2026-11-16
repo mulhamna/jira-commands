@@ -164,18 +164,24 @@ Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files 
 
 ### Dual release lanes (jira-commands vs jira-mcp)
 
-Two independent lanes via `separate-pull-requests: true`:
+Two independent lanes, each with its own config and manifest (`release-please-config.json` + `.release-please-manifest.json`, `release-please-config-mcp.json` + `.release-please-manifest-mcp.json`):
 
-| Lane            | Component        | Tag                  | Version source             | Excludes                                  |
-| --------------- | ---------------- | -------------------- | -------------------------- | ----------------------------------------- |
-| jira-commands   | jira + jira-core | `vX.Y.Z`             | `/VERSION`                 | `crates/jira-mcp`, `packaging/npm-mcp`    |
-| jira-mcp        | jira-mcp         | `jira-mcp-vX.Y.Z`    | `crates/jira-mcp/VERSION`  | —                                         |
+| Lane            | Component        | Tag                  | Version source             | Paths that trigger the lane (`include-paths`)                                                        |
+| --------------- | ---------------- | -------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| jira-commands   | jira + jira-core | `vX.Y.Z`             | `/VERSION`                 | `Cargo.toml`, `VERSION`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`                  |
+| jira-mcp        | jira-mcp         | `jira-mcp-vX.Y.Z`    | `crates/jira-mcp/VERSION`  | `crates/jira-mcp/**`, `packaging/npm-mcp/**`, `packaging/winget-mcp/**`, `.github/workflows/release-tag-mcp.yml` |
 
-**Commit scoping → which lane bumps:**
+Lane routing is path-based, not scope-based. Other files (root `README.md`, `INSTALL.md`, `plugin/`, `clawhub/`, other workflows, `Cargo.lock`) trigger neither lane.
 
-- Edits ONLY under `crates/jira-mcp/**` or `packaging/npm-mcp/**` → jira-mcp lane only. Use `feat(jira-mcp):` / `fix(jira-mcp):` (or `feat(mcp):`).
-- Edits to root files (`README.md`, `INSTALL.md`, `.github/workflows/**`, `release-please-config.json`, root `Cargo.toml`, `crates/jira/**`, `crates/jira-core/**`, `packaging/npm/**`) → jira-commands lane bumps regardless of scope name.
-- Mixed PRs bump BOTH lanes → two release PRs open in parallel.
+**One lane per PR — MUST follow:**
+
+- A PR (and every commit in it) touches only one lane, so `jirac` and `jirac-mcp` never release together.
+- A change that needs both lanes is split into two PRs:
+  1. PR A (`jirac` lane): `jira-core` + `jira` CLI/TUI changes. Scope: `feat(cli):`, `fix(core):`, …
+  2. PR B (`jirac-mcp` lane): only `crates/jira-mcp/**` (+ MCP packaging). Scope: `feat(mcp):`, `fix(mcp):`, …
+  Open PR B only after PR A is merged and a `jirac` release has published the new `jira-core` to crates.io — `jira-mcp` builds against the published `jira-core`.
+- When reviewing, reject a PR that mixes both lanes and ask for the split.
+- `!` / `BREAKING CHANGE:` bumps MAJOR of the lane the commit lands in. Use it only for a real breaking change of that binary or of the public `jira-core` API — not for plugin or docs changes.
 
 **Manifest race (avoid):** if two release PRs are open at once, merging one stale-overwrites the other's manifest entry. Mitigation:
 

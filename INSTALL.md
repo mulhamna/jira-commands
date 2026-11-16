@@ -45,8 +45,10 @@ brew trust mulhamna/tap   # newer Homebrew requires trusting third-party taps
 brew install jira-commands jira-mcp
 ```
 
-> If you see `Refusing to load formula ... from untrusted tap`, run
-> `brew trust mulhamna/tap` (one-time) and re-run the install.
+> If you see `Refusing to load formula ... from untrusted tap` or
+> `No available formula with the name "jira-commands"`, run
+> `brew trust mulhamna/tap` (one-time) and re-run the install. Homebrew
+> releases without a `trust` command load the tap without this step.
 
 Install just one:
 

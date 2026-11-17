@@ -1,26 +1,42 @@
 ---
-description: Execute a raw Jira REST API call through the jirac CLI, including GET, POST, PUT, DELETE, and PATCH requests to any Jira REST endpoint
+name: api
+description: Use Jira raw REST API requests, inspect issue fields, and preview Markdown as ADF.
 ---
 
-Execute raw Jira REST API requests with the `jirac` CLI.
+Use `jirac --version` to check availability; if missing, tell the user to install `jira-commands`.
 
-Steps:
-1. Check that `jirac` is available by running `jirac --version`. If it is missing, tell the user to install it with `cargo install jira-commands`.
-2. Extract from the user's request:
-   - HTTP method
-   - API path, for example `/rest/api/3/issue/PROJ-123`
-   - JSON body when needed
-3. Run the matching command:
-   - `jirac api get <PATH>`
-   - `jirac api post <PATH> --body '<JSON>'`
-   - `jirac api put <PATH> --body '<JSON>'`
-   - `jirac api delete <PATH>`
-   - `jirac api patch <PATH> --body '<JSON>'`
-4. Show the response clearly.
-5. If the user does not know the endpoint, help map their goal to the correct Jira REST path before running anything.
+## Raw REST API
 
-Examples:
-- "get server info" → `jirac api get /rest/api/3/serverInfo`
-- "get issue PROJ-123" → `jirac api get /rest/api/3/issue/PROJ-123`
-- "get all projects" → `jirac api get /rest/api/3/project`
-- "post to /rest/api/3/issue with body {...}" → `jirac api post /rest/api/3/issue --body '{...}'`
+Prefer a dedicated `jirac` subcommand when it supports the operation. For raw
+platform API calls, check the active profile and API version with `jirac auth
+status`; this may contact Jira to look up the current user. Keep the same
+profile and `JIRA_PROFILE` environment setting for the request. If the version
+cannot be determined, ask the user rather than assuming Cloud.
+
+Use `/rest/api/3/...` for API v3 (normally Cloud) and `/rest/api/2/...` for
+API v2 (normally Data Center or Server). Other API families, such as
+`/rest/agile/1.0/...`, have their own versions. Raw requests do not convert
+bodies: descriptions and comments generally use wiki-markup strings in v2 and
+ADF objects in v3. Check the endpoint schema for its request and response.
+
+Use `jirac api get <PATH>` or `jirac api delete <PATH>`. For a JSON body, use
+`jirac api <METHOD> <PATH> --body '<JSON>'`, where METHOD is `post`, `put`, or
+`patch`. Map an unknown endpoint before running a request. Examples:
+
+- Cloud/v3: `jirac api get /rest/api/3/serverInfo`
+- Data Center/v2: `jirac api get /rest/api/2/serverInfo`
+- For an issue or project, use `/rest/api/2/issue/PROJ-123` or
+  `/rest/api/2/project` on v2, and the corresponding `/rest/api/3/...` path on v3.
+
+## Render Markdown
+
+Use `jirac issue render --input <FILE>` or pipe text to `jirac issue render`
+to preview Markdown as ADF. The preview does not resolve `@username` into a
+Jira mention and is not a preview of the wiki markup sent to API v2. After
+review, send Markdown via `--description-file` or comment `--file`.
+
+## Inspect fields
+
+Use `jirac issue fields -p <PROJECT> --issue-type '<TYPE>'` to discover field
+IDs and types before create/update; add `--required-only` when needed. If the
+issue type is omitted, the command may prompt interactively.

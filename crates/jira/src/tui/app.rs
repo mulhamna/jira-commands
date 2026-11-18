@@ -3118,7 +3118,7 @@ fn description_if_changed(original: &str, edited: String) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
+    use crate::test_support::env_lock;
 
     #[test]
     fn formatting_warning_preserves_success_and_failure_status() {
@@ -3181,11 +3181,6 @@ mod tests {
         );
     }
 
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
     fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
         match value {
             Some(value) => std::env::set_var(key, value),
@@ -3207,7 +3202,7 @@ mod tests {
 
     #[test]
     fn shellexpand_tilde_falls_back_to_userprofile() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock();
         let temp_dir = std::env::temp_dir().join(format!(
             "jirac-tilde-userprofile-test-{}",
             std::process::id()
@@ -3237,7 +3232,7 @@ mod tests {
 
     #[test]
     fn shellexpand_tilde_accepts_backslash_prefix() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock();
         let temp_dir =
             std::env::temp_dir().join(format!("jirac-tilde-backslash-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);

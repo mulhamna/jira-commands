@@ -1,7 +1,10 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use jira_commands::{cli, help_text, tui, version_check};
-use jira_core::{config::JiraConfig, JiraClient};
+use jira_core::{
+    config::{InputFormat, JiraConfig},
+    JiraClient,
+};
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Debug, Parser)]
@@ -109,7 +112,11 @@ async fn main() -> Result<()> {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"))
     };
 
-    fmt().with_env_filter(filter).with_target(false).init();
+    fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .with_writer(std::io::stderr)
+        .init();
 
     if let Some(issue) = cli.issue {
         if cli.web {
@@ -130,8 +137,11 @@ async fn main() -> Result<()> {
             if cli::interactive::is_non_interactive() {
                 anyhow::bail!("`jirac tui` requires an interactive terminal");
             }
-            let client = build_client().context("Failed to initialize Jira client")?;
             let config = JiraConfig::load().unwrap_or_default();
+            // The TUI forms are Markdown regardless of the profile's input_format.
+            let client = build_client_from_config(config.clone())
+                .context("Failed to initialize Jira client")?
+                .with_input_format(InputFormat::Markdown);
             let effective_project = project.or(config.project);
             return tui::run_tui(client, effective_project, update_notice)
                 .await
@@ -149,8 +159,9 @@ async fn main() -> Result<()> {
         match command {
             Commands::Auth { command } => cli::auth::handle(command).await?,
             Commands::Issue { command } => {
-                let client = build_client().context("Failed to initialize Jira client")?;
                 let config = JiraConfig::load().unwrap_or_default();
+                let client = build_client_from_config(config.clone())
+                    .context("Failed to initialize Jira client")?;
                 cli::issue::handle(*command, client, config.project, config.default_issue_limit)
                     .await?;
             }
@@ -210,8 +221,10 @@ fn open_issue_shortcut(issue: &str) -> Result<()> {
 }
 
 fn build_client() -> Result<JiraClient> {
-    let config = JiraConfig::load().unwrap_or_default();
+    build_client_from_config(JiraConfig::load().unwrap_or_default())
+}
 
+fn build_client_from_config(config: JiraConfig) -> Result<JiraClient> {
     if config.base_url.is_empty() {
         anyhow::bail!(
             "Jira URL not configured. Run `jirac auth login` or set JIRA_URL environment variable."

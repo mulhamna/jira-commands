@@ -219,9 +219,40 @@ ADF mentions use Data Center login names or Cloud account IDs for the selected d
 Existing API v2 descriptions copied when cloning issues and unchanged worklog
 comments are preserved verbatim.
 
-API v2 inputs that previously contained native wiki markup should now be supplied
-as Markdown. Use `jirac api` with an explicit request body when sending native
-wiki markup without conversion.
+#### Rich-text input formats
+
+`input_format` selects how descriptions, comments, worklog comments, and issue-link
+comments are interpreted. The API version selects the representation sent to Jira:
+
+| `input_format` | API v2 | API v3 |
+| --- | --- | --- |
+| `markdown` (default) | Markdown → ADF → wiki markup | Markdown → ADF |
+| `wiki` | Send wiki markup unchanged | Reject: no wiki → ADF converter |
+| `adf` | ADF → wiki markup, warning about unsupported content | Send the ADF document |
+
+ADF input must be JSON with `type: "doc"`, `version: 1`, and a `content` array.
+Invalid JSON or document root fields cause an error; Jira validates the remaining
+ADF schema. API v2 uses the existing converter and can flatten unsupported content.
+
+```bash
+jirac config set input_format wiki               # save in the active profile
+JIRA_INPUT_FORMAT=wiki jirac issue comment PROJ-123 add --file note.wiki
+jirac issue update PROJ-123 --description-file desc.wiki --description-format wiki
+JIRA_INPUT_FORMAT=adf jirac issue comment PROJ-123 add --file note.adf.json
+jirac config unset input_format                  # back to the Markdown default
+```
+
+`JIRA_INPUT_FORMAT` overrides the profile. An empty value selects Markdown; an
+unknown value emits a warning and keeps the profile's value.
+`--description-format markdown|wiki|text|adf` overrides the setting for one file
+(`md` is accepted for `markdown`). The setting also applies to `description` in
+`bulk-create` and `batch` manifests, including `batch` update. Pre-built ADF fields
+keep their meaning. `jirac auth status` and `jirac config show` print the active
+input format. The TUI always uses Markdown.
+
+On API v3, `wiki` is rejected before any request is sent when a command would write
+text: lookups, searches, and earlier manifest operations are not run either.
+Commands that write no text are not affected.
 
 ### Rich-text display
 
@@ -386,6 +417,10 @@ a self-hosted Jira presents a cert from an internal CA. You can also set it with
 `jirac auth login --cacert /path/to/ca.pem` (the interactive flow offers it for
 Data Center) or the `JIRA_CA_BUNDLE` env var.
 
+`input_format` is optional too: `markdown` (default), `wiki` (API v2 only), or
+`adf` — see [Rich-text input formats](#rich-text-input-formats).
+Set it with `jirac config set input_format wiki` or the `JIRA_INPUT_FORMAT` env var.
+
 Environment variables override the active profile:
 
 ```bash
@@ -394,6 +429,13 @@ export JIRA_URL=https://yourcompany.atlassian.net
 export JIRA_EMAIL=you@example.com
 export JIRA_TOKEN=your_api_token
 export JIRA_CA_BUNDLE=/path/to/internal-ca.pem
+```
+
+For a Data Center (API v2) profile that should take native wiki markup:
+
+```bash
+export JIRA_PROFILE=client-dc
+export JIRA_INPUT_FORMAT=wiki
 ```
 
 ## MCP server

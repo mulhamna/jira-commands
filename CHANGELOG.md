@@ -6,6 +6,25 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [3.1.0](https://github.com/mulhamna/jira-commands/compare/v3.0.0...v3.1.0) (2026-11-18)
+
+
+### Features
+
+* **cli:** install jirac-mcp into several MCP clients at once ([#549](https://github.com/mulhamna/jira-commands/issues/549)) ([59dac78](https://github.com/mulhamna/jira-commands/commit/59dac7860825e8dcaa37ac9cb3b7b9b3bd56588a))
+* **core:** add explicit rich-text input formats ([#538](https://github.com/mulhamna/jira-commands/issues/538)) ([a3ec2eb](https://github.com/mulhamna/jira-commands/commit/a3ec2eb22911fe9577f12e42f21f30cdbd2febc0))
+* **core:** render Jira wiki markup in rich-text displays ([#539](https://github.com/mulhamna/jira-commands/issues/539)) ([e812579](https://github.com/mulhamna/jira-commands/commit/e8125792c095f023c97f70309a9f3beb1c67c7f6))
+
+
+### Bug Fixes
+
+* **cli:** clarify field ID help examples ([#536](https://github.com/mulhamna/jira-commands/issues/536)) ([200a0bd](https://github.com/mulhamna/jira-commands/commit/200a0bd19d14e880a033fb2da181988d80caa87f))
+* **cli:** prevent Windows debug stack overflow ([#537](https://github.com/mulhamna/jira-commands/issues/537)) ([7c95ec7](https://github.com/mulhamna/jira-commands/commit/7c95ec7c0ba7e7f6c7664e88019bedd182bc0507))
+* **deps:** patch quinn-udp and rustix security advisories ([#540](https://github.com/mulhamna/jira-commands/issues/540)) ([ad7640a](https://github.com/mulhamna/jira-commands/commit/ad7640a6a6ffd78b2877a8a42bd2a25ef8b4ee1f))
+* **plugin:** consolidate Jira skills ([#534](https://github.com/mulhamna/jira-commands/issues/534)) ([78ff7a6](https://github.com/mulhamna/jira-commands/commit/78ff7a6024e1d3aa219388c3b3d10732244bb488))
+* surface Jira formatting warnings in CLI and TUI ([5875dda](https://github.com/mulhamna/jira-commands/commit/5875dda000620e8ab4d59b41ce09606ce81ef778))
+* surface Jira formatting warnings in CLI and TUI ([#535](https://github.com/mulhamna/jira-commands/issues/535)) ([59bea26](https://github.com/mulhamna/jira-commands/commit/59bea2696870b3f0c4d1d9578650c95421abebe2))
+
 ## [3.0.0](https://github.com/mulhamna/jira-commands/compare/v2.12.2...v3.0.0) (2026-11-09)
 
 

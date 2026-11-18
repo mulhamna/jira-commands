@@ -20,17 +20,15 @@ jirac auth login
 
 ## Available skills
 
-| Skill                   | Description                             |
-| ----------------------- | --------------------------------------- |
-| `/jira:list-issues`     | List issues by project or JQL           |
-| `/jira:view-issue`      | View full issue detail                  |
-| `/jira:create-issue`    | Create a new issue                      |
-| `/jira:update-issue`    | Update an existing issue                |
-| `/jira:transition`      | Transition an issue                     |
-| `/jira:comment`         | List comments or add a Markdown comment |
-| `/jira:worklog`         | List, add, or delete worklogs           |
-| `/jira:fields`          | Inspect available field metadata        |
-| `/jira:bulk-transition` | Bulk transition issues via JQL          |
-| `/jira:attach`          | Upload a file to an issue               |
-| `/jira:jql`             | Build and run a JQL query               |
-| `/jira:api`             | Raw REST API passthrough                |
+| Skill | Description |
+| --- | --- |
+| `/jira:issue` | Manage issues, watchers, links, and attachments |
+| `/jira:comment` | Manage comments and worklogs |
+| `/jira:bulk` | Run bulk and batch operations |
+| `/jira:search` | Search issues, build JQL, and prepare summaries |
+| `/jira:api` | Call the REST API, inspect fields, and preview Markdown as ADF |
+| `/jira:sprint` | Manage sprints |
+| `/jira:versions` | Browse project versions and backlog previews |
+| `/jira:transition` | Transition an issue |
+
+For mappings from removed skill names, see the [migration table](plugin/README.md#skills).

@@ -17,7 +17,13 @@ version = 2
 unmaintained = "workspace"
 # Advisory IDs to ignore (add with a comment justification).
 # Leave empty unless we genuinely want to silence a specific advisory.
-ignore = []
+ignore = [
+  # chrono and chrono-tz were declared unmaintained with no safe upgrade.
+  # They have no known vulnerability; replacing them (jiff or time) is a
+  # separate migration.
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no replacement yet" },
+  { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained, no replacement yet" },
+]
 
 [licenses]
 version = 2

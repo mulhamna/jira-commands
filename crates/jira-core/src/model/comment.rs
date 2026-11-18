@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::adf::{adf_to_text, mentioned_account_ids};
+use crate::{adf::mentioned_account_ids, rich_text::rich_text_to_text};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
@@ -9,6 +9,7 @@ pub struct Comment {
     pub issue_key: String,
     pub author: Option<String>,
     pub author_account_id: Option<String>,
+    /// API v2 wiki markup is preserved; API v3 ADF is converted to readable text.
     pub body: Option<String>,
     pub mentions: Vec<String>,
     pub created: String,
@@ -31,12 +32,10 @@ impl Comment {
                 .and_then(|a| a.get("accountId"))
                 .and_then(|n| n.as_str())
                 .map(|s| s.to_string()),
-            body: body_value.and_then(|body| {
-                if body.is_object() {
-                    Some(adf_to_text(body))
-                } else {
-                    body.as_str().map(|s| s.to_string())
-                }
+            body: body_value.filter(|body| !body.is_null()).map(|body| {
+                body.as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| rich_text_to_text(body))
             }),
             mentions: body_value
                 .filter(|body| body.is_object())

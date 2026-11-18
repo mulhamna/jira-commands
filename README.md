@@ -254,6 +254,16 @@ On API v3, `wiki` is rejected before any request is sent when a command would wr
 text: lookups, searches, and earlier manifest operations are not run either.
 Commands that write no text are not affected.
 
+### Rich-text display
+
+Issue descriptions and comments are rendered from Jira wiki markup on API v2
+and ADF on API v3. CLI and TUI descriptions and MCP description excerpts support
+wiki headings, lists, tables, links, mentions, images, emphasis, quotes, and
+code/noformat blocks. Images use text placeholders; unknown macros remain visible
+and are never executed. This is display rendering, not a lossless conversion for
+editing. Raw issue descriptions remain available through `issue view --json`
+and `jirac api`.
+
 ### Worklogs
 
 ```bash

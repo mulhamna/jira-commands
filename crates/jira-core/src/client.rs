@@ -89,6 +89,16 @@ impl JiraClient {
         &self.config.base_url
     }
 
+    /// Render a parsed comment body for display, preserving API v2 wiki markup
+    /// in the public `Comment::body` model.
+    pub fn render_comment_body(&self, body: &str) -> String {
+        if self.config.api_version < 3 {
+            crate::rich_text::wiki_to_text(body)
+        } else {
+            body.to_string()
+        }
+    }
+
     /// Data Center / Server addresses users by login name and lacks several Cloud-only
     /// endpoints. This depends on the deployment, not on `api_version`: Cloud also serves
     /// API v2, and there it still uses accountId and the Cloud endpoints. `api_version` only
@@ -3717,6 +3727,22 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             ca_bundle: None,
             input_format: Default::default(),
         })
+    }
+
+    #[tokio::test]
+    async fn comment_body_for_display_renders_only_api_v2_wiki() {
+        let server = MockServer::start().await;
+        let dc = dc_client(&server);
+        assert_eq!(
+            dc.render_comment_body("h2. Details\n\n*Important*"),
+            "## Details\n\nImportant"
+        );
+
+        let cloud = cloud_client(&server);
+        assert_eq!(
+            cloud.render_comment_body("Already rendered *text*"),
+            "Already rendered *text*"
+        );
     }
 
     fn search_issue_json(key: &str) -> Value {

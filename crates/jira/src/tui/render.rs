@@ -511,7 +511,7 @@ fn build_summary_lines(
     }
 
     if let Some(desc) = &issue.description {
-        let text = jira_core::adf::adf_to_text(desc);
+        let text = jira_core::rich_text::rich_text_to_text(desc);
         if !text.is_empty() {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
@@ -1772,4 +1772,40 @@ fn side_panel_rect(area: Rect) -> Rect {
         .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
         .areas(area);
     panel
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn summary_displays_both_wiki_and_adf_descriptions() {
+        for description in [
+            json!("h2. Details\n\n*Important* text"),
+            jira_core::adf::markdown_to_adf("## Details\n\n**Important** text"),
+        ] {
+            let issue = serde_json::from_value(json!({
+                "id": "10001",
+                "key": "PROJ-1",
+                "summary": "Description rendering",
+                "description": description,
+                "status": "To Do",
+                "issue_type": "Task",
+                "project_key": "PROJ",
+                "created": "2026-01-01",
+                "updated": "2026-01-02",
+                "attachments": [],
+                "links": [],
+                "fields": {}
+            }))
+            .expect("issue fixture");
+
+            let lines = build_summary_lines(&issue, None, ThemeName::Default.palette());
+            let text: Vec<String> = lines.iter().map(ToString::to_string).collect();
+
+            assert!(text.iter().any(|line| line == "  ## Details"));
+            assert!(text.iter().any(|line| line == "  Important text"));
+        }
+    }
 }

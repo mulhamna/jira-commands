@@ -189,6 +189,7 @@ async fn comment_list(client: JiraClient, key: String) -> Result<()> {
             println!("  Created: {}", c.created);
         }
         if let Some(body) = &c.body {
+            let body = client.render_comment_body(body);
             println!("  Body   : {}", body.replace('\n', "\n           "));
         }
         println!();

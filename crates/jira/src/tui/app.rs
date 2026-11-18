@@ -255,7 +255,19 @@ impl App {
             DetailTab::Comments => {
                 if self.detail.comments.is_none() {
                     match client.get_comments(&key).await {
-                        Ok(comments) => self.detail.comments = Some(comments),
+                        Ok(comments) => {
+                            self.detail.comments = Some(
+                                comments
+                                    .into_iter()
+                                    .map(|mut comment| {
+                                        comment.body = comment
+                                            .body
+                                            .map(|body| client.render_comment_body(&body));
+                                        comment
+                                    })
+                                    .collect(),
+                            )
+                        }
                         Err(e) => self.set_status(format!("Comments load failed: {e}"), true),
                     }
                 }
@@ -1787,7 +1799,7 @@ pub async fn run_tui(
                         let desc = issue
                             .description
                             .as_ref()
-                            .map(jira_core::adf::adf_to_text)
+                            .map(jira_core::rich_text::rich_text_to_text)
                             .unwrap_or_default();
                         (issue.summary.clone(), desc)
                     })
@@ -1911,7 +1923,10 @@ pub async fn run_tui(
                 };
                 let kind = modal.kind.clone();
                 match kind {
-                    ModalKind::EditIssue { key } => {
+                    ModalKind::EditIssue {
+                        key,
+                        original_description,
+                    } => {
                         let summary = modal.field_text(0);
                         let description = modal.field_text(1);
                         let summary_trim = summary.trim();
@@ -1923,7 +1938,7 @@ pub async fn run_tui(
                         }
                         let req = UpdateIssueRequest {
                             summary: Some(summary_trim.to_string()),
-                            description: Some(description),
+                            description: description_if_changed(&original_description, description),
                             ..Default::default()
                         };
                         if let Some(m) = app.modal.as_mut() {
@@ -3096,10 +3111,14 @@ fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Borrowed(path)
 }
 
+fn description_if_changed(original: &str, edited: String) -> Option<String> {
+    (edited != original).then_some(edited)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, OnceLock};
+    use crate::test_support::env_lock;
 
     #[test]
     fn formatting_warning_preserves_success_and_failure_status() {
@@ -3162,11 +3181,6 @@ mod tests {
         );
     }
 
-    fn env_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
-
     fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
         match value {
             Some(value) => std::env::set_var(key, value),
@@ -3175,8 +3189,20 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_edit_description_is_omitted() {
+        assert_eq!(
+            description_if_changed("Rendered description", "Rendered description".into()),
+            None
+        );
+        assert_eq!(
+            description_if_changed("Rendered description", "Edited description".into()),
+            Some("Edited description".into())
+        );
+    }
+
+    #[test]
     fn shellexpand_tilde_falls_back_to_userprofile() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock();
         let temp_dir = std::env::temp_dir().join(format!(
             "jirac-tilde-userprofile-test-{}",
             std::process::id()
@@ -3206,7 +3232,7 @@ mod tests {
 
     #[test]
     fn shellexpand_tilde_accepts_backslash_prefix() {
-        let _guard = env_lock().lock().unwrap();
+        let _guard = env_lock();
         let temp_dir =
             std::env::temp_dir().join(format!("jirac-tilde-backslash-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&temp_dir);

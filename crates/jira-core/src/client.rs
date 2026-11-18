@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 use tracing::{debug, warn};
 
 use crate::{
-    adf::{adf_to_wiki, markdown_to_adf},
-    config::{JiraAuthType, JiraConfig, JiraDeployment},
+    adf::{adf_to_wiki, markdown_to_adf, parse_adf},
+    config::{InputFormat, JiraAuthType, JiraConfig, JiraDeployment},
     error::{JiraError, Result},
     model::{
         attachment::Attachment,
@@ -89,6 +89,16 @@ impl JiraClient {
         &self.config.base_url
     }
 
+    /// Render a parsed comment body for display, preserving API v2 wiki markup
+    /// in the public `Comment::body` model.
+    pub fn render_comment_body(&self, body: &str) -> String {
+        if self.config.api_version < 3 {
+            crate::rich_text::wiki_to_text(body)
+        } else {
+            body.to_string()
+        }
+    }
+
     /// Data Center / Server addresses users by login name and lacks several Cloud-only
     /// endpoints. This depends on the deployment, not on `api_version`: Cloud also serves
     /// API v2, and there it still uses accountId and the Cloud endpoints. `api_version` only
@@ -106,8 +116,40 @@ impl JiraClient {
         }
     }
 
-    fn markdown_body(&self, markdown: &str) -> Result<Value> {
-        self.rich_text_body(markdown_to_adf(markdown))
+    /// Encode user-supplied text for a description, comment or worklog comment.
+    ///
+    /// The input format selects Markdown, native wiki (API v2 only), or ADF JSON.
+    fn text_body(&self, text: &str) -> Result<Value> {
+        match self.config.input_format {
+            InputFormat::Markdown => self.rich_text_body(markdown_to_adf(text)),
+            InputFormat::Wiki => self.wiki_body(text),
+            InputFormat::Adf => self.rich_text_body(parse_adf(text)?),
+        }
+    }
+
+    fn wiki_body(&self, text: &str) -> Result<Value> {
+        self.ensure_input_format_supported()?;
+        Ok(json!(text))
+    }
+
+    /// Fail when the text format cannot be used with this API version (`wiki` on API v3).
+    /// Commands that send other requests before writing text call this first.
+    pub fn ensure_input_format_supported(&self) -> Result<()> {
+        if self.config.input_format == InputFormat::Wiki && self.config.api_version >= 3 {
+            return Err(JiraError::Config(format!(
+                "input_format `wiki` requires Jira API v2, but this profile uses API v{}; use `markdown` or `adf`, or switch the profile to API v2",
+                self.config.api_version
+            )));
+        }
+        Ok(())
+    }
+
+    /// Clone of this client that interprets text input as `input_format`.
+    /// Used for per-call overrides such as `--description-format wiki`.
+    pub fn with_input_format(&self, input_format: InputFormat) -> Self {
+        let mut client = self.clone();
+        client.config.input_format = input_format;
+        client
     }
 
     fn platform_url(&self, path: &str) -> String {
@@ -477,7 +519,7 @@ impl JiraClient {
         });
 
         if let Some(description) = &req.description {
-            fields["description"] = self.markdown_body(description)?;
+            fields["description"] = self.text_body(description)?;
         }
 
         if let Some(assignee) = &req.assignee {
@@ -517,7 +559,7 @@ impl JiraClient {
         if let Some(adf) = &req.description_adf {
             fields["description"] = self.rich_text_body(adf.clone())?;
         } else if let Some(description) = &req.description {
-            fields["description"] = self.markdown_body(description)?;
+            fields["description"] = self.text_body(description)?;
         }
         if let Some(assignee) = &req.assignee {
             fields["assignee"] = self.resolve_assignee_field(assignee).await?;
@@ -1389,18 +1431,16 @@ impl JiraClient {
         let fallback_summary = req.summary.clone();
         let fallback_issue_type = req.issue_type.clone();
 
-        let description_adf = req
-            .description_adf
-            .or_else(|| req.description.as_deref().map(markdown_to_adf));
-
         let mut fields = json!({
             "project": { "key": req.project_key },
             "summary": req.summary,
             "issuetype": { "name": req.issue_type }
         });
 
-        if let Some(adf) = description_adf {
+        if let Some(adf) = req.description_adf {
             fields["description"] = self.rich_text_body(adf)?;
+        } else if let Some(description) = &req.description {
+            fields["description"] = self.text_body(description)?;
         }
         if let Some(assignee) = &req.assignee {
             fields["assignee"] = self.resolve_assignee_field(assignee).await?;
@@ -1502,7 +1542,7 @@ impl JiraClient {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment"));
 
-        let payload = json!({ "body": self.markdown_body(body)? });
+        let payload = json!({ "body": self.text_body(body)? });
 
         let http = &self.http;
         let raw: Value = self
@@ -1515,7 +1555,7 @@ impl JiraClient {
         })
     }
 
-    /// Update a comment using Markdown, encoded as wiki markup on API v2 or ADF on API v3.
+    /// Update a comment using the configured input format.
     pub async fn update_comment(
         &self,
         issue_key: &str,
@@ -1524,7 +1564,7 @@ impl JiraClient {
     ) -> Result<Comment> {
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/comment/{comment_id}"));
-        let payload = json!({ "body": self.markdown_body(body)? });
+        let payload = json!({ "body": self.text_body(body)? });
         let http = &self.http;
         let raw: Value = self
             .request(|| http.put(&url).headers(headers.clone()).json(&payload))
@@ -1584,7 +1624,7 @@ impl JiraClient {
         });
 
         if let Some(c) = comment {
-            body["comment"] = self.markdown_body(c)?;
+            body["comment"] = self.text_body(c)?;
         }
 
         let http = &self.http;
@@ -1613,6 +1653,8 @@ impl JiraClient {
                 message: "At least one worklog field must be provided".into(),
             });
         }
+        // Encode before the GET so an unsupported text format fails without a request.
+        let comment_body = comment.map(|c| self.text_body(c)).transpose()?;
         let headers = self.auth_headers()?;
         let url = self.platform_url(&format!("/issue/{issue_key}/worklog/{worklog_id}"));
         let http = &self.http;
@@ -1647,8 +1689,8 @@ impl JiraClient {
             "timeSpent": time_spent,
             "started": started,
         });
-        if let Some(comment) = comment {
-            body["comment"] = self.markdown_body(comment)?;
+        if let Some(comment_body) = comment_body {
+            body["comment"] = comment_body;
         } else if let Some(existing_comment) = existing.get("comment") {
             body["comment"] = existing_comment.clone();
         }
@@ -2135,7 +2177,7 @@ impl JiraClient {
 
         if let Some(c) = comment {
             payload["comment"] = json!({
-                "body": self.markdown_body(c)?
+                "body": self.text_body(c)?
             });
         }
 
@@ -2328,6 +2370,7 @@ mod tests {
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         })
     }
 
@@ -2428,6 +2471,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 2,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2499,6 +2543,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         let info = client.get_server_info().await.expect("server info");
@@ -2537,6 +2582,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         let fields = client
@@ -2590,6 +2636,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         let fields = client
@@ -3643,6 +3690,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 2,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         // Jira Server / Data Center does not route /bulk/issues/move at all, so the client must
@@ -3677,7 +3725,24 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 2,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         })
+    }
+
+    #[tokio::test]
+    async fn comment_body_for_display_renders_only_api_v2_wiki() {
+        let server = MockServer::start().await;
+        let dc = dc_client(&server);
+        assert_eq!(
+            dc.render_comment_body("h2. Details\n\n*Important*"),
+            "## Details\n\nImportant"
+        );
+
+        let cloud = cloud_client(&server);
+        assert_eq!(
+            cloud.render_comment_body("Already rendered *text*"),
+            "Already rendered *text*"
+        );
     }
 
     fn search_issue_json(key: &str) -> Value {
@@ -4044,6 +4109,157 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
     }
 
     #[tokio::test]
+    async fn wiki_input_format_sends_native_wiki_unchanged_on_api_v2() {
+        let wiki = "h2. Plan\n\n* item *bold*\n\n{code:javascript}\nconst a = 1;\n{code}\n\n!shot.png|thumbnail!";
+        let started = "2026-10-30T09:00:00.000+0000";
+        let server = MockServer::start().await;
+        let client = dc_client(&server).with_input_format(InputFormat::Wiki);
+        for (method_name, suffix) in [("POST", "comment"), ("PUT", "comment/100")] {
+            Mock::given(method(method_name))
+                .and(path(format!("/rest/api/2/issue/DC-1/{suffix}")))
+                .and(body_json(json!({ "body": wiki })))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "id": "100", "body": wiki
+                })))
+                .expect(1)
+                .mount(&server)
+                .await;
+        }
+        for (method_name, suffix) in [("POST", "worklog"), ("PUT", "worklog/200")] {
+            Mock::given(method(method_name))
+                .and(path(format!("/rest/api/2/issue/DC-1/{suffix}")))
+                .and(body_json(json!({
+                    "timeSpent": "1h", "started": started, "comment": wiki
+                })))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "id": "200", "timeSpent": "1h", "started": started, "comment": wiki
+                })))
+                .expect(1)
+                .mount(&server)
+                .await;
+        }
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-1/worklog/200"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "200", "timeSpent": "1h", "started": started, "comment": "old"
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issueLink"))
+            .and(body_partial_json(json!({ "comment": { "body": wiki } })))
+            .respond_with(ResponseTemplate::new(201))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        client.add_comment("DC-1", wiki).await.expect("add comment");
+        client
+            .update_comment("DC-1", "100", wiki)
+            .await
+            .expect("update comment");
+        client
+            .add_worklog("DC-1", "1h", Some(wiki), Some(started))
+            .await
+            .expect("add worklog");
+        client
+            .update_worklog("DC-1", "200", None, Some(wiki), None)
+            .await
+            .expect("update worklog");
+        client
+            .link_issues("DC-1", "DC-2", "Relates", Some(wiki))
+            .await
+            .expect("link comment");
+    }
+
+    #[test]
+    fn ensure_input_format_supported_rejects_only_wiki_on_api_v3() {
+        for (api_version, input_format, ok) in [
+            (2, InputFormat::Wiki, true),
+            (2, InputFormat::Markdown, true),
+            (3, InputFormat::Markdown, true),
+            (3, InputFormat::Wiki, false),
+            (2, InputFormat::Adf, true),
+            (3, InputFormat::Adf, true),
+        ] {
+            let client = JiraClient::new(JiraConfig {
+                api_version,
+                input_format,
+                ..JiraConfig::default()
+            });
+            assert_eq!(
+                client.ensure_input_format_supported().is_ok(),
+                ok,
+                "API v{api_version}, {input_format:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn adf_input_converts_on_v2_and_preserves_the_document_on_v3() {
+        let document = markdown_to_adf("Hello **world**");
+        for api_version in [2, 3] {
+            let server = MockServer::start().await;
+            let expected = if api_version == 2 {
+                json!("Hello *world*")
+            } else {
+                document.clone()
+            };
+            Mock::given(method("POST"))
+                .and(path(format!("/rest/api/{api_version}/issue/P-1/comment")))
+                .and(body_json(json!({ "body": expected })))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                    "id": "100", "body": expected
+                })))
+                .expect(1)
+                .mount(&server)
+                .await;
+            let client = JiraClient::new(JiraConfig {
+                base_url: server.uri(),
+                token: Some("token".into()),
+                api_version,
+                input_format: InputFormat::Adf,
+                ..JiraConfig::default()
+            });
+            client
+                .add_comment("P-1", &document.to_string())
+                .await
+                .unwrap();
+            for invalid in [
+                "not JSON",
+                "[]",
+                "{}",
+                r#"{"type":"doc","version":2,"content":[]}"#,
+                r#"{"type":"doc","version":1,"content":{}}"#,
+            ] {
+                let error = client.add_comment("P-1", invalid).await.unwrap_err();
+                assert!(error.to_string().contains("ADF"), "{error}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn markdown_override_on_a_wiki_client_still_converts_markdown() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue/DC-1/comment"))
+            .and(body_json(json!({ "body": "hello *world*" })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({
+                "id": "100", "body": "hello *world*"
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        dc_client(&server)
+            .with_input_format(InputFormat::Wiki)
+            .with_input_format(InputFormat::Markdown)
+            .add_comment("DC-1", "hello **world**")
+            .await
+            .expect("markdown must still be converted to wiki");
+    }
+
+    #[tokio::test]
     async fn tui_mentions_use_deployment_specific_wiki_or_cloud_adf() {
         for (deployment, api_version, identifier, expected_wiki) in [
             (
@@ -4158,6 +4374,110 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             )
             .await
             .expect("update should succeed");
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn deprecated_create_issue_follows_input_format() {
+        let wiki = "h2. Legacy *create*";
+        let server = MockServer::start().await;
+        for expected in [wiki, "h2. Legacy"] {
+            Mock::given(method("POST"))
+                .and(path("/rest/api/2/issue"))
+                .and(body_partial_json(
+                    json!({ "fields": { "description": expected } }),
+                ))
+                .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "DC-9" })))
+                .expect(1)
+                .mount(&server)
+                .await;
+        }
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-9"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(search_issue_json("DC-9")))
+            .mount(&server)
+            .await;
+
+        let request = |description: &str| CreateIssueRequest {
+            project_key: "DC".into(),
+            summary: "Legacy".into(),
+            description: Some(description.into()),
+            issue_type: "Task".into(),
+            assignee: None,
+            priority: None,
+        };
+        dc_client(&server)
+            .with_input_format(InputFormat::Wiki)
+            .create_issue(request(wiki))
+            .await
+            .expect("wiki description is sent unchanged");
+        dc_client(&server)
+            .create_issue(request("## Legacy"))
+            .await
+            .expect("markdown description is still converted");
+    }
+
+    #[tokio::test]
+    async fn wiki_input_format_sends_description_unchanged_on_api_v2() {
+        let wiki = "h1. Title\n\n* point\n\n{noformat}raw{noformat}\n\n!shot.png|width=600!";
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/rest/api/2/issue"))
+            .and(body_json(json!({
+                "fields": {
+                    "project": { "key": "DC" },
+                    "summary": "Wiki issue",
+                    "issuetype": { "name": "Task" },
+                    "description": wiki
+                }
+            })))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "key": "DC-5" })))
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/DC-5"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(search_issue_json("DC-5")))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/DC-5"))
+            .and(body_json(json!({ "fields": { "description": wiki } })))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = dc_client(&server).with_input_format(InputFormat::Wiki);
+        client
+            .create_issue_v2(CreateIssueRequestV2 {
+                project_key: "DC".into(),
+                summary: "Wiki issue".into(),
+                description: Some(wiki.into()),
+                description_adf: None,
+                issue_type: "Task".into(),
+                assignee: None,
+                priority: None,
+                labels: vec![],
+                components: vec![],
+                parent: None,
+                fix_versions: vec![],
+                custom_fields: std::collections::HashMap::new(),
+            })
+            .await
+            .expect("wiki description must be sent unchanged on create");
+
+        client
+            .update_issue(
+                "DC-5",
+                UpdateIssueRequest {
+                    description: Some(wiki.into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("wiki description must be sent unchanged on update");
     }
 
     #[tokio::test]
@@ -4307,6 +4627,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         // Test list
@@ -4377,6 +4698,7 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
             api_version: 3,
             default_issue_limit: None,
             ca_bundle: None,
+            input_format: Default::default(),
         });
 
         let issue = client.get_issue("TEST-1").await.expect("get issue");

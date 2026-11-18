@@ -7,6 +7,20 @@ pub use wiki::{adf_to_wiki, collect_formatting_warnings, collect_formatting_warn
 /// stack overflow from maliciously deep or cyclic documents.
 const MAX_RENDER_DEPTH: usize = 128;
 
+/// Parse an ADF v1 document and check its root fields.
+pub fn parse_adf(input: &str) -> crate::error::Result<Value> {
+    use crate::error::JiraError;
+
+    let document: Value = serde_json::from_str(input)
+        .map_err(|error| JiraError::Config(format!("Invalid ADF JSON: {error}")))?;
+    if document["type"] != "doc" || document["version"] != 1 || !document["content"].is_array() {
+        return Err(JiraError::Config(
+            "ADF input requires an object with type 'doc', version 1 and a content array".into(),
+        ));
+    }
+    Ok(document)
+}
+
 /// Convert an ADF (Atlassian Document Format) JSON value to plain text.
 pub fn adf_to_text(value: &Value) -> String {
     let mut output = String::new();

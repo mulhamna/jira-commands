@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.0.1...jira-mcp-v3.1.0) (2026-11-19)
+
+
+### Features
+
+* **mcp:** expose rich-text input formats ([#550](https://github.com/mulhamna/jira-commands/issues/550)) ([e53d88f](https://github.com/mulhamna/jira-commands/commit/e53d88f477e0bc8b8af61b645f5874ceb2e8899a))
+
 ## [3.0.1](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.0.0...jira-mcp-v3.0.1) (2026-11-09)
 
 

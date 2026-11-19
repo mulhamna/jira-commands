@@ -124,7 +124,7 @@ impl ServerHandler for JiraMcpServer {
 impl JiraMcpServer {
     #[tool(
         name = "jira_auth_status",
-        description = "Show Jira auth configuration, token presence, and config path"
+        description = "Show Jira auth configuration, token presence, config path, and input_format (markdown, wiki or adf: how description, comment and worklog text is interpreted)"
     )]
     pub async fn jira_auth_status(&self) -> Result<Json<ToolResponse>, ErrorData> {
         self.respond(self.app.auth_status())
@@ -521,7 +521,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_create",
-        description = "Create a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
+        description = "Create a Jira issue. Supply 'description' in the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string. 'description_adf' accepts a pre-built ADF object and takes precedence. API v2 warns and flattens unsupported rich text rather than rejecting it. For required custom fields, use 'custom_fields' parameter (BTreeMap field_id→value): e.g., {\"customfield_10553\": [\"label1\", \"label2\"]} for array fields like Labels."
     )]
     pub async fn jira_issue_create(
         &self,
@@ -532,7 +532,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_update",
-        description = "Update fields on a Jira issue. Put normal text in 'description' as Markdown (converted to ADF for API v3 or Jira wiki markup for API v2); only use 'description_adf' for pre-built ADF. API v2 warns and flattens unsupported rich text rather than rejecting it."
+        description = "Update fields on a Jira issue. Supply 'description' in the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string. 'description_adf' accepts a pre-built ADF object and takes precedence. API v2 warns and flattens unsupported rich text rather than rejecting it."
     )]
     pub async fn jira_issue_update(
         &self,
@@ -609,7 +609,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_comment_add",
-        description = "Add a Markdown comment to a Jira issue"
+        description = "Add a comment to a Jira issue. 'body' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_comment_add(
         &self,
@@ -620,7 +620,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_comment_update",
-        description = "Replace the Markdown body of a Jira issue comment"
+        description = "Replace the body of a Jira issue comment. 'body' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_comment_update(
         &self,
@@ -642,7 +642,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_bulk_comment",
-        description = "Add the same comment to multiple Jira issues selected by JQL or explicit keys; requires confirm=true"
+        description = "Add the same comment to multiple Jira issues selected by JQL or explicit keys; requires confirm=true. 'body' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_issue_bulk_comment(
         &self,
@@ -661,7 +661,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_link_create",
-        description = "Create a link between two Jira issues using a Jira link type name"
+        description = "Create a link between two Jira issues using a Jira link type name. Optional 'comment' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_issue_link_create(
         &self,
@@ -727,7 +727,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_worklog_add",
-        description = "Add a worklog entry to a Jira issue"
+        description = "Add a worklog entry to a Jira issue. Optional 'comment' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_worklog_add(
         &self,
@@ -738,7 +738,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_worklog_update",
-        description = "Update provided fields on a Jira worklog entry"
+        description = "Update provided fields on a Jira worklog entry. 'comment' uses the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string"
     )]
     pub async fn jira_worklog_update(
         &self,
@@ -782,7 +782,7 @@ save_path must be an absolute path inside $HOME unless force_path=true."
 
     #[tool(
         name = "jira_issue_batch",
-        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take Markdown 'description' (converted to ADF for API v3 or Jira wiki markup for API v2)."
+        description = "Run typed issue operations in sequence; requires confirm=true. 'operations' is an array of {op: \"create\"|\"update\"|\"transition\"|\"archive\", ...}; create/update take 'description' in the input_format reported by jira_auth_status: Markdown (default), wiki (API v2 only), or an ADF JSON string."
     )]
     pub async fn jira_issue_batch(
         &self,

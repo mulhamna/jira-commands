@@ -50,6 +50,15 @@ The server reuses the same credentials/config as `jirac`:
 - `JIRA_URL`
 - `JIRA_EMAIL`
 - `JIRA_TOKEN`
+- `JIRA_INPUT_FORMAT`: `markdown` (default), `wiki` (native markup, API v2 only),
+  or `adf` (an ADF JSON string). Applies to description, comment, worklog and link
+  text; `jira_auth_status` reports it as `input_format`. API v2 converts ADF to wiki
+  with warnings for unsupported content; API v3 sends the validated document.
+  Explicit `description_adf` objects take precedence over `description`.
+
+The MCP server follows the active profile's `input_format`, shared with the CLI.
+Set `JIRA_INPUT_FORMAT` in your MCP client configuration to override it for the
+server, for example `markdown` when the CLI profile uses `wiki`.
 
 You can initialize and switch credentials with:
 

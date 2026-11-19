@@ -239,12 +239,11 @@ pub struct IssueCreateArgs {
     pub project_key: String,
     pub summary: String,
     pub issue_type: String,
-    /// Issue description as plain Markdown (headings, lists, tables, code,
-    /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
-    /// normal text — do NOT hand-build ADF.
+    /// Description in the active input_format reported by jira_auth_status:
+    /// Markdown (default), native wiki (API v2 only), or an ADF JSON string.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
-    /// for Markdown. If both are set, this one wins.
+    /// in the active input_format. If both are set, this one wins.
     /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
@@ -266,12 +265,11 @@ pub struct IssueCreateArgs {
 pub struct IssueUpdateArgs {
     pub key: String,
     pub summary: Option<String>,
-    /// Issue description as plain Markdown (headings, lists, tables, code,
-    /// links). Converted to ADF for API v3 or Jira wiki markup for API v2. Use this for
-    /// normal text — do NOT hand-build ADF.
+    /// Description in the active input_format reported by jira_auth_status:
+    /// Markdown (default), native wiki (API v2 only), or an ADF JSON string.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
-    /// for Markdown. If both are set, this one wins.
+    /// in the active input_format. If both are set, this one wins.
     /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
@@ -345,6 +343,8 @@ pub struct IssueAttachArgs {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CommentAddArgs {
     pub key: String,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub body: String,
 }
 
@@ -352,6 +352,8 @@ pub struct CommentAddArgs {
 pub struct CommentUpdateArgs {
     pub key: String,
     pub comment_id: String,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub body: String,
 }
 
@@ -366,6 +368,8 @@ pub struct CommentDeleteArgs {
 pub struct BulkCommentArgs {
     pub jql: Option<String>,
     pub keys: Option<Vec<String>>,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub body: String,
     pub confirm: Option<bool>,
 }
@@ -375,6 +379,8 @@ pub struct IssueLinkCreateArgs {
     pub outward_key: String,
     pub inward_key: String,
     pub link_type: String,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub comment: Option<String>,
 }
 
@@ -402,6 +408,8 @@ pub struct RemoteLinkDeleteArgs {
 pub struct WorklogAddArgs {
     pub key: String,
     pub time_spent: String,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub comment: Option<String>,
     pub started: Option<String>,
 }
@@ -417,6 +425,8 @@ pub struct WorklogUpdateArgs {
     pub key: String,
     pub id: String,
     pub time_spent: Option<String>,
+    /// Text in the active input_format: Markdown (default), wiki (API v2 only),
+    /// or an ADF JSON string. Check jira_auth_status for the active format.
     pub comment: Option<String>,
     pub started: Option<String>,
 }
@@ -447,11 +457,11 @@ pub struct BatchCreateOp {
     pub project_key: String,
     pub summary: String,
     pub issue_type: Option<String>,
-    /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
-    /// wiki markup for API v2 — do NOT hand-build ADF.
+    /// Description in the active input_format reported by jira_auth_status:
+    /// Markdown (default), native wiki (API v2 only), or an ADF JSON string.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
-    /// for Markdown. If both are set, this one wins.
+    /// in the active input_format. If both are set, this one wins.
     /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]
@@ -473,11 +483,11 @@ pub struct BatchCreateOp {
 pub struct BatchUpdateOp {
     pub key: String,
     pub summary: Option<String>,
-    /// Issue description as plain Markdown. Converted to ADF for API v3 or Jira
-    /// wiki markup for API v2 — do NOT hand-build ADF.
+    /// Description in the active input_format reported by jira_auth_status:
+    /// Markdown (default), native wiki (API v2 only), or an ADF JSON string.
     pub description: Option<String>,
     /// Advanced/optional: pre-built ADF JSON. Leave unset and use `description`
-    /// for Markdown. If both are set, this one wins.
+    /// in the active input_format. If both are set, this one wins.
     /// API v2 converts ADF to wiki, warning and flattening unsupported formatting.
     #[serde(default)]
     #[schemars(schema_with = "any_json_object")]

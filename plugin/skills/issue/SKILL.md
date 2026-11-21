@@ -14,6 +14,11 @@ Use `jirac --version` to check availability; if missing, tell the user to instal
 Create accepts `--assignee`, `--priority`, `--labels`, `--components`,
 `--parent`, `--sprint`, `--fix-version`, `--description-file`, and repeatable
 `--field '<FIELD_ID>=<VALUE>'`; update supports the applicable field flags.
+For a description file, `--description-format markdown|wiki|text|adf`
+overrides the configured `input_format`: `text` is literal text, `adf` is
+an ADF JSON document, and `wiki` is native Jira wiki markup for API v2 only.
+Without the flag, `jirac config show` reports the effective input format;
+`JIRA_INPUT_FORMAT` can override it for one command. Markdown is the default.
 Use `jirac issue fields -p <PROJECT> --issue-type '<TYPE>'` to discover actual
 field IDs and value shapes. `--field` uses the ID literally; never assume a
 story-points ID or hardcode a custom field.
@@ -26,6 +31,11 @@ CLI's custom-field prompts. This flag does not supply missing values.
 Updates with `--labels`, `--components`, or `--fix-version` **replace** the
 whole respective list. To add or remove items, first inspect existing values,
 then send the complete intended list; leave unrelated fields untouched.
+
+Human-readable issue views render API v2 wiki or API v3 ADF descriptions for
+display. `jirac issue view <KEY> --json` retains the Jira description value
+(wiki string or ADF object); do not treat rendered text as lossless source.
+API v2 formatting conversions can emit warnings on stderr; report these.
 
 ## Clone, move, change type, and delete
 
@@ -50,8 +60,9 @@ then send the complete intended list; leave unrelated fields untouched.
 - Link types: `jirac issue link list-types`; add with
   `jirac issue link add --link-type '<TYPE>' <OUTWARD-KEY> <INWARD-KEY>
   [--comment '<TEXT>']`. The outward issue is the source (e.g. blocker);
-  inspect existing links to avoid duplicates. Delete with
-  `jirac issue link delete <LINK-ID> [--force]` after confirmation.
+  the comment uses the configured `input_format`. Inspect existing links to
+  avoid duplicates. Delete with `jirac issue link delete <LINK-ID> [--force]`
+  after confirmation.
 - Attach: verify the file exists, then run `jirac issue attach <KEY> <FILE>`.
 - List attachments: `jirac issue attachment list <KEY> [--json]`.
 - Download: `jirac issue attachment download <ID> [--out <DIR>] [--filename <NAME>] [--force]`.

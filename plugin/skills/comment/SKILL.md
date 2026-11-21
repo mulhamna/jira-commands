@@ -8,7 +8,19 @@ Use `jirac --version` to check availability; if missing, tell the user to instal
 ## Comments
 
 - List: `jirac issue comment <KEY> list`
-- Add: `jirac issue comment <KEY> add --body '<COMMENT>'`, or use `--file <FILE>` for Markdown in a file.
+- Add: `jirac issue comment <KEY> add --body '<COMMENT>'`, or use `--file <FILE>`.
+- Update: `jirac issue comment <KEY> update <COMMENT-ID> --body '<COMMENT>'`
+  or use `--file <FILE>`.
+- Delete: `jirac issue comment <KEY> delete <COMMENT-ID> [--force]`. Confirm
+  deletion explicitly; use `--force` only after confirmation when needed.
+
+Comment bodies, bulk comments, and worklog comments use the configured
+`input_format`: Markdown by default, native `wiki` on API v2 only, or an `adf`
+JSON document. Check `jirac config show`; `JIRA_INPUT_FORMAT` overrides the
+profile for one command. Supply content in that format rather than assuming
+`--file` means Markdown. Report formatting-loss warnings printed to stderr.
+Comment list output renders API v2 wiki and API v3 ADF for display; it is not
+a lossless source for editing.
 
 ## Bulk comments
 

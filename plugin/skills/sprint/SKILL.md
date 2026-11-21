@@ -12,6 +12,9 @@ Use `jirac --version` to check availability; if missing, tell the user to instal
 - Update: `jirac issue sprint-update -p <PROJECT> --sprint '<ID|NAME>' [--name '<NAME>'] [--goal '<TEXT>'] [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]`
 - Delete: `jirac issue sprint-delete -p <PROJECT> --sprint '<ID|NAME>' [--force]`
 
+Sprint updates can clear values with `--clear-goal`, `--clear-start-date`, and
+`--clear-end-date`.
+
 List sprints first when the target is unclear; use a configured default project
 if appropriate. Creation needs `--board-id` when the project maps to multiple
 boards. Confirm before start, complete, or delete: these affect the team, and

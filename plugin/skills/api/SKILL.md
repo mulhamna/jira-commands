@@ -31,9 +31,12 @@ Use `jirac api get <PATH>` or `jirac api delete <PATH>`. For a JSON body, use
 ## Render Markdown
 
 Use `jirac issue render --input <FILE>` or pipe text to `jirac issue render`
-to preview Markdown as ADF. The preview does not resolve `@username` into a
-Jira mention and is not a preview of the wiki markup sent to API v2. After
-review, send Markdown via `--description-file` or comment `--file`.
+to preview Markdown as ADF. It also accepts `--format text|adf` and
+`--output adf|text`; ADF input is parsed as JSON, not fully schema-validated.
+The preview does not resolve `@username` into a Jira mention and is not a
+preview of the wiki markup sent to API v2. To send the reviewed Markdown via
+`--description-file`, use `--description-format markdown`; for comment
+`--file`, set `JIRA_INPUT_FORMAT=markdown` for that command.
 
 ## Inspect fields
 

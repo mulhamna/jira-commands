@@ -16,6 +16,9 @@ fn any_json_object(_: &mut SchemaGenerator) -> Schema {
 pub struct ToolResponse {
     #[schemars(schema_with = "any_json_object")]
     pub result: Value,
+    /// Formatting losses detected while preparing this tool call's Jira writes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

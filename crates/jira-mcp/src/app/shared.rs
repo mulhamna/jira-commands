@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use url::form_urlencoded;
 
-use jira_core::{adf::adf_to_text, config::JiraConfig, model::Issue, JiraClient};
+use jira_core::{config::JiraConfig, model::Issue, rich_text::rich_text_to_text, JiraClient};
 
 use crate::error::{AppError, AppResult};
 
@@ -132,8 +132,8 @@ const DESCRIPTION_EXCERPT_LEN: usize = 500;
 /// list of full issues with ADF bodies can overflow and surface as a truncated
 /// `Unexpected EOF` parse error. Slimming keeps responses well under that cap.
 pub(super) fn slim_issue(issue: &Issue) -> Value {
-    let excerpt = issue.description.as_ref().map(|adf| {
-        let text = adf_to_text(adf);
+    let excerpt = issue.description.as_ref().map(|description| {
+        let text = rich_text_to_text(description);
         truncate_chars(text.trim(), DESCRIPTION_EXCERPT_LEN)
     });
 

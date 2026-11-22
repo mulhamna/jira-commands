@@ -38,6 +38,7 @@ feature and returns an error on Standard and Free tiers.
 `jirac issue notifications [-p <PROJECT>] [--since <WINDOW>] [--limit <N>]`
 scans recent issue descriptions and comments for mentions; it is not Jira's
 notification feed. The default lookback is seven days, and the default scan
-limit is 50 recently updated issues (maximum 100). Detection uses ADF mention
-nodes, not mentions in API v2 wiki strings. State these limits rather than
+limit is 50 recently updated issues (maximum 100). Detection reads ADF mention
+nodes on API v3 and `[~user]` links in API v2 wiki markup, outside `{code}` and
+`{noformat}` blocks. State these limits rather than
 claiming a complete inbox. Use `jirac issue view <KEY>` for details.

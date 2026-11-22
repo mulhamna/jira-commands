@@ -2,6 +2,11 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.19.2] - 2026-11-23
+
+### Fixed
+- Describe API v2 wiki mention detection in the notifications guidance.
+
 ## [0.19.1] - 2026-11-21
 
 ### Fixed

@@ -126,6 +126,14 @@ pub(super) struct Modal {
     pub field_rects: Vec<Rect>,
 }
 
+fn comment_label(input_format: InputFormat) -> &'static str {
+    match input_format {
+        InputFormat::Markdown => "Comment (markdown)",
+        InputFormat::Wiki => "Comment (wiki markup)",
+        InputFormat::Adf => "Comment (ADF JSON)",
+    }
+}
+
 impl Modal {
     pub(super) fn edit_issue(
         key: String,
@@ -193,11 +201,7 @@ impl Modal {
             kind: ModalKind::AddComment { key },
             fields: vec![
                 ModalField {
-                    label: match input_format {
-                        InputFormat::Markdown => "Comment (markdown)",
-                        InputFormat::Wiki => "Comment (wiki markup)",
-                        InputFormat::Adf => "Comment (ADF JSON)",
-                    },
+                    label: comment_label(input_format),
                     area: comment_area,
                     multiline: true,
                 },
@@ -222,7 +226,7 @@ impl Modal {
         }
     }
 
-    pub(super) fn bulk_comment(jql: String) -> Self {
+    pub(super) fn bulk_comment(jql: String, input_format: InputFormat) -> Self {
         let mut jql_area = TextArea::from(vec![jql]);
         jql_area.set_cursor_line_style(Style::default());
         jql_area.set_placeholder_text("use current filter or replace with custom JQL");
@@ -233,7 +237,7 @@ impl Modal {
 
         let mut comment_area = TextArea::default();
         comment_area.set_cursor_line_style(Style::default());
-        comment_area.set_placeholder_text("required markdown comment");
+        comment_area.set_placeholder_text("required");
 
         Self {
             kind: ModalKind::BulkComment,
@@ -249,7 +253,7 @@ impl Modal {
                     multiline: true,
                 },
                 ModalField {
-                    label: "Comment",
+                    label: comment_label(input_format),
                     area: comment_area,
                     multiline: true,
                 },

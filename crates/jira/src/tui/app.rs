@@ -1834,7 +1834,7 @@ pub async fn run_tui(
             }
 
             AppAction::BulkComment => {
-                app.open_modal(Modal::bulk_comment(app.jql.clone()));
+                app.open_modal(Modal::bulk_comment(app.jql.clone(), client.input_format()));
             }
 
             AppAction::AddWorklog(key) => {
@@ -2048,6 +2048,7 @@ pub async fn run_tui(
                         let jql_raw = modal.field_text(0);
                         let keys_raw = modal.field_text(1);
                         let body = modal.field_text(2);
+                        let mention_map = modal.mention_map.clone();
                         let jql = jql_raw.trim().to_string();
                         let body_trim = body.trim().to_string();
 
@@ -2136,7 +2137,7 @@ pub async fn run_tui(
                         for key in &target_keys {
                             let (result, warnings) =
                                 jira_core::adf::collect_formatting_warnings_silently(
-                                    client.add_comment(key, &body_trim),
+                                    submit_comment(&client, key, &body_trim, &mention_map),
                                 )
                                 .await;
                             has_warning |= !warnings.is_empty();
@@ -3282,6 +3283,14 @@ mod tests {
             .await
             .expect("update");
         server.verify().await;
+    }
+
+    #[test]
+    fn comment_modals_label_the_profile_input_format() {
+        let single = Modal::add_comment("PROJ-1".into(), InputFormat::Wiki);
+        assert_eq!(single.fields[0].label, "Comment (wiki markup)");
+        let bulk = Modal::bulk_comment(String::new(), InputFormat::Adf);
+        assert_eq!(bulk.fields[2].label, "Comment (ADF JSON)");
     }
 
     #[tokio::test]

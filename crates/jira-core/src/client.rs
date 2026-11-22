@@ -212,6 +212,10 @@ impl JiraClient {
     /// (`name`, falling back to `key`) on Data Center / Server, where /myself has no accountId.
     pub async fn get_myself(&self) -> Result<String> {
         let me = self.get_myself_info().await?;
+        self.preferred_myself_id(me)
+    }
+
+    fn preferred_myself_id(&self, me: MyselfResponse) -> Result<String> {
         let preferred = if self.is_data_center() {
             me.name.clone().or_else(|| me.key.clone())
         } else {
@@ -224,6 +228,21 @@ impl JiraClient {
                 status: 0,
                 message: "Could not determine the current user from /myself".into(),
             })
+    }
+
+    /// Every identifier that can refer to the current user: the preferred one from
+    /// [`Self::get_myself`] first, then accountId, login name and key. API v2 wiki
+    /// mentions on Data Center may use either the login name or the user key.
+    pub async fn get_myself_ids(&self) -> Result<Vec<String>> {
+        let me = self.get_myself_info().await?;
+        let fallback = [me.account_id.clone(), me.name.clone(), me.key.clone()];
+        let mut ids = vec![self.preferred_myself_id(me)?];
+        for id in fallback.into_iter().flatten() {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.

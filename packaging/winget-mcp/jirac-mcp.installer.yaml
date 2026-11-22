@@ -1,21 +1,21 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: mulhamna.jirac-mcp
-PackageVersion: 3.1.0
+PackageVersion: 3.2.0
 InstallerType: zip
 NestedInstallerType: portable
-ReleaseDate: 2026-11-19
+ReleaseDate: 2026-11-21
 Installers:
   - Architecture: x64
     NestedInstallerFiles:
       - RelativeFilePath: jirac-mcp-windows-x86_64.exe
         PortableCommandAlias: jirac-mcp
-    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v3.1.0/jirac-mcp-windows-x86_64.zip
-    InstallerSha256: a1ba347345c7a0d9202b1d8b237540ea077cf35802da095cc01140ebd944dfb4
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v3.2.0/jirac-mcp-windows-x86_64.zip
+    InstallerSha256: 3524326655e154bb42ab297f4511c5d1effb68a017ac27d6ae2f93f2e8a14f7b
   - Architecture: arm64
     NestedInstallerFiles:
       - RelativeFilePath: jirac-mcp-windows-aarch64.exe
         PortableCommandAlias: jirac-mcp
-    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v3.1.0/jirac-mcp-windows-aarch64.zip
-    InstallerSha256: b88529e0fcc37a57eab20e834a8ad55790f263f7fa7a678e49b074683fc50eb8
+    InstallerUrl: https://github.com/mulhamna/jira-commands/releases/download/jira-mcp-v3.2.0/jirac-mcp-windows-aarch64.zip
+    InstallerSha256: 204f915ee489be9b6327704bf6112527ad82d358db76089b5140092a28876380
 ManifestType: installer
 ManifestVersion: 1.9.0

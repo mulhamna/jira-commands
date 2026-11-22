@@ -7,10 +7,6 @@ use std::{
 };
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "Windows debug CLI requires an increased stack reserve"
-)]
 fn cli_formatting_warnings_use_stderr_without_changing_json_or_errors() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
@@ -96,6 +92,7 @@ fn cli_formatting_warnings_use_stderr_without_changing_json_or_errors() {
             }
         }
         let output = command
+            .current_dir(&temp)
             .args(["issue", "update", key, "--description-file"])
             .arg(&description)
             .arg("--json")
@@ -103,6 +100,7 @@ fn cli_formatting_warnings_use_stderr_without_changing_json_or_errors() {
             .env("JIRA_EMAIL", "test@example.invalid")
             .env("JIRA_TOKEN", "test")
             .env("JIRA_API_VERSION", version)
+            .env("JIRA_INPUT_FORMAT", "markdown")
             .env("HOME", &temp)
             .env("USERPROFILE", &temp)
             .env("APPDATA", &temp)

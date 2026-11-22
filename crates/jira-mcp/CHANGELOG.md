@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.1.0...jira-mcp-v3.2.0) (2026-11-21)
+
+
+### Features
+
+* **jira-mcp:** render Jira wiki markup in MCP displays ([#556](https://github.com/mulhamna/jira-commands/issues/556)) ([5071699](https://github.com/mulhamna/jira-commands/commit/50716997f9f0e2f18b8c9c9483f7a859f3f2d26d))
+
+
+### Bug Fixes
+
+* **jira-mcp:** surface Jira formatting warnings ([#557](https://github.com/mulhamna/jira-commands/issues/557)) ([0111e18](https://github.com/mulhamna/jira-commands/commit/0111e18d20ff573cd7a02ddba1a2d3ae27f97cd2))
+
 ## [3.1.0](https://github.com/mulhamna/jira-commands/compare/jira-mcp-v3.0.1...jira-mcp-v3.1.0) (2026-11-19)
 
 

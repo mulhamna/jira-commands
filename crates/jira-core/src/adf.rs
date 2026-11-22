@@ -126,10 +126,11 @@ fn render_children(node: &Value, out: &mut String, depth: usize) {
 
 fn render_list(node: &Value, out: &mut String, depth: usize, ordered: bool) {
     let indent = "  ".repeat(depth);
+    let start = node["attrs"]["order"].as_u64().unwrap_or(1);
     if let Some(items) = node.get("content").and_then(|v| v.as_array()) {
         for (i, item) in items.iter().enumerate() {
             let bullet = if ordered {
-                format!("{}{}. ", indent, i + 1)
+                format!("{}{}. ", indent, start.saturating_add(i as u64))
             } else {
                 format!("{}- ", indent)
             };
@@ -421,10 +422,14 @@ fn convert_node<'a>(
                 ListType::Ordered => "orderedList",
                 ListType::Bullet => "bulletList",
             };
-            out.push(json!({
+            let mut list_node = json!({
                 "type": list_type,
                 "content": items
-            }));
+            });
+            if list.list_type == ListType::Ordered && list.start != 1 {
+                list_node["attrs"] = json!({ "order": list.start });
+            }
+            out.push(list_node);
         }
         NodeValue::Item(_) => {
             for child in node.children() {
@@ -432,7 +437,7 @@ fn convert_node<'a>(
             }
         }
         NodeValue::CodeBlock(code) => {
-            let language = code.info.trim().to_string();
+            let language = code.info.split_whitespace().next().unwrap_or("");
             let text = code.literal.trim_end_matches('\n').to_string();
             out.push(json!({
                 "type": "codeBlock",
@@ -706,6 +711,55 @@ mod tests {
         let adf = markdown_to_adf("- [docs](https://example.com)\n\n```rust\nfn main() {}\n```");
         assert_eq!(adf["content"][0]["type"], "bulletList");
         assert_eq!(adf["content"][1]["type"], "codeBlock");
+    }
+
+    #[test]
+    fn markdown_conversion_preserves_ordered_list_starts() {
+        let adf = markdown_to_adf("3. Third\n4. Fourth\n\n   7. Nested");
+        assert_eq!(adf["content"][0]["attrs"]["order"], 3);
+        assert_eq!(
+            adf["content"][0]["content"][1]["content"][1]["attrs"]["order"],
+            7
+        );
+        let default_start = markdown_to_adf("1. First");
+        assert!(default_start["content"][0].get("attrs").is_none());
+        let bullet = markdown_to_adf("- First");
+        assert!(bullet["content"][0].get("attrs").is_none());
+    }
+
+    #[test]
+    fn markdown_conversion_uses_first_code_info_word_as_language() {
+        for (info, language) in [
+            ("python title=\"example.py\"", "python"),
+            ("java linenums", "java"),
+            ("", ""),
+        ] {
+            let adf = markdown_to_adf(&format!("```{info}\nprint(1)\n```"));
+            assert_eq!(adf["content"][0]["attrs"]["language"], language);
+            assert_eq!(adf["content"][0]["content"][0]["text"], "print(1)");
+        }
+    }
+
+    #[test]
+    fn ordered_list_display_preserves_start_and_default_numbering() {
+        for (attrs, expected) in [
+            (json!({"order": 3}), "3. Third\n4. Fourth"),
+            (json!({}), "1. Third\n2. Fourth"),
+        ] {
+            let adf = json!({
+                "type": "orderedList",
+                "attrs": attrs,
+                "content": [
+                    {"type": "listItem", "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Third"}]}
+                    ]},
+                    {"type": "listItem", "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "Fourth"}]}
+                    ]}
+                ]
+            });
+            assert_eq!(adf_to_text(&adf), expected);
+        }
     }
 
     #[test]

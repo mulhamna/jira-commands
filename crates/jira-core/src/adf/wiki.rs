@@ -1186,6 +1186,34 @@ mod tests {
     }
 
     #[test]
+    fn markdown_conversion_preserves_nondefault_ordered_starts_as_readable_numbers() {
+        for deployment in [JiraDeployment::DataCenter, JiraDeployment::Cloud] {
+            assert_eq!(
+                adf_to_wiki(&markdown_to_adf("3. Third\n4. Fourth"), &deployment).unwrap(),
+                "3. Third\\\\\n4. Fourth"
+            );
+            assert_eq!(
+                adf_to_wiki(&markdown_to_adf("1. First\n2. Second"), &deployment).unwrap(),
+                "# First\n# Second"
+            );
+        }
+    }
+
+    #[test]
+    fn markdown_conversion_preserves_code_language_with_fence_metadata() {
+        for deployment in [JiraDeployment::DataCenter, JiraDeployment::Cloud] {
+            assert_eq!(
+                adf_to_wiki(
+                    &markdown_to_adf("```java title=\"Example.java\"\nint n = 1;\n```"),
+                    &deployment
+                )
+                .unwrap(),
+                "{code:java}\nint n = 1;\n{code}"
+            );
+        }
+    }
+
+    #[test]
     fn malformed_adf_still_returns_an_error() {
         for document in [
             json!({"type": "paragraph"}),

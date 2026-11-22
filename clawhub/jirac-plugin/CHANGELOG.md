@@ -2,6 +2,11 @@
 
 All notable changes to the ClawHub wrapper package for the `jirac` Claude plugin will be documented in this file.
 
+## [0.2.1] - 2026-11-23
+
+### Changed
+- Bundle plugin 0.19.2: skill guidance aligned with current rich-text formats and CLI behavior, and API v2 wiki mention detection in the notifications guidance.
+
 ## [0.2.0] - 2026-11-12
 
 ### Changed

@@ -36,6 +36,9 @@ allow = [
   "BSD-2-Clause",
   "BSD-3-Clause",
   "Unicode-3.0",
+  # Unicode-DFS-2016 is the predecessor of Unicode-3.0, used by
+  # finl_unicode (pulled in by comrak) for Unicode category tables.
+  "Unicode-DFS-2016",
   "Zlib",
   "CC0-1.0",
   "MPL-2.0",

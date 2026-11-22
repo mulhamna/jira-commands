@@ -233,21 +233,7 @@ fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)], dept
         let old = std::mem::take(content);
         let mut new_content: Vec<Value> = Vec::new();
         for child in old {
-            let child_type = child
-                .get("type")
-                .and_then(|t| t.as_str())
-                .map(str::to_owned);
-            let child_text = child
-                .get("text")
-                .and_then(|t| t.as_str())
-                .map(str::to_owned);
-            if child_type.as_deref() == Some("text") {
-                if let Some(text) = child_text {
-                    new_content.extend(expand_text_mentions(&text, mention_map));
-                    continue;
-                }
-            }
-            new_content.push(child);
+            new_content.extend(expand_text_mentions(child, mention_map));
         }
         *content = new_content;
     }
@@ -258,8 +244,17 @@ fn inject_mentions_node(node: &mut Value, mention_map: &[(String, String)], dept
     }
 }
 
-fn expand_text_mentions(text: &str, mention_map: &[(String, String)]) -> Vec<Value> {
-    let mut nodes: Vec<Value> = vec![json!({ "type": "text", "text": text })];
+/// Split a text node around `@DisplayName` occurrences. Each remaining piece is a
+/// copy of the original node, so marks such as bold or links survive. Inline code
+/// stays literal, and non-text nodes pass through unchanged.
+fn expand_text_mentions(node: Value, mention_map: &[(String, String)]) -> Vec<Value> {
+    let is_code = node["marks"]
+        .as_array()
+        .is_some_and(|marks| marks.iter().any(|mark| mark["type"] == "code"));
+    if node["type"] != "text" || !node["text"].is_string() || is_code {
+        return vec![node];
+    }
+    let mut nodes: Vec<Value> = vec![node];
     for (display_name, account_id) in mention_map {
         let pattern = format!("@{display_name}");
         let mut next: Vec<Value> = Vec::new();
@@ -272,7 +267,9 @@ fn expand_text_mentions(text: &str, mention_map: &[(String, String)]) -> Vec<Val
                         let parts: Vec<&str> = t.split(pattern.as_str()).collect();
                         for (i, part) in parts.iter().enumerate() {
                             if !part.is_empty() {
-                                next.push(json!({ "type": "text", "text": *part }));
+                                let mut piece = node.clone();
+                                piece["text"] = json!(*part);
+                                next.push(piece);
                             }
                             if i < parts.len() - 1 {
                                 next.push(json!({
@@ -814,10 +811,14 @@ mod tests {
         assert_eq!(mentioned_account_ids(&adf), vec!["acct-1", "acct-2"]);
     }
 
+    fn text_node(text: &str) -> Value {
+        json!({ "type": "text", "text": text })
+    }
+
     #[test]
     fn test_expand_text_mentions_single_mention_mid_sentence() {
         let nodes = expand_text_mentions(
-            "fix @Alice done",
+            text_node("fix @Alice done"),
             &[("Alice".to_string(), "acct-1".to_string())],
         );
 
@@ -834,11 +835,11 @@ mod tests {
     #[test]
     fn test_expand_text_mentions_handles_start_and_end_mentions() {
         let start = expand_text_mentions(
-            "@Alice done",
+            text_node("@Alice done"),
             &[("Alice".to_string(), "acct-1".to_string())],
         );
         let end = expand_text_mentions(
-            "done @Alice",
+            text_node("done @Alice"),
             &[("Alice".to_string(), "acct-1".to_string())],
         );
 
@@ -861,7 +862,7 @@ mod tests {
     #[test]
     fn test_expand_text_mentions_handles_multiple_mentions_and_spaces() {
         let nodes = expand_text_mentions(
-            "Ping @Alice and @Bob Marley today",
+            text_node("Ping @Alice and @Bob Marley today"),
             &[
                 ("Alice".to_string(), "acct-1".to_string()),
                 ("Bob Marley".to_string(), "acct-2".to_string()),
@@ -883,7 +884,7 @@ mod tests {
     #[test]
     fn test_expand_text_mentions_no_match_leaves_text_node_intact() {
         let nodes = expand_text_mentions(
-            "hello world",
+            text_node("hello world"),
             &[("Alice".to_string(), "acct-1".to_string())],
         );
 
@@ -954,6 +955,29 @@ mod tests {
         assert_eq!(
             adf["content"][1]["content"][0]["content"][0]["content"][1],
             json!({ "type": "mention", "attrs": { "id": "acct-2", "text": "@Bob Marley" } })
+        );
+    }
+
+    #[test]
+    fn inject_mentions_keeps_marks_and_leaves_inline_code_literal() {
+        let mut adf = markdown_to_adf("**Hi** [docs](https://x.y) `@Alice` *see @Alice now*");
+        inject_mentions(&mut adf, &[("Alice".to_string(), "acct-1".to_string())]);
+        let content = &adf["content"][0]["content"];
+        assert_eq!(content[0]["marks"][0]["type"], "strong");
+        assert_eq!(content[2]["marks"][0]["type"], "link");
+        assert_eq!(
+            content[4],
+            json!({"type": "text", "text": "@Alice", "marks": [{"type": "code"}]})
+        );
+        let em = json!([{ "type": "em" }]);
+        assert_eq!(
+            content[6],
+            json!({"type": "text", "text": "see ", "marks": em})
+        );
+        assert_eq!(content[7]["type"], "mention");
+        assert_eq!(
+            content[8],
+            json!({"type": "text", "text": " now", "marks": em})
         );
     }
 }

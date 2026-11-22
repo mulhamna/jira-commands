@@ -8,8 +8,10 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use jira_core::{
-    adf::mentioned_account_ids, config::config_file_path, model::Issue,
-    rich_text::rich_text_to_text, JiraClient,
+    config::config_file_path,
+    model::Issue,
+    rich_text::{mentioned_users, rich_text_to_text},
+    JiraClient,
 };
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -107,8 +109,8 @@ pub async fn scan_mention_notifications(
     since: &str,
     limit: u32,
 ) -> Result<NotificationScan> {
-    let account_id = client
-        .get_myself()
+    let my_ids = client
+        .get_myself_ids()
         .await
         .context("Failed to resolve current Jira account")?;
     let limit = limit.clamp(1, 100);
@@ -128,9 +130,9 @@ pub async fn scan_mention_notifications(
 
     for issue in result.issues {
         if let Some(description) = issue.description.as_ref() {
-            if mentioned_account_ids(description)
+            if mentioned_users(description)
                 .iter()
-                .any(|mentioned| mentioned == &account_id)
+                .any(|mentioned| my_ids.contains(mentioned))
             {
                 let id = notification_entry_id(&issue.key, "description-mention", &issue.updated);
                 entries.push(NotificationEntry {
@@ -167,13 +169,17 @@ pub async fn scan_mention_notifications(
         match comments {
             Ok(comments) => {
                 for comment in comments {
-                    if comment.author_account_id.as_deref() == Some(account_id.as_str()) {
+                    if comment
+                        .author_account_id
+                        .as_ref()
+                        .is_some_and(|author| my_ids.contains(author))
+                    {
                         continue;
                     }
                     if comment
                         .mentions
                         .iter()
-                        .any(|mentioned| mentioned == &account_id)
+                        .any(|mentioned| my_ids.contains(mentioned))
                     {
                         let id =
                             notification_entry_id(&issue.key, "comment-mention", &comment.created);

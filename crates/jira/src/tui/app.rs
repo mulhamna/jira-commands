@@ -17,7 +17,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
+use jira_core::config::{config_file_path, InputFormat, JiraConfig, JiraProfilesFile};
 use jira_core::{
     adf::{inject_mentions, markdown_to_adf},
     model::{
@@ -275,7 +275,19 @@ impl App {
             DetailTab::Worklog => {
                 if self.detail.worklogs.is_none() {
                     match client.get_worklogs(&key).await {
-                        Ok(worklogs) => self.detail.worklogs = Some(worklogs),
+                        Ok(worklogs) => {
+                            self.detail.worklogs = Some(
+                                worklogs
+                                    .into_iter()
+                                    .map(|mut worklog| {
+                                        worklog.comment = worklog
+                                            .comment
+                                            .map(|comment| client.render_comment_body(&comment));
+                                        worklog
+                                    })
+                                    .collect(),
+                            )
+                        }
                         Err(e) => self.set_status(format!("Worklog load failed: {e}"), true),
                     }
                 }
@@ -1791,20 +1803,13 @@ pub async fn run_tui(
             }
 
             AppAction::EditIssue(key) => {
-                let (summary, description) = app
-                    .issues
-                    .iter()
-                    .find(|i| i.key == key)
-                    .map(|issue| {
-                        let desc = issue
-                            .description
-                            .as_ref()
-                            .map(jira_core::rich_text::rich_text_to_text)
-                            .unwrap_or_default();
-                        (issue.summary.clone(), desc)
-                    })
-                    .unwrap_or_default();
-                app.open_modal(Modal::edit_issue(key, summary, description));
+                let issue = app.issues.iter().find(|i| i.key == key);
+                let summary = issue.map(|i| i.summary.clone()).unwrap_or_default();
+                let (description, format) = description_for_edit(
+                    issue.and_then(|i| i.description.as_ref()),
+                    client.input_format(),
+                );
+                app.open_modal(Modal::edit_issue(key, summary, description, format));
             }
 
             AppAction::AssignIssue(assignee) => {
@@ -1825,11 +1830,11 @@ pub async fn run_tui(
                 }
             }
             AppAction::AddComment(key) => {
-                app.open_modal(Modal::add_comment(key));
+                app.open_modal(Modal::add_comment(key, client.input_format()));
             }
 
             AppAction::BulkComment => {
-                app.open_modal(Modal::bulk_comment(app.jql.clone()));
+                app.open_modal(Modal::bulk_comment(app.jql.clone(), client.input_format()));
             }
 
             AppAction::AddWorklog(key) => {
@@ -1926,6 +1931,7 @@ pub async fn run_tui(
                     ModalKind::EditIssue {
                         key,
                         original_description,
+                        input_format,
                     } => {
                         let summary = modal.field_text(0);
                         let description = modal.field_text(1);
@@ -1947,7 +1953,9 @@ pub async fn run_tui(
                         terminal.draw(|f| ui(f, &mut app))?;
                         let (result, warnings) =
                             jira_core::adf::collect_formatting_warnings_silently(
-                                client.update_issue(&key, req),
+                                client
+                                    .with_input_format(input_format)
+                                    .update_issue(&key, req),
                             )
                             .await;
                         match result {
@@ -1996,12 +2004,13 @@ pub async fn run_tui(
                             m.busy = true;
                         }
                         terminal.draw(|f| ui(f, &mut app))?;
-                        let mut adf = markdown_to_adf(&body_trim);
-                        inject_mentions(&mut adf, &mention_map);
                         let (result, warnings) =
-                            jira_core::adf::collect_formatting_warnings_silently(
-                                client.add_comment_adf(&key, adf),
-                            )
+                            jira_core::adf::collect_formatting_warnings_silently(submit_comment(
+                                &client,
+                                &key,
+                                &body_trim,
+                                &mention_map,
+                            ))
                             .await;
                         match result {
                             Ok(_) => {
@@ -2039,6 +2048,7 @@ pub async fn run_tui(
                         let jql_raw = modal.field_text(0);
                         let keys_raw = modal.field_text(1);
                         let body = modal.field_text(2);
+                        let mention_map = modal.mention_map.clone();
                         let jql = jql_raw.trim().to_string();
                         let body_trim = body.trim().to_string();
 
@@ -2127,7 +2137,7 @@ pub async fn run_tui(
                         for key in &target_keys {
                             let (result, warnings) =
                                 jira_core::adf::collect_formatting_warnings_silently(
-                                    client.add_comment(key, &body_trim),
+                                    submit_comment(&client, key, &body_trim, &mention_map),
                                 )
                                 .await;
                             has_warning |= !warnings.is_empty();
@@ -3111,6 +3121,46 @@ fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Borrowed(path)
 }
 
+/// Post a TUI comment in the profile's input format. Markdown keeps the ADF path
+/// so picked `@mentions` become mention nodes; wiki gets native `[~...]` links.
+async fn submit_comment(
+    client: &JiraClient,
+    key: &str,
+    body: &str,
+    mention_map: &[(String, String)],
+) -> jira_core::error::Result<jira_core::model::Comment> {
+    match client.input_format() {
+        InputFormat::Markdown => {
+            let mut adf = markdown_to_adf(body);
+            inject_mentions(&mut adf, mention_map);
+            client.add_comment_adf(key, adf).await
+        }
+        InputFormat::Wiki => {
+            let body = client.inject_wiki_mentions(body, mention_map);
+            client.add_comment(key, &body).await
+        }
+        InputFormat::Adf => client.add_comment(key, body).await,
+    }
+}
+
+/// Seed the description editor. API v2 returns wiki markup strings: edit that
+/// source as wiki so panels, colors and macros survive a save. Other shapes
+/// (API v3 ADF, or no description) keep the rendered text and profile format.
+fn description_for_edit(
+    description: Option<&serde_json::Value>,
+    configured: InputFormat,
+) -> (String, InputFormat) {
+    match description {
+        Some(serde_json::Value::String(wiki)) => (wiki.clone(), InputFormat::Wiki),
+        other => (
+            other
+                .map(jira_core::rich_text::rich_text_to_text)
+                .unwrap_or_default(),
+            configured,
+        ),
+    }
+}
+
 fn description_if_changed(original: &str, edited: String) -> Option<String> {
     (edited != original).then_some(edited)
 }
@@ -3119,6 +3169,159 @@ fn description_if_changed(original: &str, edited: String) -> Option<String> {
 mod tests {
     use super::*;
     use crate::test_support::env_lock;
+    use jira_core::config::{JiraAuthType, JiraConfig, JiraDeployment};
+    use serde_json::json;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    fn v2_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            base_url: server.uri(),
+            token: Some("token".into()),
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+            ..JiraConfig::default()
+        })
+    }
+
+    fn app_with_issue(description: serde_json::Value) -> App {
+        let issue: Issue = serde_json::from_value(json!({
+            "id": "10001", "key": "PROJ-1", "summary": "Parity",
+            "description": description, "status": "To Do", "issue_type": "Task",
+            "project_key": "PROJ", "created": "2026-01-01", "updated": "2026-01-02",
+            "attachments": [], "links": [], "fields": {}
+        }))
+        .expect("issue fixture");
+        let mut app = App::new(String::new(), String::new(), None);
+        app.set_issues(vec![issue]);
+        app
+    }
+
+    #[tokio::test]
+    async fn api_v2_comment_and_worklog_wiki_render_for_display() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/PROJ-1/comment"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "comments": [{"id": "1", "body": "h3. Note\n*Bold* text", "created": "2026-01-01"}]
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/PROJ-1/worklog"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "worklogs": [{"id": "2", "timeSpent": "1h", "timeSpentSeconds": 3600,
+                    "started": "2026-01-01", "comment": "*Fixed* {{build}}"}]
+            })))
+            .mount(&server)
+            .await;
+        let client = v2_client(&server);
+        let mut app = app_with_issue(json!(null));
+
+        app.active_tab = DetailTab::Comments;
+        app.warm_active_tab(&client).await;
+        let comments = app.detail.comments.as_ref().expect("comments loaded");
+        assert_eq!(comments[0].body.as_deref(), Some("### Note\nBold text"));
+
+        app.active_tab = DetailTab::Worklog;
+        app.warm_active_tab(&client).await;
+        let worklogs = app.detail.worklogs.as_ref().expect("worklogs loaded");
+        assert_eq!(worklogs[0].comment.as_deref(), Some("Fixed build"));
+    }
+
+    #[test]
+    fn description_edit_seeds_v2_wiki_source_and_keeps_v3_rendering() {
+        let wiki = json!("{panel:title=Plan}\n{color:red}*Ship*{color}\n{panel}");
+        assert_eq!(
+            description_for_edit(Some(&wiki), InputFormat::Markdown),
+            (wiki.as_str().unwrap().to_string(), InputFormat::Wiki)
+        );
+
+        let adf = jira_core::adf::markdown_to_adf("## Plan\n\n**Ship**");
+        assert_eq!(
+            description_for_edit(Some(&adf), InputFormat::Markdown),
+            (
+                jira_core::rich_text::rich_text_to_text(&adf),
+                InputFormat::Markdown
+            )
+        );
+        assert_eq!(
+            description_for_edit(None, InputFormat::Markdown),
+            (String::new(), InputFormat::Markdown)
+        );
+    }
+
+    #[tokio::test]
+    async fn edited_v2_wiki_description_is_sent_unchanged() {
+        let server = MockServer::start().await;
+        let edited = "{panel:title=Plan}\n{color:red}*Ship* today{color}\n{panel}";
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/PROJ-1"))
+            .and(wiremock::matchers::body_partial_json(
+                json!({ "fields": { "description": edited } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let (_, format) = description_for_edit(
+            Some(&json!(
+                "{panel:title=Plan}\n{color:red}*Ship*{color}\n{panel}"
+            )),
+            InputFormat::Markdown,
+        );
+        let req = UpdateIssueRequest {
+            description: Some(edited.to_string()),
+            ..Default::default()
+        };
+        v2_client(&server)
+            .with_input_format(format)
+            .update_issue("PROJ-1", req)
+            .await
+            .expect("update");
+        server.verify().await;
+    }
+
+    #[test]
+    fn comment_modals_label_the_profile_input_format() {
+        let single = Modal::add_comment("PROJ-1".into(), InputFormat::Wiki);
+        assert_eq!(single.fields[0].label, "Comment (wiki markup)");
+        let bulk = Modal::bulk_comment(String::new(), InputFormat::Adf);
+        assert_eq!(bulk.fields[2].label, "Comment (ADF JSON)");
+    }
+
+    #[tokio::test]
+    async fn add_comment_follows_profile_input_format_on_api_v2() {
+        let server = MockServer::start().await;
+        let map = vec![("Alice Doe".to_string(), "alice".to_string())];
+        for (format, typed, sent) in [
+            (
+                InputFormat::Wiki,
+                "{panel}*Hi* @Alice Doe{panel}",
+                "{panel}*Hi* [~alice]{panel}",
+            ),
+            (InputFormat::Markdown, "**Hi** @Alice Doe", "*Hi* [~alice]"),
+        ] {
+            server.reset().await;
+            Mock::given(method("POST"))
+                .and(path("/rest/api/2/issue/PROJ-1/comment"))
+                .and(wiremock::matchers::body_json(json!({ "body": sent })))
+                .respond_with(
+                    ResponseTemplate::new(201).set_body_json(json!({"id": "1", "body": sent})),
+                )
+                .expect(1)
+                .mount(&server)
+                .await;
+            let client = v2_client(&server).with_input_format(format);
+            submit_comment(&client, "PROJ-1", typed, &map)
+                .await
+                .unwrap_or_else(|e| panic!("{format:?}: {e}"));
+            server.verify().await;
+        }
+    }
 
     #[test]
     fn formatting_warning_preserves_success_and_failure_status() {
@@ -3156,7 +3359,7 @@ mod tests {
     #[test]
     fn failed_modal_write_replaces_old_status_and_retry_warning() {
         let mut app = App::new(String::new(), String::new(), None);
-        app.open_modal(Modal::add_comment("PROJ-1".into()));
+        app.open_modal(Modal::add_comment("PROJ-1".into(), InputFormat::Markdown));
         app.set_status("✓ Updated PROJ-0", false);
 
         for error in ["Comment failed", "Commented on 1/2 issue(s); stopped"] {

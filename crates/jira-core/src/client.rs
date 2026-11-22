@@ -144,6 +144,33 @@ impl JiraClient {
         Ok(())
     }
 
+    /// The configured format for user-supplied description, comment and worklog text.
+    pub fn input_format(&self) -> InputFormat {
+        self.config.input_format
+    }
+
+    /// Replace each `@DisplayName` from `mention_map` with a native wiki user link:
+    /// `[~name]` on Data Center, `[~accountid:id]` on Cloud. Identifiers that would
+    /// break the link syntax are left as plain `@DisplayName` text.
+    pub fn inject_wiki_mentions(&self, text: &str, mention_map: &[(String, String)]) -> String {
+        let mut out = text.to_string();
+        for (display_name, id) in mention_map {
+            if id.trim().is_empty()
+                || id.contains(['[', ']', '|', '\\'])
+                || id.chars().any(char::is_control)
+            {
+                continue;
+            }
+            let link = if self.is_data_center() {
+                format!("[~{id}]")
+            } else {
+                format!("[~accountid:{id}]")
+            };
+            out = out.replace(&format!("@{display_name}"), &link);
+        }
+        out
+    }
+
     /// Clone of this client that interprets text input as `input_format`.
     /// Used for per-call overrides such as `--description-format wiki`.
     pub fn with_input_format(&self, input_format: InputFormat) -> Self {
@@ -212,6 +239,10 @@ impl JiraClient {
     /// (`name`, falling back to `key`) on Data Center / Server, where /myself has no accountId.
     pub async fn get_myself(&self) -> Result<String> {
         let me = self.get_myself_info().await?;
+        self.preferred_myself_id(me)
+    }
+
+    fn preferred_myself_id(&self, me: MyselfResponse) -> Result<String> {
         let preferred = if self.is_data_center() {
             me.name.clone().or_else(|| me.key.clone())
         } else {
@@ -224,6 +255,21 @@ impl JiraClient {
                 status: 0,
                 message: "Could not determine the current user from /myself".into(),
             })
+    }
+
+    /// Every identifier that can refer to the current user: the preferred one from
+    /// [`Self::get_myself`] first, then accountId, login name and key. API v2 wiki
+    /// mentions on Data Center may use either the login name or the user key.
+    pub async fn get_myself_ids(&self) -> Result<Vec<String>> {
+        let me = self.get_myself_info().await?;
+        let fallback = [me.account_id.clone(), me.name.clone(), me.key.clone()];
+        let mut ids = vec![self.preferred_myself_id(me)?];
+        for id in fallback.into_iter().flatten() {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        Ok(ids)
     }
 
     /// Get the current authenticated user's Jira timezone (IANA name), if available.
@@ -3742,6 +3788,24 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
         assert_eq!(
             cloud.render_comment_body("Already rendered *text*"),
             "Already rendered *text*"
+        );
+    }
+
+    #[tokio::test]
+    async fn wiki_mentions_use_the_deployment_link_syntax() {
+        let server = MockServer::start().await;
+        let map = vec![
+            ("Alice Doe".to_string(), "alice".to_string()),
+            ("Bad Id".to_string(), "x]y".to_string()),
+        ];
+        let text = "Hi @Alice Doe and @Bad Id, *thanks* @Alice Doe";
+        assert_eq!(
+            dc_client(&server).inject_wiki_mentions(text, &map),
+            "Hi [~alice] and @Bad Id, *thanks* [~alice]"
+        );
+        assert_eq!(
+            cloud_client(&server).inject_wiki_mentions(text, &map[..1]),
+            "Hi [~accountid:alice] and @Bad Id, *thanks* [~accountid:alice]"
         );
     }
 

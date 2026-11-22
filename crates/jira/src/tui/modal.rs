@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use jira_core::config::InputFormat;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -17,6 +18,8 @@ pub(super) enum ModalKind {
     EditIssue {
         key: String,
         original_description: String,
+        /// Format of the description text in the editor and on save.
+        input_format: InputFormat,
     },
     AddComment {
         key: String,
@@ -123,8 +126,21 @@ pub(super) struct Modal {
     pub field_rects: Vec<Rect>,
 }
 
+fn comment_label(input_format: InputFormat) -> &'static str {
+    match input_format {
+        InputFormat::Markdown => "Comment (markdown)",
+        InputFormat::Wiki => "Comment (wiki markup)",
+        InputFormat::Adf => "Comment (ADF JSON)",
+    }
+}
+
 impl Modal {
-    pub(super) fn edit_issue(key: String, summary: String, description: String) -> Self {
+    pub(super) fn edit_issue(
+        key: String,
+        summary: String,
+        description: String,
+        input_format: InputFormat,
+    ) -> Self {
         let original_description = description.clone();
         let mut summary_area = TextArea::from(vec![summary]);
         summary_area.set_cursor_line_style(Style::default());
@@ -140,6 +156,7 @@ impl Modal {
             kind: ModalKind::EditIssue {
                 key,
                 original_description,
+                input_format,
             },
             fields: vec![
                 ModalField {
@@ -148,7 +165,11 @@ impl Modal {
                     multiline: false,
                 },
                 ModalField {
-                    label: "Description (markdown)",
+                    label: match input_format {
+                        InputFormat::Markdown => "Description (markdown)",
+                        InputFormat::Wiki => "Description (wiki markup)",
+                        InputFormat::Adf => "Description (ADF JSON)",
+                    },
                     area: desc_area,
                     multiline: true,
                 },
@@ -168,7 +189,7 @@ impl Modal {
         }
     }
 
-    pub(super) fn add_comment(key: String) -> Self {
+    pub(super) fn add_comment(key: String, input_format: InputFormat) -> Self {
         let mut comment_area = TextArea::default();
         comment_area.set_cursor_line_style(Style::default());
 
@@ -180,7 +201,7 @@ impl Modal {
             kind: ModalKind::AddComment { key },
             fields: vec![
                 ModalField {
-                    label: "Comment",
+                    label: comment_label(input_format),
                     area: comment_area,
                     multiline: true,
                 },
@@ -205,7 +226,7 @@ impl Modal {
         }
     }
 
-    pub(super) fn bulk_comment(jql: String) -> Self {
+    pub(super) fn bulk_comment(jql: String, input_format: InputFormat) -> Self {
         let mut jql_area = TextArea::from(vec![jql]);
         jql_area.set_cursor_line_style(Style::default());
         jql_area.set_placeholder_text("use current filter or replace with custom JQL");
@@ -216,7 +237,7 @@ impl Modal {
 
         let mut comment_area = TextArea::default();
         comment_area.set_cursor_line_style(Style::default());
-        comment_area.set_placeholder_text("required markdown comment");
+        comment_area.set_placeholder_text("required");
 
         Self {
             kind: ModalKind::BulkComment,
@@ -232,7 +253,7 @@ impl Modal {
                     multiline: true,
                 },
                 ModalField {
-                    label: "Comment",
+                    label: comment_label(input_format),
                     area: comment_area,
                     multiline: true,
                 },

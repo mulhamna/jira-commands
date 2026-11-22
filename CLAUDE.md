@@ -162,6 +162,8 @@ See `.github/workflows/` for details — actual files are source of truth.
 
 Uses `simple` release type with a `VERSION` file at repo root. Cargo.toml files updated via `generic` updater in `release-please-config.json`. Plugin version in `plugin/.claude-plugin/plugin.json` is separate and NOT auto-bumped by release-please.
 
+release-please cannot mark `Cargo.lock`. `release-please.yml` runs `scripts/sync-cargo-lock-version.mjs` on each open Release PR branch to sync the `jira-commands`, `jira-core` and `jira-mcp` entries. If a lockfile still lags after a release, run that script on a branch and commit `Cargo.lock`.
+
 ### Dual release lanes (jira-commands vs jira-mcp)
 
 Two independent lanes, each with its own config and manifest (`release-please-config.json` + `.release-please-manifest.json`, `release-please-config-mcp.json` + `.release-please-manifest-mcp.json`):
@@ -195,5 +197,7 @@ To recover from a stomped manifest: edit `.release-please-manifest.json` to matc
 When adding/changing skills, update `plugin/skills/<skill>/SKILL.md` and the table in README.
 
 **Manual bump required:** changes to `plugin/` (skills, metadata) must also bump the version in `plugin/.claude-plugin/plugin.json` — release-please does NOT touch this file.
+
+**Manual bump required:** every change to `plugin/**` also republishes the ClawHub wrapper, so bump `clawhub/jirac-plugin/VERSION`, both versions in `clawhub/jirac-plugin/marketplace.json` (`metadata.version`, `plugins[0].version`), and add a `clawhub/jirac-plugin/CHANGELOG.md` entry. Without the bump, `clawhub-publish-jirac-plugin.yml` fails on `main` with "Version X already exists".
 
 **Manual bump required:** changes to `clawhub/jirac/` (SKILL.md, references) must also bump `clawhub/jirac/VERSION` — release-please does NOT touch this file. CI publishes to ClawHub on push to `main` only when `clawhub/jirac/**` changes.

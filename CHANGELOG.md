@@ -6,6 +6,20 @@ Format: [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`
 
 ---
 
+## [3.2.0](https://github.com/mulhamna/jira-commands/compare/v3.1.0...v3.2.0) (2026-11-22)
+
+
+### Features
+
+* **tui:** bring API v2 wiki support to parity with v3 ([#564](https://github.com/mulhamna/jira-commands/issues/564)) ([70684a4](https://github.com/mulhamna/jira-commands/commit/70684a4b88f8fcbe832b122c614d8fe5868311fa))
+
+
+### Bug Fixes
+
+* **clawhub:** bump jirac-plugin wrapper to 0.2.1 ([#566](https://github.com/mulhamna/jira-commands/issues/566)) ([f24966a](https://github.com/mulhamna/jira-commands/commit/f24966afbb94a8191bd48427b11408e4b7dc88df))
+* **core:** preserve Markdown list starts and code language hints ([#559](https://github.com/mulhamna/jira-commands/issues/559)) ([f14fd48](https://github.com/mulhamna/jira-commands/commit/f14fd48efac2522df3afb372267568af6cecec4a))
+* **deps:** bump url for RUSTSEC-2026-0592 and comrak to 0.55 ([#563](https://github.com/mulhamna/jira-commands/issues/563)) ([d49ceb8](https://github.com/mulhamna/jira-commands/commit/d49ceb84a7dc7ce5abc9265fdaeebafa0b6849a3))
+
 ## [3.1.0](https://github.com/mulhamna/jira-commands/compare/v3.0.0...v3.1.0) (2026-11-18)
 
 

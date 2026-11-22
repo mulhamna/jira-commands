@@ -275,7 +275,19 @@ impl App {
             DetailTab::Worklog => {
                 if self.detail.worklogs.is_none() {
                     match client.get_worklogs(&key).await {
-                        Ok(worklogs) => self.detail.worklogs = Some(worklogs),
+                        Ok(worklogs) => {
+                            self.detail.worklogs = Some(
+                                worklogs
+                                    .into_iter()
+                                    .map(|mut worklog| {
+                                        worklog.comment = worklog
+                                            .comment
+                                            .map(|comment| client.render_comment_body(&comment));
+                                        worklog
+                                    })
+                                    .collect(),
+                            )
+                        }
                         Err(e) => self.set_status(format!("Worklog load failed: {e}"), true),
                     }
                 }
@@ -3119,6 +3131,68 @@ fn description_if_changed(original: &str, edited: String) -> Option<String> {
 mod tests {
     use super::*;
     use crate::test_support::env_lock;
+    use jira_core::config::{JiraAuthType, JiraConfig, JiraDeployment};
+    use serde_json::json;
+    use wiremock::{
+        matchers::{method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    fn v2_client(server: &MockServer) -> JiraClient {
+        JiraClient::new(JiraConfig {
+            base_url: server.uri(),
+            token: Some("token".into()),
+            deployment: JiraDeployment::DataCenter,
+            auth_type: JiraAuthType::DataCenterPat,
+            api_version: 2,
+            ..JiraConfig::default()
+        })
+    }
+
+    fn app_with_issue(description: serde_json::Value) -> App {
+        let issue: Issue = serde_json::from_value(json!({
+            "id": "10001", "key": "PROJ-1", "summary": "Parity",
+            "description": description, "status": "To Do", "issue_type": "Task",
+            "project_key": "PROJ", "created": "2026-01-01", "updated": "2026-01-02",
+            "attachments": [], "links": [], "fields": {}
+        }))
+        .expect("issue fixture");
+        let mut app = App::new(String::new(), String::new(), None);
+        app.set_issues(vec![issue]);
+        app
+    }
+
+    #[tokio::test]
+    async fn api_v2_comment_and_worklog_wiki_render_for_display() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/PROJ-1/comment"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "comments": [{"id": "1", "body": "h3. Note\n*Bold* text", "created": "2026-01-01"}]
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/2/issue/PROJ-1/worklog"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "worklogs": [{"id": "2", "timeSpent": "1h", "timeSpentSeconds": 3600,
+                    "started": "2026-01-01", "comment": "*Fixed* {{build}}"}]
+            })))
+            .mount(&server)
+            .await;
+        let client = v2_client(&server);
+        let mut app = app_with_issue(json!(null));
+
+        app.active_tab = DetailTab::Comments;
+        app.warm_active_tab(&client).await;
+        let comments = app.detail.comments.as_ref().expect("comments loaded");
+        assert_eq!(comments[0].body.as_deref(), Some("### Note\nBold text"));
+
+        app.active_tab = DetailTab::Worklog;
+        app.warm_active_tab(&client).await;
+        let worklogs = app.detail.worklogs.as_ref().expect("worklogs loaded");
+        assert_eq!(worklogs[0].comment.as_deref(), Some("Fixed build"));
+    }
 
     #[test]
     fn formatting_warning_preserves_success_and_failure_status() {

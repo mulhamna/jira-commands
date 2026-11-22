@@ -189,7 +189,9 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           fetch-depth: 0
 
-      - name: Sync npm package versions on each open release PR branch
+      # release-please cannot mark Cargo.lock, so the workspace entries are synced
+      # here too; otherwise the lockfile lags one release behind Cargo.toml.
+      - name: Sync npm package versions and Cargo.lock on each open release PR branch
         if: env.FINALIZE_ONLY != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
@@ -214,14 +216,28 @@ jobs:
 
             git fetch origin "$BRANCH"
             git checkout -B "$BRANCH" "origin/$BRANCH"
+            COMMITTED=false
             node scripts/sync-npm-version.mjs
 
             if git diff --quiet -- packaging/npm/package.json packaging/npm-mcp/package.json; then
               echo "${COMPONENT}: npm package.json files already match VERSION sources."
-              continue
+            else
+              git add packaging/npm/package.json packaging/npm-mcp/package.json
+              git commit -m "chore(npm): sync ${COMPONENT} package version"
+              COMMITTED=true
             fi
 
-            git add packaging/npm/package.json packaging/npm-mcp/package.json
-            git commit -m "chore(npm): sync ${COMPONENT} package version"
-            git push origin "HEAD:$BRANCH"
+            node scripts/sync-cargo-lock-version.mjs
+
+            if git diff --quiet -- Cargo.lock; then
+              echo "${COMPONENT}: Cargo.lock workspace entries already match VERSION sources."
+            else
+              git add Cargo.lock
+              git commit -m "chore(cargo): sync ${COMPONENT} versions in Cargo.lock"
+              COMMITTED=true
+            fi
+
+            if [ "$COMMITTED" = true ]; then
+              git push origin "HEAD:$BRANCH"
+            fi
           done

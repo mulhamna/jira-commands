@@ -144,6 +144,33 @@ impl JiraClient {
         Ok(())
     }
 
+    /// The configured format for user-supplied description, comment and worklog text.
+    pub fn input_format(&self) -> InputFormat {
+        self.config.input_format
+    }
+
+    /// Replace each `@DisplayName` from `mention_map` with a native wiki user link:
+    /// `[~name]` on Data Center, `[~accountid:id]` on Cloud. Identifiers that would
+    /// break the link syntax are left as plain `@DisplayName` text.
+    pub fn inject_wiki_mentions(&self, text: &str, mention_map: &[(String, String)]) -> String {
+        let mut out = text.to_string();
+        for (display_name, id) in mention_map {
+            if id.trim().is_empty()
+                || id.contains(['[', ']', '|', '\\'])
+                || id.chars().any(char::is_control)
+            {
+                continue;
+            }
+            let link = if self.is_data_center() {
+                format!("[~{id}]")
+            } else {
+                format!("[~accountid:{id}]")
+            };
+            out = out.replace(&format!("@{display_name}"), &link);
+        }
+        out
+    }
+
     /// Clone of this client that interprets text input as `input_format`.
     /// Used for per-call overrides such as `--description-format wiki`.
     pub fn with_input_format(&self, input_format: InputFormat) -> Self {
@@ -3761,6 +3788,24 @@ g99IHfQMr0eJiOF2iOCVFJL9xYwsYq5Z3xEHvPLzGhEUNjxMPRdXzrRGkp6UMOK+\n\
         assert_eq!(
             cloud.render_comment_body("Already rendered *text*"),
             "Already rendered *text*"
+        );
+    }
+
+    #[tokio::test]
+    async fn wiki_mentions_use_the_deployment_link_syntax() {
+        let server = MockServer::start().await;
+        let map = vec![
+            ("Alice Doe".to_string(), "alice".to_string()),
+            ("Bad Id".to_string(), "x]y".to_string()),
+        ];
+        let text = "Hi @Alice Doe and @Bad Id, *thanks* @Alice Doe";
+        assert_eq!(
+            dc_client(&server).inject_wiki_mentions(text, &map),
+            "Hi [~alice] and @Bad Id, *thanks* [~alice]"
+        );
+        assert_eq!(
+            cloud_client(&server).inject_wiki_mentions(text, &map[..1]),
+            "Hi [~accountid:alice] and @Bad Id, *thanks* [~accountid:alice]"
         );
     }
 

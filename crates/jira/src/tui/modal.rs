@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use jira_core::config::InputFormat;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -168,7 +169,7 @@ impl Modal {
         }
     }
 
-    pub(super) fn add_comment(key: String) -> Self {
+    pub(super) fn add_comment(key: String, input_format: InputFormat) -> Self {
         let mut comment_area = TextArea::default();
         comment_area.set_cursor_line_style(Style::default());
 
@@ -180,7 +181,11 @@ impl Modal {
             kind: ModalKind::AddComment { key },
             fields: vec![
                 ModalField {
-                    label: "Comment",
+                    label: match input_format {
+                        InputFormat::Markdown => "Comment (markdown)",
+                        InputFormat::Wiki => "Comment (wiki markup)",
+                        InputFormat::Adf => "Comment (ADF JSON)",
+                    },
                     area: comment_area,
                     multiline: true,
                 },

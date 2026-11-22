@@ -17,7 +17,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use jira_core::config::{config_file_path, JiraConfig, JiraProfilesFile};
+use jira_core::config::{config_file_path, InputFormat, JiraConfig, JiraProfilesFile};
 use jira_core::{
     adf::{inject_mentions, markdown_to_adf},
     model::{
@@ -1837,7 +1837,7 @@ pub async fn run_tui(
                 }
             }
             AppAction::AddComment(key) => {
-                app.open_modal(Modal::add_comment(key));
+                app.open_modal(Modal::add_comment(key, client.input_format()));
             }
 
             AppAction::BulkComment => {
@@ -2008,12 +2008,13 @@ pub async fn run_tui(
                             m.busy = true;
                         }
                         terminal.draw(|f| ui(f, &mut app))?;
-                        let mut adf = markdown_to_adf(&body_trim);
-                        inject_mentions(&mut adf, &mention_map);
                         let (result, warnings) =
-                            jira_core::adf::collect_formatting_warnings_silently(
-                                client.add_comment_adf(&key, adf),
-                            )
+                            jira_core::adf::collect_formatting_warnings_silently(submit_comment(
+                                &client,
+                                &key,
+                                &body_trim,
+                                &mention_map,
+                            ))
                             .await;
                         match result {
                             Ok(_) => {
@@ -3123,6 +3124,28 @@ fn shellexpand_tilde(path: &str) -> std::borrow::Cow<'_, str> {
     std::borrow::Cow::Borrowed(path)
 }
 
+/// Post a TUI comment in the profile's input format. Markdown keeps the ADF path
+/// so picked `@mentions` become mention nodes; wiki gets native `[~...]` links.
+async fn submit_comment(
+    client: &JiraClient,
+    key: &str,
+    body: &str,
+    mention_map: &[(String, String)],
+) -> jira_core::error::Result<jira_core::model::Comment> {
+    match client.input_format() {
+        InputFormat::Markdown => {
+            let mut adf = markdown_to_adf(body);
+            inject_mentions(&mut adf, mention_map);
+            client.add_comment_adf(key, adf).await
+        }
+        InputFormat::Wiki => {
+            let body = client.inject_wiki_mentions(body, mention_map);
+            client.add_comment(key, &body).await
+        }
+        InputFormat::Adf => client.add_comment(key, body).await,
+    }
+}
+
 fn description_if_changed(original: &str, edited: String) -> Option<String> {
     (edited != original).then_some(edited)
 }
@@ -3194,6 +3217,36 @@ mod tests {
         assert_eq!(worklogs[0].comment.as_deref(), Some("Fixed build"));
     }
 
+    #[tokio::test]
+    async fn add_comment_follows_profile_input_format_on_api_v2() {
+        let server = MockServer::start().await;
+        let map = vec![("Alice Doe".to_string(), "alice".to_string())];
+        for (format, typed, sent) in [
+            (
+                InputFormat::Wiki,
+                "{panel}*Hi* @Alice Doe{panel}",
+                "{panel}*Hi* [~alice]{panel}",
+            ),
+            (InputFormat::Markdown, "**Hi** @Alice Doe", "*Hi* [~alice]"),
+        ] {
+            server.reset().await;
+            Mock::given(method("POST"))
+                .and(path("/rest/api/2/issue/PROJ-1/comment"))
+                .and(wiremock::matchers::body_json(json!({ "body": sent })))
+                .respond_with(
+                    ResponseTemplate::new(201).set_body_json(json!({"id": "1", "body": sent})),
+                )
+                .expect(1)
+                .mount(&server)
+                .await;
+            let client = v2_client(&server).with_input_format(format);
+            submit_comment(&client, "PROJ-1", typed, &map)
+                .await
+                .unwrap_or_else(|e| panic!("{format:?}: {e}"));
+            server.verify().await;
+        }
+    }
+
     #[test]
     fn formatting_warning_preserves_success_and_failure_status() {
         let mut app = App::new(String::new(), String::new(), None);
@@ -3230,7 +3283,7 @@ mod tests {
     #[test]
     fn failed_modal_write_replaces_old_status_and_retry_warning() {
         let mut app = App::new(String::new(), String::new(), None);
-        app.open_modal(Modal::add_comment("PROJ-1".into()));
+        app.open_modal(Modal::add_comment("PROJ-1".into(), InputFormat::Markdown));
         app.set_status("✓ Updated PROJ-0", false);
 
         for error in ["Comment failed", "Commented on 1/2 issue(s); stopped"] {

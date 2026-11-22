@@ -2,6 +2,11 @@
 
 All notable changes to the Claude Code plugin surface for jira-commands will be documented in this file.
 
+## [0.19.1] - 2026-11-21
+
+### Fixed
+- Align skill guidance with current rich-text formats, rendered output, search defaults, and CLI commands.
+
 ## [0.19.0] - 2026-11-12
 
 ### Changed

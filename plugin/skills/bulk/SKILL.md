@@ -18,8 +18,12 @@ non-interactive agent flows. Report successes and failures.
 Save a JSON array to a platform-appropriate temporary file and run
 `jirac issue bulk-create --manifest <FILE>`. Each object requires `project`
 and `summary`; `type` defaults to `Task`. Optional fields include `assignee`,
-`priority`, `labels`, `components`, `parent`, `fix_versions`, `description`
-(Markdown), and `fields` (an object keyed by discovered field IDs).
+`priority`, `labels`, `components`, `parent`, `fix_versions`, `description`,
+and `fields` (an object keyed by discovered field IDs). Descriptions use the
+configured `input_format` (Markdown by default). Check `jirac config show`;
+`JIRA_INPUT_FORMAT` can override it for one command. Native wiki is supported
+only on API v2; `adf` expects an ADF JSON document encoded as the description
+string in the manifest.
 
 ```json
 [
@@ -53,8 +57,10 @@ explicit confirmation first.
 ```
 
 `create` supports the bulk-create fields; `update` supports `summary`,
-`assignee`, `priority`, `labels`, and `components`. Batch updates replace
-supplied labels and components rather than adding to them.
+`description`, `assignee`, `priority`, `labels`, and `components`.
+Descriptions use the configured `input_format` (Markdown by default). Batch
+updates replace supplied labels and components rather than adding to them.
+Report API v2 formatting-loss warnings printed to stderr.
 
 ## Archive
 

@@ -247,7 +247,9 @@ unknown value emits a warning and keeps the profile's value.
 (`md` is accepted for `markdown`). The setting also applies to `description` in
 `bulk-create` and `batch` manifests, including `batch` update. Pre-built ADF fields
 keep their meaning. `jirac auth status` and `jirac config show` print the active
-input format. The TUI always uses Markdown.
+input format. The TUI follows the same setting for comments and worklogs. On API v2
+it edits an existing description as its wiki source, so panels, colors and macros
+survive a save.
 
 On API v3, `wiki` is rejected before any request is sent when a command would write
 text: lookups, searches, and earlier manifest operations are not run either.

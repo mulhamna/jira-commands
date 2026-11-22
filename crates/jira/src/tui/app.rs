@@ -1803,20 +1803,13 @@ pub async fn run_tui(
             }
 
             AppAction::EditIssue(key) => {
-                let (summary, description) = app
-                    .issues
-                    .iter()
-                    .find(|i| i.key == key)
-                    .map(|issue| {
-                        let desc = issue
-                            .description
-                            .as_ref()
-                            .map(jira_core::rich_text::rich_text_to_text)
-                            .unwrap_or_default();
-                        (issue.summary.clone(), desc)
-                    })
-                    .unwrap_or_default();
-                app.open_modal(Modal::edit_issue(key, summary, description));
+                let issue = app.issues.iter().find(|i| i.key == key);
+                let summary = issue.map(|i| i.summary.clone()).unwrap_or_default();
+                let (description, format) = description_for_edit(
+                    issue.and_then(|i| i.description.as_ref()),
+                    client.input_format(),
+                );
+                app.open_modal(Modal::edit_issue(key, summary, description, format));
             }
 
             AppAction::AssignIssue(assignee) => {
@@ -1938,6 +1931,7 @@ pub async fn run_tui(
                     ModalKind::EditIssue {
                         key,
                         original_description,
+                        input_format,
                     } => {
                         let summary = modal.field_text(0);
                         let description = modal.field_text(1);
@@ -1959,7 +1953,9 @@ pub async fn run_tui(
                         terminal.draw(|f| ui(f, &mut app))?;
                         let (result, warnings) =
                             jira_core::adf::collect_formatting_warnings_silently(
-                                client.update_issue(&key, req),
+                                client
+                                    .with_input_format(input_format)
+                                    .update_issue(&key, req),
                             )
                             .await;
                         match result {
@@ -3146,6 +3142,24 @@ async fn submit_comment(
     }
 }
 
+/// Seed the description editor. API v2 returns wiki markup strings: edit that
+/// source as wiki so panels, colors and macros survive a save. Other shapes
+/// (API v3 ADF, or no description) keep the rendered text and profile format.
+fn description_for_edit(
+    description: Option<&serde_json::Value>,
+    configured: InputFormat,
+) -> (String, InputFormat) {
+    match description {
+        Some(serde_json::Value::String(wiki)) => (wiki.clone(), InputFormat::Wiki),
+        other => (
+            other
+                .map(jira_core::rich_text::rich_text_to_text)
+                .unwrap_or_default(),
+            configured,
+        ),
+    }
+}
+
 fn description_if_changed(original: &str, edited: String) -> Option<String> {
     (edited != original).then_some(edited)
 }
@@ -3215,6 +3229,59 @@ mod tests {
         app.warm_active_tab(&client).await;
         let worklogs = app.detail.worklogs.as_ref().expect("worklogs loaded");
         assert_eq!(worklogs[0].comment.as_deref(), Some("Fixed build"));
+    }
+
+    #[test]
+    fn description_edit_seeds_v2_wiki_source_and_keeps_v3_rendering() {
+        let wiki = json!("{panel:title=Plan}\n{color:red}*Ship*{color}\n{panel}");
+        assert_eq!(
+            description_for_edit(Some(&wiki), InputFormat::Markdown),
+            (wiki.as_str().unwrap().to_string(), InputFormat::Wiki)
+        );
+
+        let adf = jira_core::adf::markdown_to_adf("## Plan\n\n**Ship**");
+        assert_eq!(
+            description_for_edit(Some(&adf), InputFormat::Markdown),
+            (
+                jira_core::rich_text::rich_text_to_text(&adf),
+                InputFormat::Markdown
+            )
+        );
+        assert_eq!(
+            description_for_edit(None, InputFormat::Markdown),
+            (String::new(), InputFormat::Markdown)
+        );
+    }
+
+    #[tokio::test]
+    async fn edited_v2_wiki_description_is_sent_unchanged() {
+        let server = MockServer::start().await;
+        let edited = "{panel:title=Plan}\n{color:red}*Ship* today{color}\n{panel}";
+        Mock::given(method("PUT"))
+            .and(path("/rest/api/2/issue/PROJ-1"))
+            .and(wiremock::matchers::body_partial_json(
+                json!({ "fields": { "description": edited } }),
+            ))
+            .respond_with(ResponseTemplate::new(204))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let (_, format) = description_for_edit(
+            Some(&json!(
+                "{panel:title=Plan}\n{color:red}*Ship*{color}\n{panel}"
+            )),
+            InputFormat::Markdown,
+        );
+        let req = UpdateIssueRequest {
+            description: Some(edited.to_string()),
+            ..Default::default()
+        };
+        v2_client(&server)
+            .with_input_format(format)
+            .update_issue("PROJ-1", req)
+            .await
+            .expect("update");
+        server.verify().await;
     }
 
     #[tokio::test]

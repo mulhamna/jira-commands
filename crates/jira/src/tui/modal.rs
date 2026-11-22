@@ -18,6 +18,8 @@ pub(super) enum ModalKind {
     EditIssue {
         key: String,
         original_description: String,
+        /// Format of the description text in the editor and on save.
+        input_format: InputFormat,
     },
     AddComment {
         key: String,
@@ -125,7 +127,12 @@ pub(super) struct Modal {
 }
 
 impl Modal {
-    pub(super) fn edit_issue(key: String, summary: String, description: String) -> Self {
+    pub(super) fn edit_issue(
+        key: String,
+        summary: String,
+        description: String,
+        input_format: InputFormat,
+    ) -> Self {
         let original_description = description.clone();
         let mut summary_area = TextArea::from(vec![summary]);
         summary_area.set_cursor_line_style(Style::default());
@@ -141,6 +148,7 @@ impl Modal {
             kind: ModalKind::EditIssue {
                 key,
                 original_description,
+                input_format,
             },
             fields: vec![
                 ModalField {
@@ -149,7 +157,11 @@ impl Modal {
                     multiline: false,
                 },
                 ModalField {
-                    label: "Description (markdown)",
+                    label: match input_format {
+                        InputFormat::Markdown => "Description (markdown)",
+                        InputFormat::Wiki => "Description (wiki markup)",
+                        InputFormat::Adf => "Description (ADF JSON)",
+                    },
                     area: desc_area,
                     multiline: true,
                 },
